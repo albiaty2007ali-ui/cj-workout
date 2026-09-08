@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="auth-page">
+  <div class="container-sm">
+    <h1 class="font-display">خلينا نتعرف عليك 👋</h1>
+    <p class="subtitle">بس أسئلة بسيطة حتى نبني خطتك الشخصية</p>
+
+    <div class="onboarding-progress">
+      <span id="step-indicator">1 / 6</span>
+    </div>
+
+    <form method="POST" id="onboarding-form" novalidate style="margin-top: 20px;">
+      {{ form.hidden_tag() }}
+
+      <div class="ob-step" data-step="1">
+        <label class="ob-question">شكد عمرك؟</label>
+        <input type="number" name="age" min="10" max="100" required class="ob-input" value="{{ request.form.get('age','') }}">
+        {% if errors.age %}<p class="field-error">{{ errors.age }}</p>{% endif %}
+      </div>
+
+      <div class="ob-step" data-step="2" hidden>
+        <label class="ob-question">شكد وزنك الحالي؟ (بالكيلوغرام)</label>
+        <input type="number" step="0.1" name="weight" min="30" max="300" class="ob-input" value="{{ request.form.get('weight','') }}">
+        {% if errors.weight %}<p class="field-error">{{ errors.weight }}</p>{% endif %}
+      </div>
+
+      <div class="ob-step" data-step="3" hidden>
+        <label class="ob-question">شكد طولك؟ (بالسنتيمتر)</label>
+        <input type="number" step="0.1" name="height" min="100" max="250" class="ob-input" value="{{ request.form.get('height','') }}">
+        {% if errors.height %}<p class="field-error">{{ errors.height }}</p>{% endif %}
+      </div>
+
+      <div class="ob-step" data-step="4" hidden>
+        <label class="ob-question">الجنس؟ (يستخدم فقط لحساب السعرات بدقة)</label>
+        <div class="ob-options">
+          <label class="ob-radio"><input type="radio" name="sex" value="male" required> ذكر</label>
+          <label class="ob-radio"><input type="radio" name="sex" value="female"> أنثى</label>
+        </div>
+        {% if errors.sex %}<p class="field-error">{{ errors.sex }}</p>{% endif %}
+      </div>
+
+      <div class="ob-step" data-step="5" hidden>
+        <label class="ob-question">شنو هدفك؟</label>
+        <div class="ob-options">
+          <label class="ob-radio"><input type="radio" name="goal" value="lose" required> تنزيل وزن</label>
+          <label class="ob-radio"><input type="radio" name="goal" value="gain"> تضخيم / صعود وزن</label>
+          <label class="ob-radio"><input type="radio" name="goal" value="maintain"> تثبيت الوزن</label>
+        </div>
+        {% if errors.goal %}<p class="field-error">{{ errors.goal }}</p>{% endif %}
+      </div>
+
+      <div class="ob-step" data-step="6" hidden>
+        <label class="ob-question">شكد تتمرن بالأسبوع؟</label>
+        <div class="ob-options">
+          {% for key, label in activity_labels.items() %}
+          <label class="ob-radio"><input type="radio" name="activity" value="{{ key }}" required> {{ label }}</label>
+          {% endfor %}
+        </div>
+        {% if errors.activity %}<p class="field-error">{{ errors.activity }}</p>{% endif %}
+      </div>
+
+      <div class="ob-nav">
+        <button type="button" id="ob-back" class="btn btn-outline-dark" style="display:none;">السابق</button>
+        <button type="button" id="ob-next" class="btn btn-moss">التالي</button>
+        <button type="submit" id="ob-submit" class="btn btn-gold" style="display:none;">احسب خطتي 🔥</button>
+      </div>
+    </form>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/onboarding.js') }}"></script>
+{% endblock %}

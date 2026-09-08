@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:900px; padding-top:64px; padding-bottom:64px;">
+  <h1 class="font-display">إدارة المستويات (Levels)</h1>
+  <p class="subtitle">{{ levels|length }} مستوى — يتحدد شكل تقدّم XP بالبروفايل من هذا الجدول</p>
+
+  <div class="notice-box" style="margin-top:24px;">
+    <h3 style="margin-top:0;">إضافة مستوى جديد</h3>
+    <form method="POST" action="{{ url_for('admin.admin_levels_add') }}" style="display:flex; gap:10px; flex-wrap:wrap;">
+      {{ form.hidden_tag() }}
+      <input name="level" type="number" placeholder="رقم المستوى" required style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="required_xp" type="number" placeholder="XP المطلوب" required style="width:130px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="title" placeholder="العنوان (مثلاً: مستمر)" required style="flex:1; min-width:160px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="reward" placeholder="مكافأة (اختياري)" style="flex:1; min-width:140px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <button type="submit" class="btn btn-moss">إضافة</button>
+    </form>
+  </div>
+
+  <div style="margin-top:32px; display:flex; flex-direction:column; gap:12px;">
+    {% for lvl in levels %}
+      <form method="POST" action="{{ url_for('admin.admin_levels_update', level_num=lvl.level) }}" class="payment-item">
+        {{ form.hidden_tag() }}
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; flex:1;">
+          <strong style="color: var(--heading);">#{{ lvl.level }}</strong>
+          <input name="title" value="{{ lvl.title }}" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:34px;">
+          <input name="required_xp" type="number" value="{{ lvl.required_xp }}" style="width:120px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:34px;">
+          <input name="reward" value="{{ lvl.reward or '' }}" placeholder="مكافأة" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:34px;">
+        </div>
+        <div class="payment-actions">
+          <button type="submit" class="btn btn-moss">حفظ</button>
+          <button type="submit" formaction="{{ url_for('admin.admin_levels_delete', level_num=lvl.level) }}" class="btn btn-danger-outline"
+                  onclick="return confirm('حذف هذا المستوى نهائيًا؟');">حذف</button>
+        </div>
+      </form>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

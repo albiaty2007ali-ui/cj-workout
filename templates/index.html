@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+<main>
+
+  <section class="hero">
+    <div class="container hero-inner">
+      <span class="badge">منصة اللياقة والتغذية الذكية</span>
+      <h1 class="font-display">
+        CJ WORKOUT
+        <span class="tagline">كابتن CJ وياك، كل يوم</span>
+      </h1>
+      <p class="lead">
+        خطة غذائية وتدريبية تفهم عمرك ووزنك وهدفك، وتتابعك أول بأول —
+        مو مجرد أرقام سعرات، إنسان يمشي وياك خطوة خطوة.
+      </p>
+      <div class="hero-actions">
+        <a href="{{ url_for('auth.register') }}" class="btn btn-gold">ابدأ الآن</a>
+        <a href="{{ url_for('payments.subscribe') }}" class="btn btn-outline">اكتشف الاشتراك</a>
+        <a href="{{ url_for('auth.login') }}" style="color: var(--sand); text-decoration: underline;">تسجيل الدخول</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="font-display">ليش CJ WORKOUT؟</h2>
+      <p class="subtitle">لأن كل جسم قصة مختلفة. نبني خطتك من بياناتك الحقيقية، وما نعطيك حل واحد يصلح للجميع.</p>
+      <div class="grid-3">
+        <div class="card-feature">
+          <h3>خطة شخصية فعلًا</h3>
+          <p>سعراتك وأهدافك تُحسب من عمرك ووزنك وطولك ومستوى نشاطك — مو رقم ثابت للجميع.</p>
+        </div>
+        <div class="card-feature">
+          <h3>أكل عراقي حقيقي</h3>
+          <p>دولمة، برياني، تشريب، قوزي — تعرف سعرات أكل بيتكم مو بس وجبات دايت غريبة.</p>
+        </div>
+        <div class="card-feature">
+          <h3>متابعة مستمرة</h3>
+          <p>كل وجبة، كل كيلو، كل التزام يُحسب ويُترجم لتقدم حقيقي تشوفه بعينك.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <h2 class="font-display">كابتن CJ وياك 💪</h2>
+      <p class="subtitle">
+        خطة وجبات يومية جاهزة، تضغط "تم الأكل بنجاح" وتاخذ نقاطك،
+        وإذا تعثرت يوم — ما راح تكون لحالك.
+      </p>
+      <div class="grid-4">
+        <div class="meal-card"><p>الفطور</p><p>خطة اليوم جاهزة بعد التسجيل</p></div>
+        <div class="meal-card"><p>الغداء</p><p>خطة اليوم جاهزة بعد التسجيل</p></div>
+        <div class="meal-card"><p>العشاء</p><p>خطة اليوم جاهزة بعد التسجيل</p></div>
+        <div class="meal-card"><p>سناك</p><p>خطة اليوم جاهزة بعد التسجيل</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="subscription">
+    <div class="container">
+      <h2 class="font-display">الاشتراك</h2>
+      <div class="price-card">
+        <p class="font-display" style="font-size:1.4rem; font-weight:700;">CJ WORKOUT Monthly</p>
+        <p style="margin-top:16px;"><span class="amount">١٠,٠٠٠</span><span class="unit">دينار / شهريًا</span></p>
+        <ul>
+          <li>+ أكثر من ١٠٠٠ وصفة وأكلة عراقية دايت</li>
+          <li>+ خطة غذائية يومية شخصية</li>
+          <li>+ مساعد الطبخ التفاعلي</li>
+          <li>+ استبدال الوجبات حسب النظام</li>
+          <li>+ متابعة تقدمك ووزنك</li>
+        </ul>
+        <a href="{{ url_for('payments.subscribe') }}" class="btn btn-gold btn-block">اشترك الآن</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="container">
+      <h2 class="font-display">استمر نحو جسم ومستوى أحلامك 💪</h2>
+      <a href="{{ url_for('auth.register') }}" class="btn" style="background: var(--cream); color: var(--forest); margin-top: 28px;">ابدأ رحلتك الآن</a>
+    </div>
+  </section>
+
+  <footer>
+    <p class="brand font-display">CJ WORKOUT</p>
+    <p>Nature × Fitness × Nutrition × Premium</p>
+    <p class="fine">© {{ current_year }} CJ WORKOUT. جميع الحقوق محفوظة.</p>
+  </footer>
+
+</main>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }} — CJ WORKOUT{% endblock %}
+{% block content %}
+<main class="container" style="max-width:760px; padding-top:48px; padding-bottom:64px;">
+  <div class="topbar">
+    <a href="{{ url_for('recipes.index') }}" style="color: var(--moss); text-decoration:none; font-weight:600;">→ رجوع للوصفات</a>
+  </div>
+
+  <div id="recipe-view-mode">
+    {% if recipe.image_path %}
+      <img class="recipe-hero-img" src="{{ url_for('static', filename=recipe.image_path) }}" alt="{{ recipe.name }}">
+    {% else %}
+      <div class="recipe-hero-placeholder">{{ recipe.category.icon if recipe.category else "🍽️" }}</div>
+    {% endif %}
+
+    <h1 class="font-display" style="margin-top:20px;">{{ recipe.name }}</h1>
+    {% if recipe.description %}<p class="subtitle">{{ recipe.description }}</p>{% endif %}
+
+    <div class="recipe-meta-row">
+      {% if recipe.prep_time_min %}<span>⏱️ تحضير {{ recipe.prep_time_min }} د</span>{% endif %}
+      {% if recipe.cook_time_min %}<span>🔥 طبخ {{ recipe.cook_time_min }} د</span>{% endif %}
+      <span>🍽️ {{ recipe.servings }} حصة</span>
+      <span>📊 {{ {"easy": "سهل", "medium": "متوسط", "hard": "صعب"}.get(recipe.difficulty, recipe.difficulty) }}</span>
+    </div>
+
+    <div class="recipe-macro-grid">
+      <div class="recipe-macro-box"><p class="val">{{ recipe.calories }}</p><p class="lbl">kcal</p></div>
+      <div class="recipe-macro-box"><p class="val">{{ recipe.protein }}غ</p><p class="lbl">بروتين</p></div>
+      <div class="recipe-macro-box"><p class="val">{{ recipe.carbs }}غ</p><p class="lbl">كارب</p></div>
+      <div class="recipe-macro-box"><p class="val">{{ recipe.fat }}غ</p><p class="lbl">دهون</p></div>
+      {% if recipe.fiber %}<div class="recipe-macro-box"><p class="val">{{ recipe.fiber }}غ</p><p class="lbl">ألياف</p></div>{% endif %}
+    </div>
+
+    {% if not over_target and recipe.calories > remaining_calories %}
+      <p class="calorie-warning">⚠️ هذه الوجبة ({{ recipe.calories }} kcal) أعلى من سعراتك المتبقية اليوم ({{ remaining_calories }} kcal).</p>
+    {% endif %}
+
+    <h3 class="font-display" style="margin-top:32px;">🥘 المكونات</h3>
+    <ul class="ingredient-list">
+      {% for i in ingredients %}
+        <li>
+          <span>{{ i.name }}</span>
+          {% if i.quantity or i.unit %}<span class="ingredient-qty">{{ i.quantity or "" }} {{ i.unit or "" }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+
+    {% if substitutions %}
+      <h3 class="font-display" style="margin-top:28px;">🔄 بدائل مسجّلة</h3>
+      <div class="sub-list">
+        {% for s in substitutions %}
+          <div class="sub-item"><strong>{{ s.ingredient_name }}:</strong> {{ s.replacement }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if steps %}
+      {% if over_target %}
+        <p class="calorie-warning">🚫 وصلت لهدف السعرات اليومي — بدء وصفة جديدة معطّل هسه.</p>
+      {% endif %}
+      <button id="start-cooking-btn" class="btn btn-moss btn-block" style="margin-top:16px;">▶️ ابدأ الطبخ</button>
+    {% endif %}
+  </div>
+
+  <div id="recipe-blocked-mode" hidden>
+    <div class="tutorial-step-card" style="text-align:center;">
+      <p style="font-size:1.05rem; margin-bottom:20px;" id="blocked-message"></p>
+      <a href="{{ url_for('recipes.index') }}" class="btn btn-moss">رجوع للوصفات</a>
+    </div>
+  </div>
+
+  <div id="recipe-tutorial-mode" hidden>
+    <div class="tutorial-progress-bar"><div class="tutorial-progress-fill" id="tutorial-progress-fill"></div></div>
+    <p class="tutorial-progress-label" id="tutorial-progress-label"></p>
+
+    <div class="tutorial-step-card" id="tutorial-step-card"></div>
+
+    <div class="tutorial-done" id="tutorial-done" hidden>
+      <span class="emoji">🍽️</span>
+      <p class="tutorial-step-text" id="recipe-eaten-prompt" style="white-space:pre-line;"></p>
+      <div class="tutorial-eaten-actions" id="recipe-eaten-actions">
+        <button class="btn btn-moss" data-answer="أكلتها">🍽️ إي، أكلتها</button>
+        <button class="btn btn-outline-dark" data-answer="بعدني">⏳ بعدني</button>
+        <button class="btn btn-danger-outline" data-answer="لا">❌ لا</button>
+      </div>
+      <p class="tutorial-step-text" id="recipe-eaten-result" style="white-space:pre-line; display:none;"></p>
+      <a href="{{ url_for('recipes.index') }}" class="btn btn-moss" id="recipe-eaten-back" style="margin-top:16px; display:none;">رجوع للوصفات</a>
+    </div>
+
+    <div class="tutorial-nav" id="tutorial-nav">
+      <button class="btn btn-outline-dark" id="tutorial-prev">← السابق</button>
+      <button class="btn btn-moss" id="tutorial-next">التالي →</button>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.CJ_RECIPE_SLUG = {{ recipe.slug|tojson }};
+  window.CJ_CSRF_TOKEN = {{ form.csrf_token._value()|tojson }};
+</script>
+<script id="recipe-steps-data" type="application/json">
+[
+  {% for s in steps %}
+  {
+    "step_number": {{ s.step_number }},
+    "instruction": {{ s.instruction|tojson }},
+    "duration": {{ s.duration|tojson }},
+    "temperature": {{ s.temperature|tojson }},
+    "tip": {{ s.tip|tojson }},
+    "warning": {{ s.warning|tojson }}
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+]
+</script>
+<script src="{{ url_for('static', filename='js/recipes.js') }}"></script>
+{% endblock %}

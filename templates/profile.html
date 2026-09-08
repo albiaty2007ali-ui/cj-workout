@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }} — CJ WORKOUT{% endblock %}
+{% block content %}
+<main class="container" style="max-width:760px; padding-top:48px; padding-bottom:64px;">
+  <div class="topbar">
+    <a href="{{ url_for('chat.app_home') if is_own else url_for('main.home') }}" style="color: var(--moss); text-decoration:none; font-weight:600;">→ رجوع</a>
+    {% if is_own %}<a href="{{ url_for('settings.index') }}" style="color: var(--text-muted); text-decoration:none;">⚙️ الإعدادات</a>{% endif %}
+  </div>
+
+  <div class="profile-header">
+    {% if user.photo_url %}
+      <img class="avatar" src="{{ url_for('static', filename=user.photo_url) }}" alt="{{ user.name }}">
+    {% else %}
+      <div class="avatar-placeholder">{{ user.name[0] }}</div>
+    {% endif %}
+    <div style="flex:1;">
+      <p class="profile-name">{{ user.name }}</p>
+      {% if user.username %}<p class="profile-username">@{{ user.username }}</p>{% endif %}
+      {% if user.bio %}<p class="profile-bio">{{ user.bio }}</p>{% endif %}
+    </div>
+    {% if is_own %}
+      <button class="btn btn-outline-dark" id="edit-profile-toggle">تعديل الملف الشخصي</button>
+    {% endif %}
+  </div>
+
+  {% if is_own %}
+  <form class="profile-edit-form" id="profile-edit-form">
+    <div class="photo-upload-row">
+      <input type="file" id="photo-input" accept="image/png,image/jpeg,image/webp" hidden>
+      <button type="button" class="btn btn-outline-dark" id="change-photo-btn">تغيير الصورة</button>
+      {% if user.photo_url %}<button type="button" class="btn btn-danger-outline" id="remove-photo-btn">حذف الصورة</button>{% endif %}
+    </div>
+    <div class="field">
+      <label for="edit-name">الاسم</label>
+      <input type="text" id="edit-name" value="{{ user.name }}" maxlength="120">
+      <p class="field-error" id="err-name"></p>
+    </div>
+    <div class="field">
+      <label for="edit-username">Username</label>
+      <input type="text" id="edit-username" value="{{ user.username or '' }}" placeholder="بدون @، إنكليزي فقط" maxlength="20" dir="ltr">
+      <p class="field-error" id="err-username"></p>
+    </div>
+    <div class="field">
+      <label for="edit-bio">البايو</label>
+      <textarea id="edit-bio" rows="3" maxlength="300">{{ user.bio or '' }}</textarea>
+      <p class="field-error" id="err-bio"></p>
+    </div>
+    <div style="display:flex; gap:12px;">
+      <button type="submit" class="btn btn-moss">حفظ التغييرات</button>
+      <button type="button" class="btn btn-outline-dark" id="cancel-edit-btn">إلغاء</button>
+    </div>
+  </form>
+  {% endif %}
+
+  <div class="profile-cards-grid">
+    <div class="profile-stat-card">
+      <p class="profile-stat-value">🔥 {{ user.streak_days }}</p>
+      <p class="profile-stat-label">يوم Streak</p>
+    </div>
+    <div class="profile-stat-card">
+      <p class="profile-stat-value">⭐ {{ progress.xp }}</p>
+      <p class="profile-stat-label">XP</p>
+    </div>
+    <div class="profile-stat-card">
+      <p class="profile-stat-value">🏆 {{ progress.level }}</p>
+      <p class="profile-stat-label">{{ progress.title }}</p>
+    </div>
+  </div>
+
+  <div class="settings-section" style="margin-top:20px;">
+    <h3>🎯 التقدم</h3>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" style="width: {{ ((progress.progress_in_level / progress.span * 100) if progress.span else 100) | round }}%;"></div>
+    </div>
+    <p class="settings-row-desc" style="margin-top:8px;">
+      {% if progress.is_max_level %}
+        وصلت لأعلى مستوى حالياً 🎉
+      {% else %}
+        {{ progress.needed_for_next }} XP للمستوى القادم
+      {% endif %}
+    </p>
+  </div>
+
+  {% if is_own and stats %}
+  <div class="profile-cards-grid" style="grid-template-columns: repeat(3,1fr);">
+    <div class="profile-stat-card">
+      <p class="profile-stat-value">{{ user.longest_streak }}</p>
+      <p class="profile-stat-label">أطول Streak</p>
+    </div>
+    <div class="profile-stat-card">
+      <p class="profile-stat-value">{{ stats.meals_logged }}</p>
+      <p class="profile-stat-label">وجبة مسجّلة</p>
+    </div>
+    <div class="profile-stat-card">
+      <p class="profile-stat-value">{{ stats.water_logs }}</p>
+      <p class="profile-stat-label">تسجيل ماي</p>
+    </div>
+  </div>
+
+  <div class="settings-section" style="margin-top:20px;">
+    <h3>📅 آخر 30 يوم</h3>
+    <div class="streak-calendar">
+      {% for day in stats.calendar %}
+        <div class="streak-day {{ 'active' if day.active }} {{ 'today' if day.is_today }}" title="{{ day.date }}"></div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block scripts %}
+{% if is_own %}
+<script>
+  window.CJ_CSRF_TOKEN = "{{ form.csrf_token._value() }}";
+</script>
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+{% endif %}
+{% endblock %}

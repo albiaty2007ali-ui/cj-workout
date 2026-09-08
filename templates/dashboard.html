@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="padding-top:64px; padding-bottom:64px;">
+  <div class="topbar">
+    <div>
+      <h1 class="font-display">أهلًا، {{ current_user.name }} 👋</h1>
+      <p class="subtitle">هذا لوحتك الشخصية بـ CJ WORKOUT</p>
+    </div>
+    <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-dark">تسجيل الخروج</a>
+  </div>
+
+  <section class="sub-status-card">
+    <h2 class="font-display" style="font-size:1.3rem;">حالة الاشتراك</h2>
+    {% if subscription %}
+      <p style="margin-top:12px;">الحالة: <strong style="color: var(--moss);">نشط ✅</strong></p>
+      <p>ينتهي بتاريخ: <strong>{{ subscription.end_date.strftime('%Y-%m-%d') }}</strong></p>
+    {% else %}
+      <p style="margin-top:12px; color: rgba(34,32,27,0.7);">ما عندك اشتراك فعّال حاليًا. اشترك للوصول إلى كل ميزات CJ WORKOUT.</p>
+      <a href="{{ url_for('payments.subscribe') }}" class="btn btn-gold" style="margin-top:16px;">اشترك الآن — ١٠,٠٠٠ د.ع</a>
+    {% endif %}
+  </section>
+
+  {% if current_user.role == 'admin' %}
+    <section class="admin-hint">
+      <p style="font-weight:600;">أنت مسجّل كأدمن.</p>
+      <a href="{{ url_for('payments.admin_payments') }}" style="color: var(--moss); text-decoration: underline;">
+        الذهاب إلى لوحة تحكم الإدارة — مراجعة المدفوعات
+      </a>
+    </section>
+  {% endif %}
+</main>
+{% endblock %}

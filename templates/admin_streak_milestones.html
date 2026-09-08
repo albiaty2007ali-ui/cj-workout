@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:900px; padding-top:64px; padding-bottom:64px;">
+  <h1 class="font-display">إدارة محطات الستريك (Milestones)</h1>
+  <p class="subtitle">{{ milestones|length }} محطة — كل محطة تُمنح XP مرة وحدة فقط لكل مستخدم</p>
+
+  <div class="notice-box" style="margin-top:24px;">
+    <h3 style="margin-top:0;">إضافة محطة جديدة</h3>
+    <form method="POST" action="{{ url_for('admin.admin_streak_milestones_add') }}" style="display:flex; gap:10px; flex-wrap:wrap;">
+      {{ form.hidden_tag() }}
+      <input name="days" type="number" placeholder="عدد الأيام" required style="width:120px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="xp_reward" type="number" placeholder="XP المكافأة" required style="width:130px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="label" placeholder="الوصف (مثلاً: أسبوع كامل)" required style="flex:1; min-width:200px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <button type="submit" class="btn btn-moss">إضافة</button>
+    </form>
+  </div>
+
+  <div style="margin-top:32px; display:flex; flex-direction:column; gap:12px;">
+    {% for m in milestones %}
+      <div class="payment-item">
+        <div>
+          <p style="font-weight:700; color: var(--heading);">🔥 {{ m.days }} يوم — {{ m.label }}{% if not m.active %} (معطّلة){% endif %}</p>
+          <p style="font-size:0.85rem; color: var(--text-muted);">مكافأة: {{ m.xp_reward }} XP</p>
+        </div>
+        <div class="payment-actions">
+          <form method="POST" action="{{ url_for('admin.admin_streak_milestones_toggle', milestone_id=m.id) }}">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-moss">{{ "تعطيل" if m.active else "تفعيل" }}</button>
+          </form>
+          <form method="POST" action="{{ url_for('admin.admin_streak_milestones_delete', milestone_id=m.id) }}"
+                onsubmit="return confirm('حذف هذي المحطة نهائيًا؟');">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-danger-outline">حذف</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

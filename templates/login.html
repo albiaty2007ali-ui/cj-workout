@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="auth-page">
+  <div class="container-sm">
+    <h1 class="font-display">تسجيل الدخول</h1>
+    <p class="subtitle">أهلًا بعودتك إلى CJ WORKOUT</p>
+
+    <form method="POST" novalidate style="margin-top: 32px;">
+      {{ form.hidden_tag() }}
+
+      <div class="field">
+        <label for="email">البريد الإلكتروني</label>
+        <input type="email" id="email" name="email" required>
+      </div>
+
+      <div class="field">
+        <div class="field-row">
+          <label for="password" style="margin:0;">كلمة المرور</label>
+          <a href="{{ url_for('auth.forgot_password') }}">نسيت كلمة المرور؟</a>
+        </div>
+        <input type="password" id="password" name="password" required>
+      </div>
+
+      {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+      <button type="submit" class="btn btn-moss btn-block">تسجيل الدخول</button>
+    </form>
+
+    <p class="muted-center">ما عندك حساب؟ <a href="{{ url_for('auth.register') }}">أنشئ حسابًا</a></p>
+  </div>
+</main>
+{% endblock %}

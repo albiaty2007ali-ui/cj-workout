@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:900px; padding-top:64px; padding-bottom:64px;">
+  <div class="topbar">
+    <a href="{{ url_for('admin.admin_recipes') }}" style="color: var(--moss); text-decoration:none; font-weight:600;">→ رجوع لكل الوصفات</a>
+  </div>
+  <h1 class="font-display">{{ recipe.name }}</h1>
+  <p class="subtitle">{{ "مفعّلة ✅" if recipe.active else "غير مفعّلة — أكمل المكونات والخطوات ثم فعّلها من قائمة الوصفات" }}</p>
+
+  <div class="notice-box" style="margin-top:24px; text-align:right;">
+    <h3 style="margin-top:0;">صورة الوصفة</h3>
+    {% if recipe.image_path %}
+      <img src="{{ url_for('static', filename=recipe.image_path) }}" alt="{{ recipe.name }}" style="max-width:240px; border-radius:12px; display:block; margin-bottom:12px;">
+    {% endif %}
+    <form method="POST" action="{{ url_for('admin.admin_recipe_image', recipe_id=recipe.id) }}" enctype="multipart/form-data" style="display:flex; gap:10px; align-items:center;">
+      {{ form.hidden_tag() }}
+      <input type="file" name="image" accept="image/png,image/jpeg,image/webp" required>
+      <button type="submit" class="btn btn-moss">رفع / تغيير الصورة</button>
+    </form>
+  </div>
+
+  <div class="notice-box" style="margin-top:24px; text-align:right;">
+    <h3 style="margin-top:0;">البيانات الأساسية</h3>
+    <form method="POST" action="{{ url_for('admin.admin_recipe_update', recipe_id=recipe.id) }}" style="display:flex; flex-direction:column; gap:10px;">
+      {{ form.hidden_tag() }}
+      <input name="name" value="{{ recipe.name }}" required minlength="2" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:12px; padding:10px 14px;">
+      <textarea name="description" rows="2" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:12px; padding:10px 14px; font-family:inherit;">{{ recipe.description or "" }}</textarea>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <select name="category_id" required style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+          {% for c in categories %}
+            <option value="{{ c.id }}" {% if c.id == recipe.category_id %}selected{% endif %}>{{ c.icon }} {{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="difficulty" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+          {% for d, label in [("easy", "سهل"), ("medium", "متوسط"), ("hard", "صعب")] %}
+            <option value="{{ d }}" {% if d == recipe.difficulty %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <input name="servings" type="number" value="{{ recipe.servings }}" min="1" style="width:90px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="prep_time_min" type="number" value="{{ recipe.prep_time_min or '' }}" placeholder="تحضير (د)" style="width:140px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="cook_time_min" type="number" value="{{ recipe.cook_time_min or '' }}" placeholder="طبخ (د)" style="width:130px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input name="calories" type="number" value="{{ recipe.calories }}" required style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="protein" type="number" step="0.1" value="{{ recipe.protein }}" style="width:120px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="carbs" type="number" step="0.1" value="{{ recipe.carbs }}" style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="fat" type="number" step="0.1" value="{{ recipe.fat }}" style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="fiber" type="number" step="0.1" value="{{ recipe.fiber or '' }}" placeholder="ألياف (اختياري)" style="width:150px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      </div>
+      <button type="submit" class="btn btn-moss" style="align-self:flex-start;">حفظ البيانات الأساسية</button>
+    </form>
+  </div>
+
+  <div class="notice-box" style="margin-top:24px; text-align:right;">
+    <h3 style="margin-top:0;">🥘 المكونات ({{ ingredients|length }})</h3>
+    {% for i in ingredients %}
+      <div class="payment-item">
+        <div>{{ i.name }} {% if i.quantity or i.unit %}— {{ i.quantity or "" }} {{ i.unit or "" }}{% endif %}</div>
+        <form method="POST" action="{{ url_for('admin.admin_recipe_ingredient_delete', recipe_id=recipe.id, ingredient_id=i.id) }}">
+          {{ form.hidden_tag() }}
+          <button type="submit" class="btn btn-danger-outline">حذف</button>
+        </form>
+      </div>
+    {% endfor %}
+    <form method="POST" action="{{ url_for('admin.admin_recipe_ingredient_add', recipe_id=recipe.id) }}" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+      {{ form.hidden_tag() }}
+      <input name="name" placeholder="اسم المكوّن" required style="flex:1; min-width:140px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="quantity" placeholder="الكمية" style="width:90px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="unit" placeholder="الوحدة" style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <button type="submit" class="btn btn-moss">إضافة</button>
+    </form>
+  </div>
+
+  <div class="notice-box" style="margin-top:24px; text-align:right;">
+    <h3 style="margin-top:0;">👨‍🍳 خطوات الطبخ ({{ steps|length }})</h3>
+    {% for s in steps %}
+      <div class="payment-item">
+        <div>
+          <p style="font-weight:700;">الخطوة {{ s.step_number }}</p>
+          <p style="font-size:0.9rem;">{{ s.instruction }}</p>
+          <p style="font-size:0.8rem; color: var(--text-muted);">
+            {% if s.duration %}⏱️ {{ s.duration }} · {% endif %}
+            {% if s.temperature %}🌡️ {{ s.temperature }} · {% endif %}
+            {% if s.tip %}💡 {{ s.tip }} · {% endif %}
+            {% if s.warning %}⚠️ {{ s.warning }}{% endif %}
+          </p>
+        </div>
+        <form method="POST" action="{{ url_for('admin.admin_recipe_step_delete', recipe_id=recipe.id, step_id=s.id) }}">
+          {{ form.hidden_tag() }}
+          <button type="submit" class="btn btn-danger-outline">حذف</button>
+        </form>
+      </div>
+    {% endfor %}
+    <form method="POST" action="{{ url_for('admin.admin_recipe_step_add', recipe_id=recipe.id) }}" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;">
+      {{ form.hidden_tag() }}
+      <textarea name="instruction" placeholder="نص الخطوة..." required rows="2" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:12px; padding:10px 14px; font-family:inherit;"></textarea>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input name="duration" placeholder="المدة (اختياري)" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="temperature" placeholder="درجة الحرارة (اختياري)" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="tip" placeholder="نصيحة (اختياري)" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="warning" placeholder="تحذير (اختياري)" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      </div>
+      <button type="submit" class="btn btn-moss" style="align-self:flex-start;">إضافة خطوة</button>
+    </form>
+  </div>
+
+  <div class="notice-box" style="margin-top:24px; text-align:right;">
+    <h3 style="margin-top:0;">🔄 بدائل المكونات ({{ substitutions|length }})</h3>
+    {% for s in substitutions %}
+      <div class="payment-item">
+        <div><strong>{{ s.ingredient_name }}:</strong> {{ s.replacement }}</div>
+        <form method="POST" action="{{ url_for('admin.admin_recipe_substitution_delete', recipe_id=recipe.id, sub_id=s.id) }}">
+          {{ form.hidden_tag() }}
+          <button type="submit" class="btn btn-danger-outline">حذف</button>
+        </form>
+      </div>
+    {% endfor %}
+    <form method="POST" action="{{ url_for('admin.admin_recipe_substitution_add', recipe_id=recipe.id) }}" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+      {{ form.hidden_tag() }}
+      <input name="ingredient_name" placeholder="اسم المكوّن" required style="flex:1; min-width:140px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <input name="replacement" placeholder="البديل المقترح" required style="flex:2; min-width:200px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <button type="submit" class="btn btn-moss">إضافة</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

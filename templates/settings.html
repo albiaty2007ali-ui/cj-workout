@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}الإعدادات — CJ WORKOUT{% endblock %}
+{% block content %}
+<main class="container" style="max-width:820px; padding-top:48px; padding-bottom:64px;">
+  <div class="topbar">
+    <a href="{{ url_for('profile.my_profile') }}" style="color: var(--moss); text-decoration:none; font-weight:600;">→ رجوع للبروفايل</a>
+  </div>
+  <h1 class="font-display">الإعدادات</h1>
+
+  <div class="settings-layout" style="margin-top:24px;">
+    <nav class="settings-nav">
+      <a href="#account">👤 الحساب</a>
+      <a href="#ai-style">💬 تفضيلات كابتن CJ</a>
+      <a href="#appearance">🎨 المظهر</a>
+      <a href="#notifications">🔔 الإشعارات</a>
+      <a href="#privacy">🔒 الخصوصية</a>
+      <a href="#security">🛡️ الأمان</a>
+      <a href="#subscription">⭐ الاشتراك</a>
+      <a href="#data">📦 البيانات</a>
+      <a href="#about">ℹ️ حول التطبيق</a>
+    </nav>
+
+    <div style="flex:1; min-width:280px;">
+      <section class="settings-section" id="account">
+        <h3>👤 الحساب</h3>
+        <div class="settings-row">
+          <div>
+            <p class="settings-row-label">تعديل الاسم/اليوزرنيم/البايو/الصورة</p>
+            <p class="settings-row-desc">تعديل هوية حسابك من صفحة البروفايل</p>
+          </div>
+          <a href="{{ url_for('profile.my_profile') }}" class="btn btn-outline-dark">فتح البروفايل</a>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-label">البريد الإلكتروني</div>
+          <div class="settings-row-desc" dir="ltr">{{ current_user.email }}</div>
+        </div>
+      </section>
+
+      <section class="settings-section" id="ai-style">
+        <h3>💬 تفضيلات كابتن CJ</h3>
+        <p class="settings-row-desc" style="margin-bottom:12px;">أسلوب رد الكابتن بعد تسجيل الوجبات — القواعد الأساسية للحساب والسلامة تبقى نفسها دائماً.</p>
+        <div class="segmented" id="ai-style-segmented" data-current="{{ current_user.ai_response_style }}">
+          <button data-value="concise">مختصر</button>
+          <button data-value="balanced">متوازن</button>
+          <button data-value="detailed">تفصيلي</button>
+        </div>
+      </section>
+
+      <section class="settings-section" id="appearance">
+        <h3>🎨 المظهر</h3>
+        <div class="segmented" id="theme-segmented">
+          <button data-value="system">تلقائي</button>
+          <button data-value="light">فاتح</button>
+          <button data-value="dark">غامق</button>
+        </div>
+      </section>
+
+      <section class="settings-section" id="notifications">
+        <h3>🔔 الإشعارات</h3>
+        <p class="settings-row-desc" style="margin-bottom:12px;">إشعارات حقيقية (Web Push) — توصلك حتى إذا الموقع مسكّر. ما تشتغل إلا بعد ما توافق من المتصفح.</p>
+
+        <div class="settings-row">
+          <div>
+            <p class="settings-row-label">تشغيل الإشعارات</p>
+            <p class="settings-row-desc">يطلب إذن المتصفح ويفعّل الإرسال الفعلي.</p>
+          </div>
+          <button class="btn {{ 'btn-moss' if notification_settings.enabled else 'btn-outline-dark' }}" id="push-master-toggle">
+            {{ "مفعّلة ✓" if notification_settings.enabled else "تفعيل" }}
+          </button>
+        </div>
+        <p class="field-error" id="push-error"></p>
+
+        <div id="notification-categories" style="{{ '' if notification_settings.enabled else 'opacity:0.5; pointer-events:none;' }} margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+          {% for field, label in [
+            ("breakfast_enabled", "☀️ تذكير الفطور"), ("lunch_enabled", "🍗 تذكير الغداء"),
+            ("dinner_enabled", "🌙 تذكير العشاء"), ("water_enabled", "💧 تذكير الماي"),
+            ("streak_enabled", "🔥 محطات Streak"), ("xp_enabled", "⭐ XP وتحفيز"),
+            ("recipe_enabled", "🍳 اقتراح وصفات"), ("daily_summary_enabled", "📊 الملخص اليومي"),
+          ] %}
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+              <input type="checkbox" class="notif-category-checkbox" data-field="{{ field }}" {{ "checked" if notification_settings[field] else "" }}>
+              {{ label }}
+            </label>
+          {% endfor %}
+
+          <div class="settings-row">
+            <div class="settings-row-label">وقت عدم الإزعاج</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="time" id="quiet-start" value="{{ notification_settings.quiet_hours_start }}">
+              <span>إلى</span>
+              <input type="time" id="quiet-end" value="{{ notification_settings.quiet_hours_end }}">
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row-label">أوقات التذكير</div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <label style="font-size:0.8rem;">فطور <input type="time" id="time-breakfast" value="{{ notification_settings.breakfast_time }}"></label>
+              <label style="font-size:0.8rem;">غداء <input type="time" id="time-lunch" value="{{ notification_settings.lunch_time }}"></label>
+              <label style="font-size:0.8rem;">عشاء <input type="time" id="time-dinner" value="{{ notification_settings.dinner_time }}"></label>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-row-label">الحد الأقصى للإشعارات يوميًا</div>
+            <input type="number" id="daily-limit" min="1" max="20" value="{{ notification_settings.daily_limit }}" style="width:70px;">
+          </div>
+
+          <button class="btn btn-moss" id="save-notification-settings" style="align-self:flex-start;">حفظ إعدادات الإشعارات</button>
+        </div>
+      </section>
+
+      <section class="settings-section" id="privacy">
+        <h3>🔒 الخصوصية</h3>
+        <p class="settings-row-desc" style="margin-bottom:12px;">من يقدر يشوف بروفايلك العام (@{{ current_user.username or '...' }}).</p>
+        <div class="segmented" id="privacy-segmented" data-current="{{ current_user.profile_visibility }}">
+          <button data-value="public">عام</button>
+          <button data-value="private">أنا بس</button>
+        </div>
+      </section>
+
+      <section class="settings-section" id="security">
+        <h3>🛡️ الأمان</h3>
+        <form id="password-form" style="display:flex; flex-direction:column; gap:14px;">
+          <div class="field">
+            <label>كلمة المرور الحالية</label>
+            <input type="password" id="current-password" autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label>كلمة المرور الجديدة</label>
+            <input type="password" id="new-password" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label>تأكيد كلمة المرور الجديدة</label>
+            <input type="password" id="confirm-password" autocomplete="new-password">
+          </div>
+          <p class="field-error" id="password-error"></p>
+          <button type="submit" class="btn btn-moss" style="align-self:flex-start;">تغيير كلمة المرور</button>
+        </form>
+        <div class="settings-row">
+          <div class="settings-row-label">تسجيل الخروج</div>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-dark">تسجيل الخروج</a>
+        </div>
+        <div class="settings-row">
+          <div>
+            <p class="settings-row-label" style="color:#7a1f1f;">حذف الحساب</p>
+            <p class="settings-row-desc">تعطيل حسابك ومسح بياناتك الشخصية نهائياً (سجلات الاشتراك تبقى للتدقيق).</p>
+          </div>
+          <button class="btn btn-danger-outline" id="delete-account-btn">حذف الحساب</button>
+        </div>
+        <div id="delete-confirm-box" style="display:none; margin-top:14px;">
+          <input type="password" id="delete-password" placeholder="اكتب كلمة المرور للتأكيد">
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn btn-danger-outline" id="confirm-delete-btn">تأكيد الحذف نهائياً</button>
+            <button class="btn btn-outline-dark" id="cancel-delete-btn">إلغاء</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section" id="subscription">
+        <h3>⭐ الاشتراك</h3>
+        {% set sub = current_user.active_subscription() %}
+        {% if sub %}
+          <div class="settings-row">
+            <div class="settings-row-label">الحالة</div>
+            <div style="color: var(--moss); font-weight:700;">نشط ✅</div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label">الخطة</div>
+            <div>{{ sub.plan_code }}</div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-label">تاريخ الانتهاء</div>
+            <div>{{ sub.end_date.strftime('%Y-%m-%d') }}</div>
+          </div>
+        {% else %}
+          <div class="settings-row">
+            <div class="settings-row-label">الحالة</div>
+            <div>تجربة مجانية — {{ current_user.free_meals_remaining }} / 6 وجبات متبقية</div>
+          </div>
+          <a href="{{ url_for('payments.subscribe') }}" class="btn btn-gold">كمل رحلتك — اشترك الآن</a>
+        {% endif %}
+      </section>
+
+      <section class="settings-section" id="data">
+        <h3>📦 البيانات</h3>
+        <div class="settings-row">
+          <div>
+            <p class="settings-row-label">تصدير بياناتي</p>
+            <p class="settings-row-desc">ملف JSON يحتوي وجباتك وماءك وتاريخ وزنك.</p>
+          </div>
+          <a href="{{ url_for('settings.export_data') }}" class="btn btn-outline-dark">تصدير (JSON)</a>
+        </div>
+      </section>
+
+      <section class="settings-section" id="about">
+        <h3>ℹ️ حول التطبيق</h3>
+        <p class="settings-row-desc">CJ WORKOUT — "كابتن CJ وياك"</p>
+      </section>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.CJ_CSRF_TOKEN = "{{ form.csrf_token._value() }}";
+</script>
+<script src="{{ url_for('static', filename='js/push.js') }}"></script>
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

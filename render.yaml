@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: cj-workout
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT "app:create_app()"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SESSION_COOKIE_SECURE
+        value: "True"
+      - key: FLASK_ENV
+        value: production
+      - key: SUBSCRIPTION_PRICE_IQD
+        value: "10000"
+      - key: MANUAL_PAYMENT_CARD_NUMBER
+        sync: false
+      - key: MANUAL_PAYMENT_CARD_NETWORK
+        sync: false
+      - key: SUPPORT_WHATSAPP_NUMBER
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

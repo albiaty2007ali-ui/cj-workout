@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:900px; padding-top:64px; padding-bottom:64px;">
+  <h1 class="font-display">إدارة الوصفات</h1>
+  <p class="subtitle">{{ recipes|length }} وصفة بقاعدة البيانات — الوصفة تحتاج مكوّن وخطوة واحدة على الأقل قبل التفعيل</p>
+
+  <div class="notice-box" style="margin-top:24px;">
+    <h3 style="margin-top:0;">إضافة تصنيف جديد</h3>
+    <form method="POST" action="{{ url_for('admin.admin_recipe_category_add') }}" style="display:flex; gap:10px; flex-wrap:wrap;">
+      {{ form.hidden_tag() }}
+      <input name="icon" placeholder="🍮" maxlength="10" style="width:70px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px; text-align:center;">
+      <input name="name" placeholder="اسم التصنيف الجديد" required style="flex:1; min-width:160px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      <button type="submit" class="btn btn-moss">إضافة</button>
+    </form>
+  </div>
+
+  <div class="notice-box" style="margin-top:24px;">
+    <h3 style="margin-top:0;">إضافة وصفة جديدة</h3>
+    <form method="POST" action="{{ url_for('admin.admin_recipes_add') }}" style="display:flex; flex-direction:column; gap:10px;">
+      {{ form.hidden_tag() }}
+      <input name="name" placeholder="اسم الوصفة" required minlength="2"
+             style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:12px; padding:10px 14px;">
+      <textarea name="description" placeholder="وصف قصير..." rows="2"
+                style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:12px; padding:10px 14px; font-family:inherit;"></textarea>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <select name="category_id" required style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+          <option value="">اختر تصنيف</option>
+          {% for c in categories %}<option value="{{ c.id }}">{{ c.icon }} {{ c.name }}</option>{% endfor %}
+        </select>
+        <select name="difficulty" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+          <option value="easy">سهل</option>
+          <option value="medium">متوسط</option>
+          <option value="hard">صعب</option>
+        </select>
+        <input name="servings" type="number" value="1" min="1" placeholder="حصص" title="عدد الحصص"
+               style="width:90px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="prep_time_min" type="number" placeholder="وقت تحضير (د)"
+               style="width:150px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="cook_time_min" type="number" placeholder="وقت طبخ (د)"
+               style="width:140px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input name="calories" type="number" placeholder="سعرات" required style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="protein" type="number" step="0.1" placeholder="بروتين غ" style="width:120px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="carbs" type="number" step="0.1" placeholder="كارب غ" style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="fat" type="number" step="0.1" placeholder="دهون غ" style="width:110px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="fiber" type="number" step="0.1" placeholder="ألياف غ (اختياري)" style="width:150px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      </div>
+      <button type="submit" class="btn btn-moss" style="align-self:flex-start;">إضافة الوصفة ومتابعة التفاصيل</button>
+    </form>
+  </div>
+
+  <div style="margin-top:32px; display:flex; flex-direction:column; gap:12px;">
+    {% for r in recipes %}
+      <div class="payment-item">
+        <div>
+          <p style="font-weight:700; color: var(--heading);">
+            {{ r.category.icon if r.category else "🍽️" }} {{ r.name }}
+            {% if not r.active %} — غير مفعّلة{% endif %}
+          </p>
+          <p style="font-size:0.9rem;">{{ r.category.name if r.category else "بدون تصنيف" }} · {{ r.calories }} kcal · {{ r.ingredients|length }} مكوّن · {{ r.steps|length }} خطوة</p>
+        </div>
+        <div class="payment-actions">
+          <a href="{{ url_for('admin.admin_recipe_edit', recipe_id=r.id) }}" class="btn btn-outline-dark">تعديل</a>
+          <form method="POST" action="{{ url_for('admin.admin_recipe_toggle', recipe_id=r.id) }}">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-moss">{{ "تعطيل" if r.active else "تفعيل" }}</button>
+          </form>
+          <form method="POST" action="{{ url_for('admin.admin_recipe_delete', recipe_id=r.id) }}"
+                onsubmit="return confirm('حذف هذي الوصفة نهائيًا؟');">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-danger-outline">حذف</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

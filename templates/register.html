@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="auth-page">
+  <div class="container-sm">
+    <h1 class="font-display">إنشاء حساب</h1>
+    <p class="subtitle">ابدأ رحلتك مع CJ WORKOUT اليوم</p>
+
+    <form method="POST" novalidate style="margin-top: 32px;">
+      {{ form.hidden_tag() }}
+
+      <div class="field">
+        <label for="name">الاسم</label>
+        <input type="text" id="name" name="name" value="{{ values.get('name', '') }}">
+        {% if errors.name %}<p class="field-error">{{ errors.name }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="email">البريد الإلكتروني</label>
+        <input type="email" id="email" name="email" value="{{ values.get('email', '') }}">
+        {% if errors.email %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" name="password">
+        {% if errors.password %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="confirm">تأكيد كلمة المرور</label>
+        <input type="password" id="confirm" name="confirm">
+        {% if errors.confirm %}<p class="field-error">{{ errors.confirm }}</p>{% endif %}
+      </div>
+
+      <button type="submit" class="btn btn-moss btn-block">إنشاء حساب</button>
+    </form>
+
+    <p class="muted-center">عندك حساب؟ <a href="{{ url_for('auth.login') }}">سجّل الدخول</a></p>
+  </div>
+</main>
+{% endblock %}

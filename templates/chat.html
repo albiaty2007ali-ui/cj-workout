@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="app-shell">
+
+  <div class="sidebar-overlay" id="sidebar-overlay" hidden></div>
+
+  <aside class="app-sidebar" id="app-sidebar" aria-label="القائمة الرئيسية">
+    <div class="sidebar-top">
+      <p class="font-display sidebar-logo">CJ WORKOUT</p>
+      <button id="sidebar-close" class="sidebar-close-btn" aria-label="إغلاق القائمة">✕</button>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="sidebar-item" data-prompt="باقيلي شكد سعرات؟">🔥 اليوم</button>
+      <button class="sidebar-item" data-prompt="شنو آكل هسه؟">🍽️ شنو آكل</button>
+      <button class="sidebar-item" data-prompt="اليوم غدانا ">🍲 أكل بيتنا</button>
+      <a class="sidebar-item" href="{{ url_for('recipes.index') }}">🍳 وصفات دايت</a>
+      <a class="sidebar-item" href="{{ url_for('progress.daily') }}">🍽️ يومي الغذائي</a>
+      <a class="sidebar-item" href="{{ url_for('progress.weight_progress') }}">⚖️ متابعة الوزن</a>
+      <button class="sidebar-item" id="progress-toggle">📈 التقدم</button>
+      <button class="sidebar-item" id="consult-toggle">👨‍⚕️ استشارة مختص</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <a class="sidebar-item" href="{{ url_for('profile.my_profile') }}">👤 {{ current_user.name }}</a>
+      <a class="sidebar-item" href="{{ url_for('settings.index') }}">⚙️ الإعدادات</a>
+      {% if current_user.role == 'admin' %}
+        <a class="sidebar-item" href="{{ url_for('payments.admin_payments') }}">🛠️ لوحة الإدارة</a>
+      {% endif %}
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-topbar">
+      <button id="sidebar-toggle" class="hamburger" aria-label="القائمة" aria-expanded="true" aria-controls="app-sidebar">☰</button>
+      <p class="font-display" style="font-size:1.1rem;">كابتن CJ وياك 💪</p>
+      <div></div>
+    </header>
+
+    <div class="calorie-cards">
+      <div class="calorie-card">
+        <p class="cc-label">🔥 هدفك اليوم</p>
+        <p class="cc-value" id="cc-target">{{ target_calories }} kcal</p>
+      </div>
+      <div class="calorie-card">
+        <p class="cc-label">🍽️ أكلت</p>
+        <p class="cc-value" id="cc-eaten">{{ today_calories }} kcal</p>
+      </div>
+      <div class="calorie-card">
+        <p class="cc-label">🎯 المتبقي</p>
+        <p class="cc-value" id="cc-remaining">{{ remaining }} kcal</p>
+      </div>
+      <div class="calorie-card">
+        <p class="cc-label">{% if is_premium %}✓ Premium{% else %}⭐ تجربة مجانية{% endif %}</p>
+        <p class="cc-value" id="cc-free">
+          {% if is_premium %}نشط{% else %}{{ free_meals_remaining }} / 6{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div id="progress-panel" class="side-panel" hidden>
+      <p class="font-display" style="font-weight:700;">تقدمك</p>
+      <p>⭐ XP: {{ current_user.xp }}</p>
+      <p>🔥 Streak: {{ current_user.streak_days }} يوم</p>
+      <p>💧 هدف الماء اليومي: {{ profile.water_target_ml if profile else '—' }} مل</p>
+    </div>
+
+    <div class="chat-window" id="chat-window">
+      {% if just_onboarded %}
+        <div class="chat-bubble bot">
+          هلا بيك 👋 أنا كابتنك الغذائي بـ CJ WORKOUT. خلينا نبدأ.
+        </div>
+      {% endif %}
+      <div class="chat-bubble bot" style="white-space:pre-line;">{{ greeting_text }}</div>
+    </div>
+
+    <div class="quick-prompts" id="quick-prompts">
+      {% for label, prompt in greeting_prompts %}
+        <button class="qp-btn" data-prompt="{{ prompt }}">{{ label }}</button>
+      {% endfor %}
+      <button class="qp-btn" data-prompt="شنو آكل هسه؟">🥗 شنو آكل هسه؟</button>
+      <button class="qp-btn" data-prompt="باقيلي شكد سعرات؟">🔥 شكد باقيلي سعرات؟</button>
+      <button class="qp-btn" data-prompt="راح أنام">😴 راح أنام</button>
+    </div>
+
+    <form id="chat-form" class="chat-input-bar">
+      {{ form.hidden_tag() }}
+      <input type="text" id="chat-input" placeholder="اكتب رسالتك..." autocomplete="off">
+      <button type="submit" id="chat-send">➤</button>
+    </form>
+  </div>
+
+  <div id="consult-modal-overlay" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <button id="consult-modal-close" class="modal-close" aria-label="إغلاق">✕</button>
+      <h3 class="font-display">👨‍⚕️ استشارة مختص</h3>
+      <p>تحتاج مساعدة من مختص؟ تواصل مباشرة مع المختص عبر واتساب.</p>
+      {% if consult_whatsapp_link %}
+        <a href="{{ consult_whatsapp_link }}" target="_blank" rel="noopener" class="btn btn-moss" style="display:inline-block; margin-top:12px;">💬 تواصل عبر واتساب</a>
+      {% else %}
+        <p class="subtitle">خدمة الاستشارة غير مفعّلة حاليًا.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.CJ_CSRF_TOKEN = "{{ form.csrf_token._value() }}";
+  window.CJ_SUBSCRIBE_URL = "{{ url_for('payments.subscribe') }}";
+</script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}

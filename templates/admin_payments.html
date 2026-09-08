@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:760px; padding-top:64px; padding-bottom:64px;">
+  <h1 class="font-display">مراجعة المدفوعات</h1>
+  <p class="subtitle">{{ payments|length }} عملية دفع بانتظار المراجعة</p>
+
+  <div style="margin-top:32px;">
+    {% if not payments %}
+      <div class="notice-box">لا توجد عمليات دفع بانتظار المراجعة حاليًا 🎉</div>
+    {% endif %}
+
+    {% for p in payments %}
+      <div class="payment-item">
+        <div>
+          <p style="font-weight:700; color: var(--heading);">{{ "{:,}".format(p.amount) }} {{ p.currency }}</p>
+          <p style="font-size:0.9rem; color: var(--text-muted);">مستخدم: {{ p.user.name }} ({{ p.user.email }})</p>
+          <p style="font-size:0.9rem; color: var(--text-muted);">رقم مرجعي: <span dir="ltr">{{ p.transfer_reference }}</span></p>
+          {% if p.user_note %}<p style="font-size:0.85rem; color: var(--text-muted);">ملاحظة: {{ p.user_note }}</p>{% endif %}
+        </div>
+        {% if p.proof_image_path %}
+          <img src="{{ url_for('static', filename=p.proof_image_path) }}" alt="إثبات التحويل">
+        {% endif %}
+
+        <div class="payment-actions">
+          <form method="POST" action="{{ url_for('payments.verify_payment', payment_id=p.id) }}">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-moss">تأكيد وتفعيل الاشتراك</button>
+          </form>
+          <form method="POST" action="{{ url_for('payments.reject_payment', payment_id=p.id) }}" style="display:flex; gap:8px;">
+            {{ form.hidden_tag() }}
+            <input type="text" name="reason" placeholder="سبب الرفض (اختياري)" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius: 999px; padding: 0 14px;">
+            <button type="submit" class="btn btn-danger-outline">رفض</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

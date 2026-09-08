@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:560px; padding-top:64px; padding-bottom:64px;">
+
+  {% if submitted %}
+    <div class="notice-box">
+      <p class="font-display" style="font-size:1.4rem; font-weight:700; color: var(--heading);">تم استلام طلبك ✅</p>
+      <p style="margin-top:14px; color: var(--text-muted);">
+        وصلنا طلب دفعك وراح تتم مراجعته يدويًا خلال وقت قصير. بعد التأكيد
+        راح يتفعل اشتراكك تلقائيًا وتوصلك رسالة تأكيد.
+      </p>
+      {% if whatsapp_link %}
+        <p style="margin-top:20px; color: var(--text-muted);">
+          حتى تسرّع المراجعة، أرسل صورة إثبات التحويل مباشرة عبر واتساب:
+        </p>
+        <a href="{{ whatsapp_link }}" target="_blank" rel="noopener"
+           class="btn btn-moss" style="margin-top:12px; display:inline-block;">
+          📲 أرسل الإثبات عبر واتساب
+        </a>
+      {% endif %}
+    </div>
+  {% else %}
+    <h1 class="font-display">إتمام الاشتراك</h1>
+    <p class="subtitle">CJ WORKOUT Monthly — {{ "{:,}".format(price) }} د.ع / شهر</p>
+
+    <div class="payment-instructions">
+      <p style="color: var(--sand); font-weight:600;">خطوات الدفع اليدوي</p>
+      <ol>
+        <li>١. حوّل مبلغ {{ "{:,}".format(price) }} دينار عراقي إلى رقم الكارد أدناه.</li>
+        <li>٢. احتفظ برقم العملية أو التحويل (Reference).</li>
+        <li>٣. أدخل الرقم أدناه، ويُفضّل إرفاق لقطة شاشة الإثبات.</li>
+        <li>٤. سيقوم فريقنا بمراجعة وتفعيل اشتراكك خلال وقت قصير.</li>
+      </ol>
+      <div class="card-number-box">
+        <p style="font-size:0.85rem; color: var(--sand);">رقم الكارد (Mastercard)</p>
+        <p class="number">{{ card_number }}</p>
+      </div>
+    </div>
+
+    {% if whatsapp_link %}
+      <div style="text-align:center; margin-bottom:24px;">
+        <p style="color: var(--text-muted); font-size:0.9rem;">تفضّل ترسل الإثبات مباشرة؟</p>
+        <a href="{{ whatsapp_link }}" target="_blank" rel="noopener" class="btn btn-moss" style="margin-top:8px;">
+          📲 تواصل عبر واتساب
+        </a>
+      </div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }}
+
+      <div class="field">
+        <label for="reference">الرقم المرجعي لعملية التحويل</label>
+        <input type="text" id="reference" name="reference" placeholder="مثال: 128933 أو آخر 4 أرقام العملية">
+      </div>
+
+      <div class="field">
+        <label for="proof">إثبات التحويل (صورة — اختياري لكن يسرّع المراجعة)</label>
+        <input type="file" id="proof" name="proof" accept="image/*">
+      </div>
+
+      <div class="field">
+        <label for="note">ملاحظة (اختياري)</label>
+        <textarea id="note" name="note" rows="3"></textarea>
+      </div>
+
+      {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+      <button type="submit" class="btn btn-gold btn-block">إرسال طلب التفعيل</button>
+    </form>
+  {% endif %}
+
+</main>
+{% endblock %}

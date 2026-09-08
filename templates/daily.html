@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}يومي الغذائي — CJ WORKOUT{% endblock %}
+{% block content %}
+<main class="container" style="max-width:720px; padding-top:48px; padding-bottom:64px;">
+  <div class="topbar">
+    <a href="{{ url_for('chat.app_home') }}" style="color: var(--moss); text-decoration:none; font-weight:600;">→ رجوع للشات</a>
+    <a href="{{ url_for('progress.weight_progress') }}" style="color: var(--text-muted); text-decoration:none;">⚖️ متابعة الوزن</a>
+  </div>
+
+  <h1 class="font-display">🍽️ يومي الغذائي</h1>
+
+  {% if not profile %}
+    <div class="notice-box" style="margin-top:24px;">أكمل بياناتك الأساسية أول مرة حتى نقدر نحسب يومك الغذائي.</div>
+  {% else %}
+    <div class="topbar" style="margin-top:8px;">
+      <a href="{{ url_for('progress.daily', date=prev_date.isoformat()) }}" style="color: var(--text-muted); text-decoration:none;">◀ اليوم السابق</a>
+      <p style="font-weight:700; color: var(--heading);">{{ target_date.strftime('%Y-%m-%d') }}{% if is_today %} (اليوم){% endif %}</p>
+      {% if next_date %}
+        <a href="{{ url_for('progress.daily', date=next_date.isoformat()) }}" style="color: var(--text-muted); text-decoration:none;">اليوم التالي ▶</a>
+      {% else %}<span></span>{% endif %}
+    </div>
+
+    <div class="calorie-cards" style="margin-top:16px;">
+      <div class="calorie-card">
+        <p class="cc-label">🔥 هدفك اليوم</p>
+        <p class="cc-value">{{ target_calories }} kcal</p>
+      </div>
+      <div class="calorie-card">
+        <p class="cc-label">🎯 {{ 'المتبقي' if not over_target else 'تجاوزت' }}</p>
+        <p class="cc-value">
+          {% if over_target %}
+            ⚠️ +{{ -remaining_calories }} kcal
+          {% else %}
+            {{ remaining_calories }} kcal
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:24px;">
+      {% for meal_type, label, icon in [('breakfast','الفطور','🍳'), ('lunch','الغداء','🍗'), ('dinner','العشاء','🌙')] %}
+        {% set meal = meals[meal_type] %}
+        <div class="notice-box" style="text-align:right;">
+          <p style="font-weight:700; color: var(--heading);">{{ icon }} {{ label }}</p>
+          {% if meal.status == 'LOGGED' %}
+            <p style="color: var(--moss); font-weight:600;">✅ {{ meal.calories }} kcal</p>
+            <p style="font-size:0.85rem; color: var(--text-muted);">
+              بروتين {{ meal.protein|round(1) }}غ · كارب {{ meal.carbs|round(1) }}غ · دهون {{ meal.fat|round(1) }}غ
+            </p>
+            {% if meal.foods %}
+              <p style="font-size:0.85rem; color: var(--text-muted);">{{ meal.foods|join(' + ') }}</p>
+            {% endif %}
+          {% else %}
+            <p style="color: var(--text-muted);">⏳ لم تسجل بعد</p>
+            {% if is_today and budgets.get(meal_type) %}
+              <p style="font-size:0.85rem; color: var(--text-muted);">ميزانية مقترحة: ~{{ budgets[meal_type] }} kcal</p>
+            {% endif %}
+            {% if is_today %}
+              <a href="{{ url_for('chat.app_home') }}" class="btn btn-outline-dark" style="margin-top:8px; display:inline-block;">شنو آكل؟</a>
+            {% endif %}
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <div class="notice-box" style="text-align:right;">
+        <p style="font-weight:700; color: var(--heading);">🥗 سناك</p>
+        {% if meals.snack %}
+          {% for s in meals.snack %}
+            <p style="color: var(--moss); font-weight:600;">✅ {{ s.calories }} kcal{% if s.foods %} — {{ s.foods|join(' + ') }}{% endif %}</p>
+          {% endfor %}
+        {% else %}
+          <p style="color: var(--text-muted);">⏳ لم تسجل بعد</p>
+        {% endif %}
+        {% if is_today %}
+          <a href="{{ url_for('chat.app_home') }}" class="btn btn-outline-dark" style="margin-top:8px; display:inline-block;">إضافة سناك</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</main>
+{% endblock %}

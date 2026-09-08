@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:900px; padding-top:64px; padding-bottom:64px;">
+  <h1 class="font-display">إدارة قوالب الإشعارات</h1>
+  <p class="subtitle">{{ templates|length }} قالب بقاعدة البيانات — تقدر تضيف قالب جديد بدون أي تعديل بالكود</p>
+
+  <div class="notice-box" style="margin-top:24px;">
+    <h3 style="margin-top:0;">إضافة قالب جديد</h3>
+    <form method="POST" action="{{ url_for('admin.admin_notifications_add') }}" style="display:flex; flex-direction:column; gap:10px;">
+      {{ form.hidden_tag() }}
+      <input name="title" placeholder="عنوان الإشعار (مثلاً: 🍳 صباح الخير كابتن)" required minlength="2"
+             style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:12px; padding:10px 14px;">
+      <textarea name="body" placeholder="نص الإشعار..." required minlength="5" rows="2"
+                style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:12px; padding:10px 14px; font-family:inherit;"></textarea>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input name="category" list="notif-categories-list" placeholder="التصنيف (مثلاً: BREAKFAST)" required
+               style="flex:1; min-width:160px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <datalist id="notif-categories-list">
+          {% for c in categories %}<option value="{{ c }}">{% endfor %}
+        </datalist>
+        <select name="meal_type" style="border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+          <option value="">بدون وجبة محددة</option>
+          <option value="breakfast">فطور</option>
+          <option value="lunch">غداء</option>
+          <option value="dinner">عشاء</option>
+          <option value="snack">سناك</option>
+        </select>
+        <input name="priority" type="number" value="0" title="الأولوية (يزيد احتمال اختياره عشوائيًا)"
+               style="width:80px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+        <input name="cooldown_minutes" type="number" value="0" title="Cooldown خاص بهذا القالب (اختياري)"
+               style="width:100px; border:1px solid var(--border); background:var(--surface-solid); color:var(--text); border-radius:999px; padding:0 14px; height:38px;">
+      </div>
+      <button type="submit" class="btn btn-moss" style="align-self:flex-start;">إضافة القالب</button>
+    </form>
+  </div>
+
+  <div style="margin-top:32px; display:flex; flex-direction:column; gap:12px;">
+    {% for t in templates %}
+      <div class="payment-item">
+        <div>
+          <p style="font-weight:700; color: var(--heading);">{{ t.category }}{% if not t.active %} — معطّل{% endif %}</p>
+          <p style="font-size:0.9rem; font-weight:600;">{{ t.title }}</p>
+          <p style="font-size:0.85rem;">{{ t.body }}</p>
+          <p style="font-size:0.8rem; color: var(--text-muted);">
+            {% if t.meal_type %}وجبة: {{ t.meal_type }} · {% endif %}
+            أولوية: {{ t.priority }}
+          </p>
+        </div>
+        <div class="payment-actions">
+          <form method="POST" action="{{ url_for('admin.admin_notifications_toggle', template_id=t.id) }}">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-moss">{{ "تعطيل" if t.active else "تفعيل" }}</button>
+          </form>
+          <form method="POST" action="{{ url_for('admin.admin_notifications_delete', template_id=t.id) }}"
+                onsubmit="return confirm('حذف هذا القالب نهائيًا؟');">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-danger-outline">حذف</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

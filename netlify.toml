@@ -1,0 +1,68 @@
+# CJ WORKOUT — إعداد Netlify (راجع NETLIFY_MIGRATION_AUDIT.md لتفاصيل حالة الهجرة الكاملة).
+
+[build]
+  # لا نستخدم [build.base] عمدًا — يخلي functions.directory وpublish نسبيين لجذر المستودع
+  # مباشرة، بدون التباس حول ما إذا base يُطبَّق عليهم أيضًا بمزوّدين/إصدارات مختلفة.
+  publish = "frontend/dist"
+  command = "npm install --prefix frontend && npm run build --prefix frontend"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# يخفي شكل /.netlify/functions/xxx عن الواجهة — نفس توصية الطلب الأصلي (API نظيفة /api/...)
+[[redirects]]
+  from = "/api/chat"
+  to = "/.netlify/functions/chat"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/login"
+  to = "/.netlify/functions/auth-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/register"
+  to = "/.netlify/functions/auth-register"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/logout"
+  to = "/.netlify/functions/auth-logout"
+  status = 200
+
+[[redirects]]
+  from = "/api/me"
+  to = "/.netlify/functions/me"
+  status = 200
+
+[[redirects]]
+  from = "/api/progress/daily"
+  to = "/.netlify/functions/progress-daily"
+  status = 200
+
+[[redirects]]
+  from = "/api/progress/weight"
+  to = "/.netlify/functions/progress-weight"
+  status = 200
+
+[[redirects]]
+  from = "/api/recipes"
+  to = "/.netlify/functions/recipes-list"
+  status = 200
+
+[[redirects]]
+  from = "/api/recipes/detail"
+  to = "/.netlify/functions/recipes-detail"
+  status = 200
+
+[[redirects]]
+  from = "/api/recipes/action"
+  to = "/.netlify/functions/recipes-actions"
+  status = 200
+
+# SPA Fallback — لازم آخر قاعدة (الأعم)، حتى refresh مباشر على /chat أو /login يشتغل بدون 404
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

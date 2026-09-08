@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}وصفات دايت — CJ WORKOUT{% endblock %}
+{% block content %}
+<main class="container" style="max-width:1100px; padding-top:48px; padding-bottom:64px;">
+  <div class="topbar">
+    <a href="{{ url_for('chat.app_home') }}" style="color: var(--moss); text-decoration:none; font-weight:600;">→ رجوع للشات</a>
+  </div>
+
+  <h1 class="font-display">🍳 وصفات دايت</h1>
+  <p class="subtitle">وصفات حقيقية بمكونات وخطوات وسعرات دقيقة — تقدر تسوي أي وحدة خطوة بخطوة.</p>
+
+  <div class="recipe-search-bar">
+    <input type="text" id="recipe-search-input" placeholder="دوّر عن وصفة (اسم، مكوّن...)" autocomplete="off">
+  </div>
+
+  <div class="recipe-categories" id="recipe-categories">
+    <button class="recipe-cat-chip active" data-category="">الكل</button>
+    {% for c in categories %}
+      <button class="recipe-cat-chip" data-category="{{ c.id }}">{{ c.icon }} {{ c.name }}</button>
+    {% endfor %}
+    {% if not over_target %}
+      <button class="recipe-cat-chip" id="recipe-fits-remaining-toggle">🎯 مناسب لسعراتي المتبقية</button>
+    {% endif %}
+  </div>
+  {% if over_target %}
+    <p class="calorie-warning">🚫 وصلت لهدف السعرات اليومي — بدء وصفة جديدة معطّل هسه، لكن تقدر تتصفح الكل.</p>
+  {% endif %}
+
+  <div id="recipe-grid" class="recipe-grid"></div>
+  <div id="recipe-empty" class="recipe-empty" hidden>
+    <span class="emoji">🍽️</span>
+    لا توجد وصفات بهذا التصنيف حاليًا — راح تُضاف وصفات حقيقية قريبًا.
+  </div>
+  <div id="recipe-error" class="recipe-error" hidden>
+    <span class="emoji">⚠️</span>
+    صار خطأ بجلب الوصفات، حاول مرة ثانية.
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.CJ_INITIAL_RECIPES = {{ recipes|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/recipes.js') }}"></script>
+{% endblock %}
