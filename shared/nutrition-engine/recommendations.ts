@@ -87,18 +87,23 @@ export async function suggestMealNearTarget(targetCalories: number): Promise<str
 }
 
 /**
- * يقترح كمية حقيقية من طعام محدد بالاسم (مثلاً "شكد آكل من الدولمة؟") — يعتمد فقط على
- * getPortionsFor/computeFood الحقيقيين، صفر اختراع أرقام. يختار أكبر Portion معروف يبقى ضمن
- * الباقي من السعرات، أو يوضح صراحة لو حتى أصغر كمية معروفة أعلى من الباقي.
+ * يقترح كميات حقيقية من طعام محدد بالاسم (مثلاً "شكد آكل من الدولمة؟" أو "شكد آكل من الرز؟") —
+ * يعتمد فقط على getPortionsFor/computeFood الحقيقيين، صفر اختراع أرقام. يعرض كل الوحدات الحقيقية
+ * المعروفة لهذا الطعام (ملعقة/خاشوقة/كوب/صحن/حبة...، أيًا كانت الوحدات المسجّلة له بقاعدة
+ * البيانات) بدل اقتراح وحدة وحدة بس — حتى المستخدم يشوف الخيارات ويختار الأنسب إله.
  */
 export async function suggestPortionForFood(foodId: number, foodName: string, remainingCalories: number): Promise<string> {
   const portions = await getPortionsFor(foodId);
-  const scored: { portion_name: string; calories: number }[] = [];
+  const scored: { portion_name: string; calories: number; fits: boolean }[] = [];
   for (const p of portions) {
     const grams = p.grams;
     if (!grams) continue;
     const nutrition = await computeFood(foodId, Number(grams));
-    scored.push({ portion_name: (p.portion_name as string) || "حصة", calories: nutrition.calories });
+    scored.push({
+      portion_name: (p.portion_name as string) || "حصة",
+      calories: nutrition.calories,
+      fits: remainingCalories <= 0 || nutrition.calories <= remainingCalories,
+    });
   }
 
   if (scored.length === 0) {
@@ -106,20 +111,17 @@ export async function suggestPortionForFood(foodId: number, foodName: string, re
   }
 
   scored.sort((a, b) => a.calories - b.calories);
-  const fitting = scored.filter((s) => remainingCalories <= 0 || s.calories <= remainingCalories);
+  const lines = scored.map((s) => `🍽️ ${s.portion_name} — ~${s.calories} kcal${s.fits ? "" : " (أعلى من الباقي إلك)"}`);
+  const anyFits = scored.some((s) => s.fits);
 
-  if (fitting.length > 0) {
-    const choice = fitting[fitting.length - 1];
-    return (
-      `إذا مشتهي ${foodName}، نكدر نخليها بكمية مناسبة لسعراتك 🌱\n` +
-      `أقترح تقريبًا ${choice.portion_name} — ~${choice.calories} kcal.`
-    );
+  if (anyFits) {
+    return `إذا مشتهي ${foodName}، هذي الكميات الحقيقية المعروفة إلي عنه 🌱:\n${lines.join("\n")}`;
   }
 
-  const choice = scored[0];
+  const smallest = scored[0];
   return (
-    `حتى أصغر كمية معروفة من ${foodName} (${choice.portion_name}, ~${choice.calories} kcal) ` +
+    `حتى أصغر كمية معروفة من ${foodName} (${smallest.portion_name}, ~${smallest.calories} kcal) ` +
     `أعلى شوي من سعراتك المتبقية (~${remainingCalories}) — القرار إلك طبعًا، ` +
-    "بس خل الوجبة الجاية أخف حتى توازن يومك."
+    `بس خل الوجبة الجاية أخف حتى توازن يومك.\n\n${lines.join("\n")}`
   );
 }

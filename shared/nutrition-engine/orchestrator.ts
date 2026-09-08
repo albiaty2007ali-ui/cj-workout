@@ -504,7 +504,10 @@ async function handlePortionForFood(repo: Repository, user: UserRecord, textNorm
 
   const profile = await repo.findNutritionProfile(user.id);
   const ctx = await context.build(repo, user.id, profile, now);
-  const reply = await recommendations.suggestPortionForFood(foodId, foodName!, ctx.remaining_calories);
+  let reply = await recommendations.suggestPortionForFood(foodId, foodName!, ctx.remaining_calories);
+  const tipCategory = tipsEngine.chooseCategoryForContext(ctx, null);
+  const tipText = await tipsEngine.pickTip(repo, user.id, tipCategory);
+  if (tipText) reply += `\n\n🌱 ${tipText}`;
   user.pending_food_topic_json = JSON.stringify({ food_id: foodId, food_name: foodName, kind: "portion_given" });
   await repo.saveUser(user);
   return { reply, meal_logged: false };
@@ -783,6 +786,16 @@ async function dispatch(
       : await recipeSearch.searchRecipes(repo, textNorm);
     const recipe = results[0] ?? null;
     if (recipe) {
+      // نفس تحقق /api/recipes-actions?action=start — نمنع بدء طبخة جديدة لو تجاوزت الهدف
+      // اليومي أصلاً (مو تسجيل وجبة أُكلت فعليًا، هذا يبقى صريح دايمًا بـ_finalizeMeal).
+      const profile = await repo.findNutritionProfile(user.id);
+      const ctx = await context.build(repo, user.id, profile, now);
+      if (ctx.over_target) {
+        return {
+          reply: `وصلت لهدف السعرات اليومي 🎯 "${recipe.name}" راح تزيد سعراتك أكثر من هدفك اليوم. تحب تشوف وصفة أخف بدالها؟`,
+          meal_logged: false,
+        };
+      }
       user.current_recipe_id = recipe.id;
       user.current_recipe_step = 0;
       await repo.saveUser(user);

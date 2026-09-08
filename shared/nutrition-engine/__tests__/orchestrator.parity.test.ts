@@ -160,4 +160,29 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
     );
     expect(r.reply).toContain("أو شوف الوصفة كاملة: /recipes/grilled-chicken-salad");
   });
+
+  it("'وصفة دجاج' (ASK_RECIPE) بعد تجاوز الهدف اليومي -> رفض بدء طبخة جديدة، صفر current_recipe_id", async () => {
+    repo.recipes = [
+      {
+        id: "r2", name: "دجاج مشوي مع سلطة", slug: "grilled-chicken-salad",
+        description: "وجبة غداء عالية البروتين ومنخفضة الدهون.", category_id: "c1", active: true,
+        calories: 380, protein: 40, carbs: 10, fat: 18, fiber: null,
+        prep_time_min: 10, cook_time_min: 15, servings: 1, difficulty: "medium",
+        match_keywords: "دجاج مشوي|دجاج بالخضار|سلطة دجاج",
+        ingredients: [], steps: [], substitutions: [],
+      },
+    ];
+    const user = await freshUser(repo, "r2user");
+    // تجاوز الهدف (2249) مباشرة بصف MealLog حقيقي — نفس تحقق /api/recipes-actions?action=start
+    await repo.insertMealLog({
+      user_id: user.id, meal_type: "lunch", raw_text: "test", matched_foods_json: null,
+      total_calories: 2500, total_protein: 0, total_carbs: 0, total_fat: 0, is_free_meal: true,
+    });
+    const r = await handleMessage(repo, user, "وصفة دجاج");
+    expect(r.reply).toBe(
+      'وصلت لهدف السعرات اليومي 🎯 "دجاج مشوي مع سلطة" راح تزيد سعراتك أكثر من هدفك اليوم. تحب تشوف وصفة أخف بدالها؟',
+    );
+    expect(r.meal_logged).toBe(false);
+    expect(user.current_recipe_id).toBeNull(); // ما بدأ الـTutorial فعليًا
+  });
 });

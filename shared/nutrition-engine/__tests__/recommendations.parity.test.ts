@@ -42,9 +42,22 @@ describe("suggestMealNearTarget — تكافؤ حرفي", () => {
   });
 });
 
-describe("suggestPortionForFood — تكافؤ حرفي", () => {
-  it("بيضة (food_id=1)، 500 سعرة متبقية -> يقترح 'حبة' (~78 kcal)", async () => {
+describe("suggestPortionForFood — يعرض كل الكميات الحقيقية المعروفة، مو خيار وحدة بس", () => {
+  it("بيضة (food_id=1، وحدة قياس وحيدة)، 500 سعرة متبقية -> يعرض 'حبة' (~78 kcal)", async () => {
     const reply = await suggestPortionForFood(1, "بيضة", 500);
-    expect(reply).toBe("إذا مشتهي بيضة، نكدر نخليها بكمية مناسبة لسعراتك 🌱\nأقترح تقريبًا حبة — ~78 kcal.");
+    expect(reply).toBe("إذا مشتهي بيضة، هذي الكميات الحقيقية المعروفة إلي عنه 🌱:\n🍽️ حبة — ~78 kcal");
+  });
+
+  it("تمن (food_id=8، عدة وحدات بينها خاشوقة)، سعرات كافية -> يعرض كل الخيارات مرتّبة بالسعرات", async () => {
+    const reply = await suggestPortionForFood(8, "تمن", 1000);
+    expect(reply).toContain("🍽️ خاشوقة —");
+    expect(reply).toContain("🍽️ كوب مطبوخ —");
+    expect(reply).toContain("🍽️ صحن كبير —");
+    expect(reply.indexOf("خاشوقة")).toBeLessThan(reply.indexOf("صحن كبير"));
+  });
+
+  it("سعرات متبقية صفر/سالبة تُعامل كـ'بلا حد' (نفس سلوك الأصل)، لا توسم أي خيار كـ'أعلى من الباقي'", async () => {
+    const reply = await suggestPortionForFood(1, "بيضة", 0);
+    expect(reply).not.toContain("أعلى من الباقي");
   });
 });
