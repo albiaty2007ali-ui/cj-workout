@@ -207,6 +207,21 @@ export class FirestoreRepository implements Repository {
   }
 
   // ---- Meal Logs / Water Logs ----
+  async countMealLogsForUser(userId: string): Promise<number> {
+    const snap = await this.db.collection("meal_logs").where("user_id", "==", userId).count().get();
+    return snap.data().count;
+  }
+
+  async countWaterLogsForUser(userId: string): Promise<number> {
+    const snap = await this.db.collection("water_logs").where("user_id", "==", userId).count().get();
+    return snap.data().count;
+  }
+
+  async listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: string | null }[]> {
+    const snap = await this.db.collection("levels").orderBy("level").get();
+    return snap.docs.map((d) => d.data() as { level: number; required_xp: number; title: string; reward: string | null });
+  }
+
   async insertMealLog(row: MealLogInput): Promise<MealLogRecord> {
     const id = genId();
     const createdAt = new Date();
@@ -345,4 +360,39 @@ export class FirestoreRepository implements Repository {
       return true;
     });
   }
+}
+
+// ---- حقول عرض فقط (name/username/bio/photo_url) — خارج UserRecord/Repository عمدًا، لأنها
+// لا تخص منطق الأعمال بـorchestrator.ts أبدًا، فقط صفحات الواجهة (البروفايل، القائمة الجانبية).
+
+export interface UserDisplayFields {
+  name: string;
+  email: string;
+  username: string | null;
+  bio: string | null;
+  photo_url: string | null;
+  profile_visibility: string;
+  role: string;
+}
+
+export async function getUserDisplayFields(db: Firestore, userId: string): Promise<UserDisplayFields | null> {
+  const doc = await db.collection("users").doc(userId).get();
+  if (!doc.exists) return null;
+  const d = doc.data()!;
+  return {
+    name: d.name ?? "", email: d.email ?? "", username: d.username ?? null,
+    bio: d.bio ?? null, photo_url: d.photo_url ?? null,
+    profile_visibility: d.profile_visibility ?? "public", role: d.role ?? "user",
+  };
+}
+
+export async function findUserIdByUsername(db: Firestore, username: string): Promise<string | null> {
+  const snap = await db.collection("users").where("username", "==", username).limit(1).get();
+  return snap.empty ? null : snap.docs[0]!.id;
+}
+
+export async function updateUserDisplayFields(
+  db: Firestore, userId: string, patch: Partial<Pick<UserDisplayFields, "name" | "username" | "bio">>,
+): Promise<void> {
+  await db.collection("users").doc(userId).set(patch, { merge: true });
 }

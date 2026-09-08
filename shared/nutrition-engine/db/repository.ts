@@ -103,6 +103,8 @@ export interface Repository {
   deleteWeightHistory(id: string): Promise<void>;
 
   // ---- Meal Logs / Water Logs ----
+  countMealLogsForUser(userId: string): Promise<number>;
+  countWaterLogsForUser(userId: string): Promise<number>;
   insertMealLog(row: MealLogInput): Promise<MealLogRecord>;
   findMealLog(id: string): Promise<MealLogRecord | null>;
   deleteMealLog(id: string): Promise<void>;
@@ -120,6 +122,9 @@ export interface Repository {
   findNutritionTipsByCategory(category: string): Promise<NutritionTipRecord[]>;
   findRecentShownTipIds(userId: string, limit: number): Promise<string[]>;
   insertShownTip(userId: string, tipId: string): Promise<void>;
+
+  // ---- Levels ----
+  listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: string | null }[]>;
 
   // ---- Recipes ----
   findActiveRecipes(categoryId?: string | null): Promise<RecipeRecord[]>; // مرتبة بالاسم

@@ -38,6 +38,8 @@ export const api = {
 export interface MeResponse {
   id: string;
   role: string;
+  name: string;
+  username: string | null;
   xp: number;
   streak_days: number;
   longest_streak: number;

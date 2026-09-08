@@ -108,6 +108,20 @@ export class InMemoryRepository implements Repository {
   nutritionTips: NutritionTipRecord[] = [];
   private shownTips: { user_id: string; tip_id: string; shown_at: Date }[] = [];
 
+  async countMealLogsForUser(userId: string): Promise<number> {
+    return this.mealLogs.filter((m) => m.user_id === userId).length;
+  }
+
+  async countWaterLogsForUser(userId: string): Promise<number> {
+    return this.waterLogs.filter((w) => w.user_id === userId).length;
+  }
+
+  levels: { level: number; required_xp: number; title: string; reward: string | null }[] = [];
+
+  async listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: string | null }[]> {
+    return [...this.levels].sort((a, b) => a.level - b.level);
+  }
+
   async insertMealLog(row: MealLogInput): Promise<MealLogRecord> {
     const record: MealLogRecord = { id: genId(), created_at: new Date(), ...row };
     this.mealLogs.push(record);

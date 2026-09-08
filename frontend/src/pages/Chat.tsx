@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type ChatReply, type MeResponse } from "../lib/api";
+import AppShell from "../components/AppShell";
 
 interface Message {
   role: "user" | "bot";
@@ -58,34 +59,40 @@ export default function Chat() {
     }
   }
 
+  function quickPrompt(prompt: string) {
+    setInput(prompt);
+  }
+
+  if (!me) return null; // بانتظار /api/me — لا نعرض القائمة الجانبية بدون اسم مستخدم حقيقي
+
   return (
-    <div className="chat-page">
-      <div className="chat-header">
-        <strong>🥗 CJ WORKOUT</strong>
-        {me && (
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} onQuickPrompt={quickPrompt}>
+      <div className="chat-page">
+        <div className="chat-header">
+          <strong>🥗 CJ WORKOUT</strong>
           <span className="stats">
             ⭐ {me.xp} XP · 🔥 {me.streak_days} يوم{remaining !== null ? ` · باقي ${remaining} kcal` : ""}
           </span>
-        )}
-      </div>
+        </div>
 
-      <div className="chat-messages">
-        {messages.length === 0 && <p style={{ color: "#888", textAlign: "center" }}>ابدأ بكتابة شنو أكلت اليوم 🌱</p>}
-        {messages.map((m, i) => (
-          <div key={i} className={`bubble ${m.role}`}>{m.text}</div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
+        <div className="chat-messages">
+          {messages.length === 0 && <p style={{ color: "#888", textAlign: "center" }}>ابدأ بكتابة شنو أكلت اليوم 🌱</p>}
+          {messages.map((m, i) => (
+            <div key={i} className={`bubble ${m.role}`}>{m.text}</div>
+          ))}
+          <div ref={bottomRef} />
+        </div>
 
-      <form className="chat-input" onSubmit={sendMessage}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="اكتب رسالتك... (مثلاً: اكلت بيضتين)"
-          disabled={sending}
-        />
-        <button type="submit" disabled={sending}>إرسال</button>
-      </form>
-    </div>
+        <form className="chat-input" onSubmit={sendMessage}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="اكتب رسالتك... (مثلاً: اكلت بيضتين)"
+            disabled={sending}
+          />
+          <button type="submit" disabled={sending}>إرسال</button>
+        </form>
+      </div>
+    </AppShell>
   );
 }
