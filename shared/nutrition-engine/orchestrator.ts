@@ -121,7 +121,22 @@ function summarizePending(pending: PendingMeal): string {
   );
 }
 
-type ResolvedClarificationResult = { food_id: number; food_name: string; resolved: true; grams: number; portion_name?: string } | "REJECTED" | null;
+type ResolvedClarificationResult =
+  | { food_id: number; food_name: string; resolved: true; grams: number; portion_name?: string }
+  | { food_id: number; food_name: string; needsQuantity: true }
+  | "REJECTED"
+  | null;
+
+/**
+ * الطعام معروف الآن (تأكيد هوية أو اختيار من مرشّحين)، لكن resolveAliasAt ما گدر يحدد الكمية من
+ * نص الرسالة الأصلية (مثلاً "باجة" بدون "صحن باجة" أو رقم) — بدل رجوع null (يخلي نفس سؤال
+ * "تقصد X؟" يتكرر للأبد لأن المستخدم فعليًا أكّد بس الكود يرمي التأكيد)، نحوّلها لتوضيح "quantity"
+ * جديد بنفس الشكل اللي يصير بالمطابقة التلقائية عالية الثقة (entities.ts).
+ */
+function toResult(hit: Awaited<ReturnType<typeof import("./foodSearch.js").resolveAliasAt>>): ResolvedClarificationResult {
+  if (hit.resolved) return hit as ResolvedClarificationResult;
+  return { food_id: hit.food_id, food_name: hit.food_name, needsQuantity: true };
+}
 
 async function resolveClarificationItem(item: ClarificationItem, textNorm: string): Promise<ResolvedClarificationResult> {
   const { resolveQuantityForFood, resolveAliasAt } = await import("./foodSearch.js");
@@ -137,7 +152,7 @@ async function resolveClarificationItem(item: ClarificationItem, textNorm: strin
   if (item.kind === "confirm_match") {
     if (intents.CONFIRM_PHRASES.includes(textNorm)) {
       const hit = await resolveAliasAt(item.alias_row as never, item.source_text, item.start ?? 0);
-      return hit.resolved ? (hit as ResolvedClarificationResult) : null;
+      return toResult(hit);
     }
     if (intents.CANCEL_PHRASES.includes(textNorm)) return "REJECTED";
     return null;
@@ -148,17 +163,17 @@ async function resolveClarificationItem(item: ClarificationItem, textNorm: strin
     for (const opt of item.options) {
       if (normalize(opt.food_name) && normText.includes(normalize(opt.food_name))) {
         const hit = await resolveAliasAt(opt.alias_row as never, item.source_text, item.start ?? 0);
-        return hit.resolved ? (hit as ResolvedClarificationResult) : null;
+        return toResult(hit);
       }
     }
     const stripped = normText.trim();
     if (stripped === "1" || stripped === "الاول" || stripped === "الأول") {
       const hit = await resolveAliasAt(item.options[0].alias_row as never, item.source_text, item.start ?? 0);
-      return hit.resolved ? (hit as ResolvedClarificationResult) : null;
+      return toResult(hit);
     }
     if (stripped === "2" || stripped === "الثاني" || stripped === "الثانية") {
       const hit = await resolveAliasAt(item.options[1].alias_row as never, item.source_text, item.start ?? 0);
-      return hit.resolved ? (hit as ResolvedClarificationResult) : null;
+      return toResult(hit);
     }
     return null;
   }
@@ -191,7 +206,11 @@ async function handleMealMessage(
     for (const item of pending.pending_clarifications as ClarificationItem[]) {
       const result = await resolveClarificationItem(item, textNorm);
       if (result === "REJECTED") continue;
-      if (result !== null) {
+      if (result !== null && "needsQuantity" in result) {
+        // الهوية تأكدت (بس الكمية ماكو بالرسالة الأصلية) — نستبدل سؤال "تقصد X؟" بسؤال كمية حقيقي
+        // بدل ما يتكرر نفس سؤال التأكيد للأبد كل ما يجاوب المستخدم "اي".
+        remainingClarifications.push({ kind: "quantity", food_id: result.food_id, food_name: result.food_name });
+      } else if (result !== null) {
         const n = await calculator.computeFood(result.food_id, result.grams);
         addResolvedToPending(pending, result, n);
       } else {
