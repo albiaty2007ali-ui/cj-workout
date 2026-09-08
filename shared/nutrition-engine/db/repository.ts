@@ -172,6 +172,11 @@ export interface RecipeRecord {
   protein: number;
   carbs: number;
   fat: number;
+  fiber: number | null;
+  prep_time_min: number | null;
+  cook_time_min: number | null;
+  servings: number;
+  difficulty: string;
   match_keywords: string | null;
   ingredients: RecipeIngredientRecord[];
   steps: RecipeStepRecord[];

@@ -137,7 +137,8 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
       {
         id: "r1", name: "دجاج مشوي مع سلطة", slug: "grilled-chicken-salad",
         description: "وجبة غداء عالية البروتين ومنخفضة الدهون.", category_id: "c1", active: true,
-        calories: 380, protein: 40, carbs: 10, fat: 18,
+        calories: 380, protein: 40, carbs: 10, fat: 18, fiber: null,
+        prep_time_min: 10, cook_time_min: 15, servings: 1, difficulty: "medium",
         match_keywords: "دجاج مشوي|دجاج بالخضار|سلطة دجاج",
         ingredients: [
           { name: "صدر دجاج", quantity: "1", unit: "قطعة" },
