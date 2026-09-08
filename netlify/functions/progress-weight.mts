@@ -16,10 +16,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
   if (!claims) return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
 
-  const repo = new FirestoreRepository();
   const url = new URL(req.url);
 
   try {
+    const repo = new FirestoreRepository();
     if (req.method === "GET") {
       const period = url.searchParams.get("period") ?? "30";
       const periodDays = PERIOD_DAYS[period] ?? 30;

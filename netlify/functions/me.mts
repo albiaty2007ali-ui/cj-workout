@@ -14,8 +14,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
   if (!claims) return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
 
-  const repo = new FirestoreRepository();
   try {
+    const repo = new FirestoreRepository();
     const user = await repo.findUser(claims.sub);
     if (!user) return jsonError(404, "USER_NOT_FOUND", "الحساب غير موجود.");
 

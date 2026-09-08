@@ -14,8 +14,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const slug = new URL(req.url).searchParams.get("slug") ?? "";
   if (!slug) return jsonError(400, "VALIDATION_ERROR", "slug مطلوب.");
 
-  const repo = new FirestoreRepository();
   try {
+    const repo = new FirestoreRepository();
     const recipe = await repo.findRecipeBySlug(slug);
     if (!recipe) return jsonError(404, "NOT_FOUND", "الوصفة غير موجودة.");
 

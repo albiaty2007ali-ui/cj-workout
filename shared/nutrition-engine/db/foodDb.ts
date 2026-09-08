@@ -8,15 +8,42 @@
  * (لا حالة مستخدم، لا Mutable State)، آمن تمامًا بمعمارية Serverless حتى لو أُعيد استخدامه بين
  * استدعاءات مختلفة على نفس الـContainer الدافئ.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import path from "node:path";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// نفس مسار data/database/foods.sqlite بجذر المشروع الأصلي — يُشحن كملف ثابت مع كل Function
-const DEFAULT_DB_PATH = path.resolve(__dirname, "../../../data/database/foods.sqlite");
+
+/**
+ * يبحث عن ملف بين عدة مسارات محتملة ويرجّع أول وحدة موجودة فعليًا — ضروري هنا تحديدًا لأن
+ * esbuild (مُجمِّع Netlify Functions) يعيد ترتيب بنية المجلدات وقت البناء، فمسار "__dirname
+ * نسبي" الثابت (صالح بالتطوير المحلي وبـvitest) ينكسر بصمت بعد النشر الفعلي. لو ولا مسار
+ * انلقى، نرمي خطأ يذكر كل المسارات المجرَّبة — يسهّل التشخيص من Netlify Function Logs مباشرة
+ * بدل خطأ "file not found" غامض بلا سياق.
+ */
+function resolveExistingPath(candidates: string[]): string {
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  throw new Error(
+    `تعذّر إيجاد الملف بأي من المسارات المتوقعة (تحقق من [functions].included_files بـnetlify.toml):\n` +
+    candidates.map((p) => `  - ${p}`).join("\n"),
+  );
+}
+
+function candidatePaths(relativeFromRepoRoot: string): string[] {
+  return [
+    // مسار التطوير المحلي الطبيعي (شغّال بـnpm test/vite-node)
+    path.resolve(__dirname, "../../../", relativeFromRepoRoot),
+    // بنية حزمة Netlify Function المحتملة بعد esbuild (جذر الحزمة = cwd وقت التشغيل)
+    path.resolve(process.cwd(), relativeFromRepoRoot),
+    // احتياط: أحيانًا included_files يُنسخ بجانب ملف الدالة نفسه مباشرة
+    path.resolve(__dirname, relativeFromRepoRoot),
+    path.resolve(__dirname, "../", relativeFromRepoRoot),
+  ];
+}
 
 let sqlJsPromise: Promise<SqlJsStatic> | null = null;
 let dbInstance: Database | null = null;
@@ -24,23 +51,31 @@ let dbPathUsed: string | null = null;
 
 async function getSqlJs(): Promise<SqlJsStatic> {
   if (!sqlJsPromise) {
-    // createRequire بدل import.meta.resolve — الأخيرة غير مدعومة بسياق SSR/vite-node
-    // (Vitest) بدون علم تجريبي. "sql.js/package.json" مرفوض بحقل exports الخاص بالحزمة —
-    // نستخدم subpath "./dist/*" المصرَّح به فعليًا بدلًا منه.
-    const require = createRequire(import.meta.url);
-    const wasmPath = require.resolve("sql.js/dist/sql-wasm.wasm");
+    let wasmPath: string;
+    try {
+      // createRequire بدل import.meta.resolve — الأخيرة غير مدعومة بسياق SSR/vite-node
+      // (Vitest) بدون علم تجريبي. "sql.js/package.json" مرفوض بحقل exports الخاص بالحزمة —
+      // نستخدم subpath "./dist/*" المصرَّح به فعليًا بدلًا منه. هذا يعمل بالتطوير المحلي
+      // (node_modules موجودة كما هي)، لكن بعد نشر Netlify قد لا يُحل نفس المسار، فنجرّب
+      // مسارات included_files الاحتياطية أيضًا.
+      const require = createRequire(import.meta.url);
+      wasmPath = require.resolve("sql.js/dist/sql-wasm.wasm");
+    } catch {
+      wasmPath = resolveExistingPath(candidatePaths("node_modules/sql.js/dist/sql-wasm.wasm"));
+    }
     sqlJsPromise = initSqlJs({ locateFile: () => wasmPath });
   }
   return sqlJsPromise;
 }
 
 /** يفتح (أو يرجّع من الكاش) اتصال Read-Only بقاعدة foods.sqlite. */
-export async function getFoodDb(dbPath: string = DEFAULT_DB_PATH): Promise<Database> {
-  if (dbInstance && dbPathUsed === dbPath) return dbInstance;
+export async function getFoodDb(dbPath?: string): Promise<Database> {
+  const resolvedPath = dbPath ?? resolveExistingPath(candidatePaths("data/database/foods.sqlite"));
+  if (dbInstance && dbPathUsed === resolvedPath) return dbInstance;
   const SQL = await getSqlJs();
-  const fileBuffer = readFileSync(dbPath);
+  const fileBuffer = readFileSync(resolvedPath);
   dbInstance = new SQL.Database(fileBuffer);
-  dbPathUsed = dbPath;
+  dbPathUsed = resolvedPath;
   return dbInstance;
 }
 

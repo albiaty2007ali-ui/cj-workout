@@ -31,9 +31,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     return jsonError(400, "VALIDATION_ERROR", "الرسالة فاضية.");
   }
 
-  const repo = new FirestoreRepository();
-
   try {
+    const repo = new FirestoreRepository();
     const user = await repo.findUser(claims.sub);
     if (!user) {
       return jsonError(404, "USER_NOT_FOUND", "الحساب غير موجود.");

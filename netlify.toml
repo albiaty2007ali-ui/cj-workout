@@ -9,6 +9,10 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # esbuild ما يجمّع ملفات ثنائية/بيانات تلقائيًا (SQLite + WASM) — لازم تُذكر صراحة حتى
+  # تُنسخ لحزمة كل Function. راجع foodDb.ts للمنطق الدفاعي اللي يبحث عنها بأكثر من مسار محتمل
+  # وقت التشغيل (بنية مجلدات الحزمة النهائية بعد esbuild غير مضمونة سلفًا بدون تجربة حية).
+  included_files = ["data/database/foods.sqlite", "node_modules/sql.js/dist/sql-wasm.wasm"]
 
 # يخفي شكل /.netlify/functions/xxx عن الواجهة — نفس توصية الطلب الأصلي (API نظيفة /api/...)
 [[redirects]]

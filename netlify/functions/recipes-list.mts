@@ -28,8 +28,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const q = url.searchParams.get("q") ?? "";
   const categoryId = url.searchParams.get("category") || null;
 
-  const repo = new FirestoreRepository();
   try {
+    const repo = new FirestoreRepository();
     const [recipes, categories, profile] = await Promise.all([
       searchRecipes(repo, q, categoryId),
       repo.listRecipeCategories(),

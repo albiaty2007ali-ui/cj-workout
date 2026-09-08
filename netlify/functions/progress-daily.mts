@@ -29,8 +29,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     ({ year, month, day } = nowBaghdad(now));
   }
 
-  const repo = new FirestoreRepository();
   try {
+    const repo = new FirestoreRepository();
     const profile = await repo.findNutritionProfile(claims.sub);
     if (!profile) {
       return jsonOk({ profile: null });
