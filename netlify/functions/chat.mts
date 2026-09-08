@@ -10,6 +10,7 @@ import { handleMessage } from "../../shared/nutrition-engine/orchestrator.js";
 import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import { sendNotification } from "../../shared/nutrition-engine/notifications/engine.js";
+import { getProvider } from "../../shared/nutrition-engine/provider.js";
 
 interface NewMilestone { days: number; label: string; xp_reward: number }
 
@@ -46,6 +47,14 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     if (result.premium_required) {
       return jsonError(402, "TRIAL_EXHAUSTED", "خلصت وجباتك المجانية. تحتاج اشتراك لتكملة التسجيل.");
+    }
+
+    // صياغة اختيارية عبر Gemini — لا تلمس أي رقم، فقط تنويع الجملة. تُتخطى بأمان بدون
+    // GEMINI_API_KEY (getProvider() ترجع NullAIProvider)، ولا ترمي أبدًا ولا تعطّل الرد الأصلي.
+    const provider = getProvider();
+    if (result.reply && provider.isAvailable()) {
+      const rephrased = await provider.rephrase(result.reply, { kind: result.meal_logged ? "meal_logged" : "chat_reply" });
+      if (rephrased) result.reply = rephrased;
     }
 
     // Push حقيقي لأي محطة Streak جديدة — Best-effort دائمًا (sendNotification لا ترمي، ولا تؤخر

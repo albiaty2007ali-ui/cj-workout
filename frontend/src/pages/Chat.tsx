@@ -53,7 +53,7 @@ export default function Chat() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, sending]);
 
   async function sendMessage(e: FormEvent) {
     e.preventDefault();
@@ -147,6 +147,13 @@ export default function Chat() {
           {messages.map((m, i) => (
             <div key={i} className={`bubble ${m.role}`}>{m.text}</div>
           ))}
+          {sending && (
+            <div className="bubble bot typing-bubble" aria-label="جاري الكتابة">
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
 
