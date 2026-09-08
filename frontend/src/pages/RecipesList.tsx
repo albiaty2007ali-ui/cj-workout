@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import type { RecipeCard, RecipeCategory } from "../lib/recipesApi";
 import AppShell from "../components/AppShell";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../lib/adsConfig";
 
 interface ListState {
   categories: RecipeCategory[];
@@ -94,6 +96,8 @@ export default function RecipesList() {
         {state?.over_target && (
           <p className="calorie-warning">🚫 وصلت لهدف السعرات اليومي — بدء وصفة جديدة معطّل هسه، لكن تقدر تتصفح الكل.</p>
         )}
+
+        {!me.is_premium && <AdSlot html={AD_SLOTS.recipesListTop} className="ad-slot ad-slot-inline" />}
 
         <div className="recipe-grid">
           {loading && Array.from({ length: 6 }).map((_, i) => (

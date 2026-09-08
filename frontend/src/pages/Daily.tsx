@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import type { DailyResponse, MealBucket } from "../lib/progressApi";
 import AppShell from "../components/AppShell";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../lib/adsConfig";
 
 const MEAL_META: Array<{ key: "breakfast" | "lunch" | "dinner"; label: string; icon: string }> = [
   { key: "breakfast", label: "الفطور", icon: "🍳" },
@@ -118,6 +120,8 @@ export default function Daily() {
                 {data.is_today && <Link to="/chat" className="btn btn-outline-dark" style={{ marginTop: 8, display: "inline-block" }}>إضافة سناك</Link>}
               </div>
             </div>
+
+            {!me.is_premium && <AdSlot html={AD_SLOTS.dailyBottom} className="ad-slot ad-slot-inline" />}
           </>
         )}
       </main>

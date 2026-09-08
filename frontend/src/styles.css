@@ -346,6 +346,11 @@ body {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
   30% { transform: translateY(-5px); opacity: 1; }
 }
+.ad-slot { display: flex; justify-content: center; align-items: center; overflow: hidden; }
+.ad-slot:empty { display: none; }
+.ad-slot-inline { margin: 14px 20px; }
+.ad-slot-large { margin: 16px 0 20px; min-height: 0; }
+
 .chat-input {
   display: flex;
   gap: 10px;

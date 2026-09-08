@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../lib/adsConfig";
 
 interface SubscribeInfo {
   card_number: string;
@@ -68,6 +70,8 @@ export default function Subscribe() {
           <>
             <h1 className="font-display">إتمام الاشتراك</h1>
             <p className="subtitle">CJ WORKOUT Monthly — {info ? info.price.toLocaleString("en-US") : "..."} د.ع / شهر</p>
+
+            <AdSlot html={AD_SLOTS.subscribeInterstitial} className="ad-slot ad-slot-large" />
 
             <div className="notice-box">
               <p style={{ fontWeight: 600 }}>خطوات الدفع اليدوي</p>

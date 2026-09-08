@@ -4,6 +4,8 @@ import { api, type ChatReply, type MeResponse } from "../lib/api";
 import type { GreetingResponse } from "../lib/greetingApi";
 import type { DailyResponse } from "../lib/progressApi";
 import AppShell from "../components/AppShell";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../lib/adsConfig";
 
 interface Message {
   role: "user" | "bot";
@@ -164,6 +166,8 @@ export default function Chat() {
             ))}
           </div>
         )}
+
+        {!me.is_premium && <AdSlot html={AD_SLOTS.chatBanner} className="ad-slot ad-slot-inline" />}
 
         <form className="chat-input" onSubmit={sendMessage}>
           <input

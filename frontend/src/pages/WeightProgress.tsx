@@ -4,6 +4,8 @@ import Chart from "chart.js/auto";
 import { api, type MeResponse } from "../lib/api";
 import type { WeightStatsResponse } from "../lib/progressApi";
 import AppShell from "../components/AppShell";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../lib/adsConfig";
 
 const PERIODS: Array<[string, string]> = [["7", "7 أيام"], ["30", "30 يوم"], ["90", "90 يوم"], ["180", "6 أشهر"], ["365", "سنة"], ["all", "الكل"]];
 
@@ -164,6 +166,8 @@ export default function WeightProgress() {
         ) : (
           <div className="notice-box" style={{ marginTop: 24 }}>بعد ما سجلت وزنك 🌱 سجّله فوگ حتى نبدأ نتابع تقدمك.</div>
         )}
+
+        {!me.is_premium && <AdSlot html={AD_SLOTS.weightBottom} className="ad-slot ad-slot-inline" />}
       </main>
     </AppShell>
   );
