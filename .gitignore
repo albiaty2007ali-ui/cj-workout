@@ -20,3 +20,12 @@ dist/
 # Local Netlify folder
 .netlify
 deno.lock
+
+# Android (Capacitor) — build outputs ومسار SDK محلي، مو جزء من الكود المصدري
+frontend/android/local.properties
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/capacitor-cordova-android-plugins/build/
+frontend/android/**/*.apk
+frontend/android/**/*.aab
