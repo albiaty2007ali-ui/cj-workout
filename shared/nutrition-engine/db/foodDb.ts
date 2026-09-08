@@ -14,7 +14,10 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// اسم مختلف عمدًا عن "__dirname" — esbuild (مُجمِّع Netlify Functions) يحقن shim تلقائي بهذا
+// الاسم بالحزمة الناتجة (توافقًا مع أكواد تفترض CJS)، وإعادة تعريفه هنا يسبب خطأ حقيقي وقت
+// التشغيل: "Identifier '__dirname' has already been declared".
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * يبحث عن ملف بين عدة مسارات محتملة ويرجّع أول وحدة موجودة فعليًا — ضروري هنا تحديدًا لأن
@@ -36,12 +39,12 @@ function resolveExistingPath(candidates: string[]): string {
 function candidatePaths(relativeFromRepoRoot: string): string[] {
   return [
     // مسار التطوير المحلي الطبيعي (شغّال بـnpm test/vite-node)
-    path.resolve(__dirname, "../../../", relativeFromRepoRoot),
+    path.resolve(moduleDir, "../../../", relativeFromRepoRoot),
     // بنية حزمة Netlify Function المحتملة بعد esbuild (جذر الحزمة = cwd وقت التشغيل)
     path.resolve(process.cwd(), relativeFromRepoRoot),
     // احتياط: أحيانًا included_files يُنسخ بجانب ملف الدالة نفسه مباشرة
-    path.resolve(__dirname, relativeFromRepoRoot),
-    path.resolve(__dirname, "../", relativeFromRepoRoot),
+    path.resolve(moduleDir, relativeFromRepoRoot),
+    path.resolve(moduleDir, "../", relativeFromRepoRoot),
   ];
 }
 

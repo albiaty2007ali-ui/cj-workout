@@ -41,6 +41,26 @@
   status = 200
 
 [[redirects]]
+  from = "/api/onboarding"
+  to = "/.netlify/functions/onboarding"
+  status = 200
+
+[[redirects]]
+  from = "/api/greeting"
+  to = "/.netlify/functions/greeting"
+  status = 200
+
+[[redirects]]
+  from = "/api/profile"
+  to = "/.netlify/functions/profile"
+  status = 200
+
+[[redirects]]
+  from = "/api/settings"
+  to = "/.netlify/functions/settings"
+  status = 200
+
+[[redirects]]
   from = "/api/progress/daily"
   to = "/.netlify/functions/progress-daily"
   status = 200
@@ -63,6 +83,56 @@
 [[redirects]]
   from = "/api/recipes/action"
   to = "/.netlify/functions/recipes-actions"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/forgot-password"
+  to = "/.netlify/functions/auth-forgot-password"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/reset-password"
+  to = "/.netlify/functions/auth-reset-password"
+  status = 200
+
+[[redirects]]
+  from = "/api/subscribe"
+  to = "/.netlify/functions/subscribe"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/tips"
+  to = "/.netlify/functions/admin-tips"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/levels"
+  to = "/.netlify/functions/admin-levels"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/streak-milestones"
+  to = "/.netlify/functions/admin-streak-milestones"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/recipes"
+  to = "/.netlify/functions/admin-recipes"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/notifications"
+  to = "/.netlify/functions/admin-notifications"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/payments"
+  to = "/.netlify/functions/admin-payments"
+  status = 200
+
+[[redirects]]
+  from = "/api/push/subscribe"
+  to = "/.netlify/functions/push-subscribe"
   status = 200
 
 # SPA Fallback — لازم آخر قاعدة (الأعم)، حتى refresh مباشر على /chat أو /login يشتغل بدون 404

@@ -31,14 +31,14 @@ describe("hashPassword / checkPassword", () => {
 
 describe("signSession / verifySession", () => {
   it("توكن صالح يرجّع نفس الـclaims", () => {
-    const token = signSession({ sub: "user1", role: "user" });
+    const token = signSession({ sub: "user1", role: "user", email: "user1@example.com" });
     const claims = verifySession(token);
     expect(claims?.sub).toBe("user1");
     expect(claims?.role).toBe("user");
   });
 
   it("توكن ملاعَب فيه يُرفض", () => {
-    const token = signSession({ sub: "user1", role: "user" });
+    const token = signSession({ sub: "user1", role: "user", email: "user1@example.com" });
     const tampered = token.slice(0, -2) + "xx";
     expect(verifySession(tampered)).toBeNull();
   });

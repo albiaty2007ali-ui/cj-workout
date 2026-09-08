@@ -16,3 +16,7 @@ data/reports/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Local Netlify folder
+.netlify
+deno.lock

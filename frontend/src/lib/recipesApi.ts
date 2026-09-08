@@ -6,6 +6,10 @@ export interface RecipeCard {
   carbs: number;
   fat: number;
   fits_remaining: boolean | null;
+  category: string | null;
+  category_icon: string | null;
+  prep_time_min: number | null;
+  cook_time_min: number | null;
 }
 
 export interface RecipeCategory {

@@ -2,10 +2,10 @@
  * GET /api/me — بيانات المستخدم الحالي + ملفه الغذائي. لا مقابل مباشر بايثون (chat.py's app_home
  * يحقن هذي البيانات داخل Template مباشرة)؛ هنا Endpoint مستقل لأن الواجهة React ستحتاجه بكل صفحة.
  */
-import type { Context, Config } from "@netlify/functions";
+import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreRepository, getFirebaseApp, getUserDisplayFields } from "../../shared/nutrition-engine/db/firestoreRepository.js";
-import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
+import { authenticateRequest, isAdminClaims } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import { trialExhausted, freeMealsRemaining } from "../../shared/nutrition-engine/userStatus.js";
 
@@ -24,7 +24,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const display = await getUserDisplayFields(getFirestore(getFirebaseApp()), claims.sub);
 
     return jsonOk({
-      id: user.id, role: claims.role, name: display?.name ?? "", username: display?.username ?? null,
+      id: user.id, role: isAdminClaims(claims) ? "admin" : "user", name: display?.name ?? "", username: display?.username ?? null,
       xp: user.xp, streak_days: user.streak_days,
       longest_streak: user.longest_streak, is_premium: user.is_premium,
       free_meals_remaining: freeMealsRemaining(user), trial_exhausted: trialExhausted(user),
@@ -35,5 +35,3 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
   }
 };
-
-export const config: Config = { path: "/.netlify/functions/me" };

@@ -3,7 +3,7 @@
  * POST تعديل الاسم/اليوزرنيم/البايو). رفع الصور غير منفَّذ هنا بعد (يحتاج StorageService —
  * راجع NETLIFY_MIGRATION_AUDIT.md، خارج نطاق هذي الدفعة).
  */
-import type { Context, Config } from "@netlify/functions";
+import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
 import {
   FirestoreRepository, getFirebaseApp, getUserDisplayFields,
@@ -86,5 +86,3 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
   }
 };
-
-export const config: Config = { path: "/.netlify/functions/profile" };

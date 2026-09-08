@@ -36,6 +36,7 @@ export default function Sidebar({ userName, isAdmin, onQuickPrompt }: SidebarPro
           <Link className="sidebar-item" to="/recipes" onClick={() => setOpen(false)}>🍳 وصفات دايت</Link>
           <Link className="sidebar-item" to="/daily" onClick={() => setOpen(false)}>🍽️ يومي الغذائي</Link>
           <Link className="sidebar-item" to="/progress/weight" onClick={() => setOpen(false)}>⚖️ متابعة الوزن</Link>
+          <Link className="sidebar-item" to="/subscribe" onClick={() => setOpen(false)}>💎 الاشتراك</Link>
         </nav>
         <div className="sidebar-bottom">
           <Link className="sidebar-item" to="/profile" onClick={() => setOpen(false)}>👤 {userName}</Link>

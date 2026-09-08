@@ -1,16 +1,19 @@
 /**
- * /api/settings — يعادل settings_bp.py's أقسام حقيقية فقط (ai-style, privacy, password,
- * delete-account, export). قسم الإشعارات (Web Push) غير منفَّذ هنا عمدًا — نظام الجدولة/الإرسال
- * نفسه (Scheduled Functions) لسا ما تحوّل بجهة Netlify (راجع NETLIFY_MIGRATION_AUDIT.md)، وبناء
- * واجهة لتفضيلات إشعارات ما ترسل أي شي فعليًا يخالف قاعدة "لا واجهة وهمية" الموثّقة بالمشروع.
+ * /api/settings — يعادل settings_bp.py's أقسام (ai-style, privacy, password, delete-account,
+ * export, notifications). قسم الإشعارات هسه حقيقي: تفضيلات تُحفَظ فعليًا بـFirestore وتُفحَص عند
+ * كل إرسال (notifications/engine.ts). التذكيرات المجدولة (فطور/غداء/عشاء بوقت ثابت) تحتاج Netlify
+ * Scheduled Function منفصلة — لسا غير مبنية؛ الإشعار الحقيقي المُفعَّل فعليًا هسه هو محطات الستريك
+ * (يُرسل مباشرة من netlify/functions/chat.mts، Event-driven بدون حاجة لجدولة).
  */
-import type { Context, Config } from "@netlify/functions";
+import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseApp, getUserDisplayFields, FirestoreRepository } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { authenticateRequest, checkPassword, hashPassword, buildLogoutCookie } from "../../shared/nutrition-engine/auth.js";
 import { validatePassword } from "../../shared/nutrition-engine/validation.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import { randomUUID } from "node:crypto";
+import { getSettings as getNotificationSettings, updateSettings as updateNotificationSettings } from "../../shared/nutrition-engine/notifications/engine.js";
+import { getVapidPublicKey } from "../../shared/nutrition-engine/notifications/push.js";
 
 const AI_STYLES = new Set(["concise", "balanced", "detailed"]);
 const VISIBILITY_OPTIONS = new Set(["public", "private"]);
@@ -27,6 +30,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const userRef = db.collection("users").doc(claims.sub);
 
     if (req.method === "GET") {
+      if (action === "notifications") {
+        const settings = await getNotificationSettings(db, claims.sub);
+        return jsonOk({ ...settings, vapid_public_key: getVapidPublicKey() });
+      }
       const display = await getUserDisplayFields(db, claims.sub);
       const userDoc = await userRef.get();
       return jsonOk({
@@ -88,6 +95,22 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonOk({ ok: true }, { headers: { "Set-Cookie": buildLogoutCookie() } });
     }
 
+    if (action === "notifications") {
+      const patch: Record<string, unknown> = {};
+      if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
+      for (const key of ["meals", "water", "streak", "tips"] as const) {
+        if (typeof body[key] === "boolean") patch[key] = body[key];
+      }
+      if (body.quiet_hours_start === null || (Number.isInteger(body.quiet_hours_start) && body.quiet_hours_start >= 0 && body.quiet_hours_start <= 23)) {
+        patch.quiet_hours_start = body.quiet_hours_start;
+      }
+      if (body.quiet_hours_end === null || (Number.isInteger(body.quiet_hours_end) && body.quiet_hours_end >= 0 && body.quiet_hours_end <= 23)) {
+        patch.quiet_hours_end = body.quiet_hours_end;
+      }
+      await updateNotificationSettings(db, claims.sub, patch);
+      return jsonOk({ ok: true });
+    }
+
     if (action === "export") {
       const repo = new FirestoreRepository();
       const [user, profile, display, mealLogs, waterLogs, weightHistory] = await Promise.all([
@@ -122,5 +145,3 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
   }
 };
-
-export const config: Config = { path: "/.netlify/functions/settings" };

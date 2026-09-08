@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, type ChatReply, type MeResponse } from "../lib/api";
+import type { GreetingResponse } from "../lib/greetingApi";
+import type { DailyResponse } from "../lib/progressApi";
 import AppShell from "../components/AppShell";
 
 interface Message {
@@ -8,9 +10,20 @@ interface Message {
   text: string;
 }
 
+const STATIC_PROMPTS = [
+  { label: "🥗 شنو آكل هسه؟", prompt: "شنو آكل هسه؟" },
+  { label: "🔥 شكد باقيلي سعرات؟", prompt: "باقيلي شكد سعرات؟" },
+  { label: "😴 راح أنام", prompt: "راح أنام" },
+];
+
 export default function Chat() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const justOnboarded = params.get("welcome") === "1";
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
+  const [daily, setDaily] = useState<DailyResponse | null>(null);
+  const [showProgress, setShowProgress] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -23,8 +36,18 @@ export default function Chat() {
         navigate("/login");
         return;
       }
+      if (!res.data.onboarding_completed) {
+        navigate("/onboarding");
+        return;
+      }
       setMe(res.data);
       if (res.data.profile) setRemaining(res.data.profile.calorie_target);
+    });
+    api.get<GreetingResponse>("/greeting").then((res) => {
+      if (res.success && res.data) setGreeting(res.data);
+    });
+    api.get<DailyResponse>("/progress/daily").then((res) => {
+      if (res.success && res.data && res.data.meals) setDaily(res.data);
     });
   }, [navigate]);
 
@@ -54,6 +77,13 @@ export default function Chat() {
       const reply = res.data?.reply ?? "...";
       setMessages((prev) => [...prev, { role: "bot", text: reply }]);
       if (typeof res.data?.remaining === "number") setRemaining(res.data.remaining);
+      if (typeof res.data?.today_calories === "number" && daily) {
+        setDaily({ ...daily, target_calories: daily.target_calories });
+      }
+      // أرقام اليوم (أكلت/متبقي) ممكن تكون تغيّرت بعد أي رسالة (تسجيل وجبة/ماي) — نجيبها من جديد
+      api.get<DailyResponse>("/progress/daily").then((r) => {
+        if (r.success && r.data && r.data.meals) setDaily(r.data);
+      });
     } finally {
       setSending(false);
     }
@@ -65,23 +95,68 @@ export default function Chat() {
 
   if (!me) return null; // بانتظار /api/me — لا نعرض القائمة الجانبية بدون اسم مستخدم حقيقي
 
+  const eatenToday = daily ? daily.target_calories! - daily.remaining_calories! : null;
+  const allPrompts = [...(greeting?.prompts ?? []), ...STATIC_PROMPTS];
+
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} onQuickPrompt={quickPrompt}>
       <div className="chat-page">
         <div className="chat-header">
           <strong>🥗 CJ WORKOUT</strong>
-          <span className="stats">
-            ⭐ {me.xp} XP · 🔥 {me.streak_days} يوم{remaining !== null ? ` · باقي ${remaining} kcal` : ""}
-          </span>
+          <button type="button" className="progress-toggle-btn" onClick={() => setShowProgress((v) => !v)}>📈 التقدم</button>
         </div>
 
+        {daily && daily.meals && (
+          <div className="calorie-cards chat-calorie-cards">
+            <div className="calorie-card">
+              <p className="cc-label">🔥 هدفك اليوم</p>
+              <p className="cc-value">{daily.target_calories} kcal</p>
+            </div>
+            <div className="calorie-card">
+              <p className="cc-label">🍽️ أكلت</p>
+              <p className="cc-value">{eatenToday} kcal</p>
+            </div>
+            <div className="calorie-card">
+              <p className="cc-label">🎯 المتبقي</p>
+              <p className="cc-value">{daily.remaining_calories} kcal</p>
+            </div>
+            <div className="calorie-card">
+              <p className="cc-label">{me.is_premium ? "✓ Premium" : "⭐ تجربة مجانية"}</p>
+              <p className="cc-value">{me.is_premium ? "نشط" : `${me.free_meals_remaining} / 6`}</p>
+            </div>
+          </div>
+        )}
+
+        {showProgress && (
+          <div className="side-panel">
+            <p className="font-display" style={{ fontWeight: 700, margin: 0 }}>تقدمك</p>
+            <p>⭐ XP: {me.xp}</p>
+            <p>🔥 Streak: {me.streak_days} يوم</p>
+            <p>💧 هدف الماء اليومي: {me.profile ? `${me.profile.water_target_ml} مل` : "—"}</p>
+          </div>
+        )}
+
         <div className="chat-messages">
-          {messages.length === 0 && <p style={{ color: "#888", textAlign: "center" }}>ابدأ بكتابة شنو أكلت اليوم 🌱</p>}
+          {messages.length === 0 && (
+            <>
+              {justOnboarded && <div className="bubble bot">هلا بيك 👋 أنا كابتنك الغذائي بـ CJ WORKOUT. خلينا نبدأ.</div>}
+              {greeting?.text && <div className="bubble bot" style={{ whiteSpace: "pre-line" }}>{greeting.text}</div>}
+              {!greeting?.text && <p style={{ color: "#888", textAlign: "center" }}>ابدأ بكتابة شنو أكلت اليوم 🌱</p>}
+            </>
+          )}
           {messages.map((m, i) => (
             <div key={i} className={`bubble ${m.role}`}>{m.text}</div>
           ))}
           <div ref={bottomRef} />
         </div>
+
+        {allPrompts.length > 0 && (
+          <div className="quick-prompts">
+            {allPrompts.map((p, i) => (
+              <button type="button" key={i} className="qp-btn" onClick={() => quickPrompt(p.prompt)}>{p.label}</button>
+            ))}
+          </div>
+        )}
 
         <form className="chat-input" onSubmit={sendMessage}>
           <input

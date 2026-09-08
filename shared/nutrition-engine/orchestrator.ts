@@ -4,9 +4,11 @@
  * Tips Engine, Context Manager, Response Generator) لبناء رد واحد. لا اتصال شبكة هنا، ولا أي رقم
  * سعرات يُخترع — كل شيء يمر من foodSearch.ts/foods.sqlite عبر calculator.ts.
  *
- * ملاحظة هجرة: نظام إشعارات Push (notifyStreakMilestones بالأصل) غير منفَّذ هنا — طبقة منفصلة
- * (Netlify Scheduled Functions) تُبنى لاحقًا، ونداؤها هنا best-effort تمامًا مثل الأصل
- * (فشل الإرسال لا يوقف ولا يؤخر تسجيل الوجبة/الماي أبدًا).
+ * ملاحظة هجرة: إشعار Push لمحطة Streak جديدة عمدًا خارج هذا الملف — orchestrator.ts يبقى
+ * Repository-agnostic (يشتغل بنفس الدقة مع InMemoryRepository بالاختبارات وFirestoreRepository
+ * حقيقيًا)، بينما إرسال Push يحتاج Firestore مباشرة (اشتراكات المتصفح). DispatchResult يحمل
+ * new_milestones، والمستدعي (netlify/functions/chat.mts) يستخدمها لإرسال push حقيقي best-effort
+ * (فشل الإرسال لا يوقف ولا يؤخر تسجيل الوجبة/الماي أبدًا — راجع notifications/engine.ts).
  */
 import { normalize } from "./arabicNormalize.js";
 import * as calculator from "./calculator.js";
@@ -83,11 +85,6 @@ export function compensationMessage(remaining: number, target: number): string {
   if (remaining >= 0 || !target) return "";
   const ratioOver = -remaining / target;
   return responses.compensationNote(ratioOver <= 0.1);
-}
-
-/** Push حقيقي لأي محطة Streak جديدة — Best-effort دائمًا (طبقة الإشعارات تُبنى لاحقًا). */
-async function notifyStreakMilestones(_user: UserRecord, _streakSnapshot: streaks.StreakSnapshot): Promise<void> {
-  // مقصود: لا شيء بعد — راجع تعليق أعلى الملف.
 }
 
 function addResolvedToPending(pending: PendingMeal, hit: { food_id: number; food_name: string; grams?: number; quantity?: number; unit_grams?: number; portion_name?: string }, nutrition: { calories: number; protein: number; carbs: number; fat: number }): void {
@@ -331,7 +328,6 @@ async function finalizeMeal(
   for (const milestone of streakSnapshot.new_milestones) {
     reply += `\n\n🔥 ${milestone.label}! +${milestone.xp_reward} XP`;
   }
-  await notifyStreakMilestones(user, streakSnapshot);
 
   if (source === "direct" || source === "recipe") {
     const snapshot = directLog.buildMealSnapshot(
@@ -347,6 +343,7 @@ async function finalizeMeal(
   return {
     reply, meal_logged: true, today_calories: dayTotals.calories,
     target_calories: target, remaining, xp: user.xp, free_meals_used: user.free_meals_used,
+    new_milestones: streakSnapshot.new_milestones,
   };
 }
 
@@ -512,8 +509,7 @@ async function handleWaterLog(repo: Repository, user: UserRecord, textNorm: stri
   for (const milestone of streakSnapshot.new_milestones) {
     reply += `\n\n🔥 ${milestone.label}! +${milestone.xp_reward} XP`;
   }
-  await notifyStreakMilestones(user, streakSnapshot);
-  return { reply, meal_logged: false };
+  return { reply, meal_logged: false, new_milestones: streakSnapshot.new_milestones };
 }
 
 async function handleWeightUpdate(repo: Repository, user: UserRecord, textNorm: string): Promise<DispatchResult> {

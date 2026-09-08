@@ -1,5 +1,5 @@
 /** POST /api/auth/login — يعادل auth.py's login(). */
-import type { Context, Config } from "@netlify/functions";
+import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { findUserCredentialsByEmail, checkPassword, signSession, buildSessionCookie } from "../../shared/nutrition-engine/auth.js";
@@ -30,12 +30,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonError(403, "ACCOUNT_DISABLED", "هذا الحساب معطّل، تواصل مع الإدارة");
     }
 
-    const token = signSession({ sub: user.id, role: user.role });
+    const token = signSession({ sub: user.id, role: user.role, email });
     return jsonOk({ user_id: user.id }, { headers: { "Set-Cookie": buildSessionCookie(token) } });
   } catch (err) {
     console.error("auth-login error:", err);
     return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
   }
 };
-
-export const config: Config = { path: "/.netlify/functions/auth-login" };

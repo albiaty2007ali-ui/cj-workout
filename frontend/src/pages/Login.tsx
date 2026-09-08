@@ -42,6 +42,9 @@ export default function Login() {
         <p className="auth-switch">
           ماكو حساب؟ <Link to="/register">سجّل وحدة جديدة</Link>
         </p>
+        <p className="auth-switch">
+          <Link to="/forgot-password">نسيت كلمة المرور؟</Link>
+        </p>
       </form>
     </div>
   );

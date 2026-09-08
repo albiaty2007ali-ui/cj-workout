@@ -2,7 +2,7 @@
  * GET /api/progress/daily?date=YYYY-MM-DD — يعادل progress_bp.py's /daily. اليوم الحالي
  * افتراضيًا (بتوقيت بغداد)؛ الأيام الماضية للقراءة فقط، بدون ميزانية توزيع (نفس قرار الأصل).
  */
-import type { Context, Config } from "@netlify/functions";
+import type { Context } from "@netlify/functions";
 import { FirestoreRepository } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
@@ -67,5 +67,3 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
   }
 };
-
-export const config: Config = { path: "/.netlify/functions/progress-daily" };

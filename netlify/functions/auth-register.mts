@@ -1,12 +1,11 @@
-/** POST /api/auth/register — يعادل auth.py's register(). إرسال إيميل الترحيب غير منفَّذ هنا
- * بعد (طبقة email_service.py لسا ما تحوّلت) — التسجيل ينجح بدونه، مطابقًا لقاعدة "فشل الإيميل
- * لا يوقف الإجراء الحقيقي" الموثّقة بالأصل. */
-import type { Context, Config } from "@netlify/functions";
+/** POST /api/auth/register — يعادل auth.py's register(). */
+import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { emailExists, createUser, signSession, buildSessionCookie } from "../../shared/nutrition-engine/auth.js";
 import { validateName, validateEmail, validatePassword } from "../../shared/nutrition-engine/validation.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
+import { sendWelcomeEmail } from "../../shared/nutrition-engine/emailService.js";
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method !== "POST") return jsonError(405, "METHOD_NOT_ALLOWED", "استخدم POST فقط.");
@@ -42,12 +41,17 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     }
 
     const { id, role } = await createUser(db, { name, email, password });
-    const token = signSession({ sub: id, role });
+
+    try {
+      await sendWelcomeEmail(email, name);
+    } catch (e) {
+      console.warn("welcome email failed:", e);
+    }
+
+    const token = signSession({ sub: id, role, email });
     return jsonOk({ user_id: id }, { headers: { "Set-Cookie": buildSessionCookie(token) } });
   } catch (err) {
     console.error("auth-register error:", err);
     return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
   }
 };
-
-export const config: Config = { path: "/.netlify/functions/auth-register" };

@@ -26,7 +26,7 @@ import type {
   MealStatusRecord, NutritionTipRecord, RecipeRecord,
 } from "./repository.js";
 
-function genId(): string {
+export function genId(): string {
   return randomUUID().replace(/-/g, "");
 }
 

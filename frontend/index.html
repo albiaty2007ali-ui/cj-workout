@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CJ WORKOUT</title>
+    <script>
+      // يُطبَّق قبل أول Paint حتى ما يصير "ومضة" لون خاطئ لحظة تحميل الصفحة —
+      // نفس مفتاح localStorage ("cj_theme") المستخدم بالنسخة الأصلية (static/js/settings.js)
+      try {
+        var t = localStorage.getItem("cj_theme");
+        if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

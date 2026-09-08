@@ -66,7 +66,7 @@ export default function Profile() {
           {!editing ? (
             <>
               <p style={{ fontWeight: 700, fontSize: "1.1rem" }}>{profile.name}</p>
-              {profile.username && <p style={{ color: "var(--text-muted, #777)" }}>@{profile.username}</p>}
+              {profile.username && <p style={{ color: "var(--text-muted, var(--text-muted))" }}>@{profile.username}</p>}
               {profile.bio && <p>{profile.bio}</p>}
               <button className="btn btn-outline-dark" onClick={() => setEditing(true)}>تعديل البيانات</button>
             </>
@@ -130,8 +130,8 @@ export default function Profile() {
                 title={day.date}
                 style={{
                   aspectRatio: "1", borderRadius: 6,
-                  background: day.active ? "var(--moss, #4c7a5e)" : "#e5e0d5",
-                  border: day.is_today ? "2px solid #1f3a2e" : "none",
+                  background: day.active ? "var(--moss, var(--moss))" : "var(--border)",
+                  border: day.is_today ? "2px solid var(--heading)" : "none",
                 }}
               />
             ))}

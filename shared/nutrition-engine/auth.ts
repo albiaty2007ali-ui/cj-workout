@@ -33,6 +33,20 @@ export function checkPassword(rawPassword: string, stored: string): boolean {
 export interface SessionClaims {
   sub: string; // user id
   role: string;
+  email: string;
+}
+
+/**
+ * نقطة التحقق المركزية الوحيدة من صلاحية أدمن — مصدر الحقيقة هو متغير بيئة ADMIN_EMAIL (Netlify
+ * Environment Variables)، وليس فقط حقل role بقاعدة البيانات. هذا يمنع بالضبط الالتباس اللي صار:
+ * حساب تجربة تُرفَّع مؤقتًا لأدمن (لاختبار) ويبقى ظاهر للوحة الإدارة حتى بعد التجربة. حتى لو
+ * role="admin" بقيت بالخطأ بمستند مستخدم آخر بـFirestore، هذا الفحص يرفضها لأنه يقارن الإيميل
+ * الحقيقي المُوقَّع بالـJWT مع القيمة الوحيدة المصرَّح بيها بالبيئة — كل ملفات admin-*.mts تستدعي
+ * هذي الدالة، صفر تكرار لمنطق "if user.email == ...".
+ */
+export function isAdminClaims(claims: SessionClaims | null): boolean {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  return !!claims && !!adminEmail && claims.role === "admin" && claims.email.toLowerCase() === adminEmail.toLowerCase();
 }
 
 const SESSION_LIFETIME_SECONDS = 14 * 24 * 60 * 60; // 14 يوم — نفس PERMANENT_SESSION_LIFETIME الحالي
