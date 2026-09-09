@@ -35,7 +35,7 @@ import { NLU_ALLOWED_INTENTS } from "./nlu/knownIntents.js";
 import type { NLUContext } from "./nlu/types.js";
 import { pyFloatStr } from "./pyRound.js";
 import { FREE_MEALS_CAP } from "./userStatus.js";
-import type { Repository, UserRecord } from "./db/repository.js";
+import type { Repository, UserRecord, RecipeRecord } from "./db/repository.js";
 import type { PendingMeal, PendingItem } from "./corrections.js";
 
 // كلمات تصنيف تُمرَّر مباشرة لـrecipeSearch بدل بحث نصي حر — نفس عبارات
@@ -549,6 +549,61 @@ async function handlePortionForFood(
 }
 
 /**
+ * Cook From What I Have — "عندي بيض وبطاطا، شنو اگدر اطبخ؟" — يبحث بوصفات قسم وجبات الدايت
+ * الحقيقية عن أعلى نسبة تطابق مكونات، صفر تسجيل وجبة أبدًا (نفس ضمان handleWhatIf). يعيد
+ * استخدام extractFoodEntities الموجودة (نفس محرك استخراج الطعام المتعدد لتسجيل الوجبات، يشمل
+ * نظام Aliases الحقيقي لـfoods.sqlite تلقائيًا — "بطاطا"~"بطاطس" تُحل بنفس الآلية الموجودة).
+ */
+async function handleCookFromIngredients(repo: Repository, textNorm: string): Promise<DispatchResult> {
+  const entities = await extractFoodEntities(textNorm);
+  // نأخذ الهوية فقط (مو الكمية) — طعام واحد بدون رقم غالبًا يرجع "clarification: quantity/
+  // confirm_match" مو resolved مباشرة (نفس اللي صار مع "عندي دجاج"، دجاج مقلي طابق بثقة كافية
+  // للهوية بس احتاج سؤال كمية) — هذا لا يهمنا هنا أصلاً، نريد بس نعرف "شنو المكوّن المذكور؟".
+  const mentionedNames = [
+    ...entities.resolved.map((h) => h.food_name),
+    ...entities.clarifications.flatMap((c) => ("food_id" in c && c.food_id ? [c.food_name] : [])),
+  ];
+
+  if (mentionedNames.length === 0) {
+    return { reply: "گلي شنو عندك من مكونات وأشوفلك وصفة حقيقية تناسبها (مثلاً: عندي بيض وبطاطا وطماطة).", meal_logged: false, suggested_recipe: null };
+  }
+
+  const recipes = await repo.findActiveRecipes(null);
+  const scored: { recipe: RecipeRecord; coverage: number; missing: string[] }[] = [];
+  for (const r of recipes) {
+    if (r.ingredients.length === 0) continue;
+    const missing = r.ingredients.filter(
+      (ing) => !mentionedNames.some((name) => ing.name.includes(name) || name.includes(ing.name)),
+    );
+    const coverage = (r.ingredients.length - missing.length) / r.ingredients.length;
+    if (coverage > 0) scored.push({ recipe: r, coverage, missing: missing.map((m) => m.name) });
+  }
+  scored.sort((a, b) => b.coverage - a.coverage);
+  const top = scored.slice(0, 3);
+
+  if (top.length === 0) {
+    return { reply: "ما لكيت وصفة حقيقية بقسم وجبات الدايت تستخدم هذي المكونات حاليًا.", meal_logged: false, suggested_recipe: null };
+  }
+
+  const lines = top.map((s) => {
+    const pct = Math.round(s.coverage * 100);
+    const note = s.missing.length > 0 ? ` — ناقصك: ${s.missing.join("، ")}` : " — عندك كل المكونات المطلوبة 👍";
+    return `🍽️ ${s.recipe.name} (${pct}% من المكونات متوفرة)${note}`;
+  });
+
+  const bestFull = top.find((s) => s.coverage === 1);
+  const suggestedRecipe = bestFull
+    ? { id: bestFull.recipe.id, slug: bestFull.recipe.slug, name: bestFull.recipe.name, calories: bestFull.recipe.calories, protein: bestFull.recipe.protein, carbs: bestFull.recipe.carbs, fat: bestFull.recipe.fat }
+    : null;
+
+  return {
+    reply: `من الي گلتلي عليه، هذي وصفات حقيقية من قسم وجبات الدايت تگدر تسويها:\n${lines.join("\n")}`,
+    meal_logged: false,
+    suggested_recipe: suggestedRecipe,
+  };
+}
+
+/**
  * أسئلة معلوماتية صرفة عن طعام محدد (ASK_CALORIES/ASK_FOOD_SIZE/ASK_FOOD_FIT/ASK_SUBSTITUTION) —
  * صفر تسجيل وجبة أبدًا (meal_logged: false دايمًا)، بس معلومة حقيقية من قاعدة البيانات. يعتمد
  * نفس منطق استخراج الطعام المستخدم بـASK_PORTION_FOR_FOOD (رسالة حالية، أو موضوع طعام سابق).
@@ -852,6 +907,7 @@ async function dispatch(
   if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, foodLookupText, "plan");
   if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now, nluFoodQuery);
   if (intent === intents.WHAT_IF) return handleWhatIf(repo, user, foodLookupText, now);
+  if (intent === intents.COOK_FROM_INGREDIENTS) return handleCookFromIngredients(repo, foodLookupText);
   if (intent === intents.ASK_CALORIES) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "calories");
   if (intent === intents.ASK_FOOD_SIZE) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "size");
   if (intent === intents.ASK_FOOD_FIT) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "fit");

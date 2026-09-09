@@ -452,6 +452,14 @@ body {
 .recipe-fits-badge { font-size: 0.72rem; color: var(--moss); font-weight: 700; margin: 4px 0 0; }
 .recipe-over-badge { font-size: 0.72rem; color: var(--gold); font-weight: 700; margin: 4px 0 0; }
 
+/* بطاقة وصفة مصغّرة داخل الشات (المرحلة 3 من الذكاء الغذائي الذكي) — نفس .recipe-card تمامًا،
+   بس بعرض مقيّد وصورة أقصر حتى تنسجم مع عرض فقاعة الرسالة بدل عرض شبكة كاملة. */
+.chat-recipe-card { max-width: 320px; margin: 6px 0 10px; flex-direction: row; align-items: stretch; }
+.chat-recipe-card .recipe-card-img-placeholder { width: 80px; aspect-ratio: auto; font-size: 1.6rem; flex-shrink: 0; }
+.chat-recipe-card .recipe-card-body { padding: 10px 14px; gap: 3px; }
+.chat-recipe-card .recipe-card-name { font-size: 0.9rem; }
+.chat-recipe-card .recipe-card-btn { font-size: 0.78rem; padding: 0 12px; height: 30px; }
+
 .recipe-hero-img { width: 100%; max-height: 340px; object-fit: cover; border-radius: 24px; }
 .recipe-hero-placeholder {
   width: 100%; height: 220px; display: flex; align-items: center; justify-content: center;

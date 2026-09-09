@@ -52,6 +52,16 @@ export interface MeResponse {
   profile: { calorie_target: number; water_target_ml: number } | null;
 }
 
+export interface SuggestedRecipe {
+  id: string;
+  slug: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
 export interface ChatReply {
   reply: string | null;
   meal_logged: boolean;
@@ -60,4 +70,5 @@ export interface ChatReply {
   remaining?: number;
   xp?: number;
   free_meals_used?: number;
+  suggested_recipe?: SuggestedRecipe | null;
 }

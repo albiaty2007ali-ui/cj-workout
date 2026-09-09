@@ -38,6 +38,9 @@ export const ASK_SUBSTITUTION = "ASK_SUBSTITUTION";
 // كسلسلة فرعية جوا "إذا أكلت" فيتفعّل hasConsumptionHint وتسقط الرسالة لـLOG_MEAL الافتراضي
 // (نفس فئة باگ "شكد حجم البيتزا؟" بالضبط). راجع WHAT_IF_PARTICLES/detectIntent أسفل.
 export const WHAT_IF = "WHAT_IF";
+// "شنو أگدر أطبخ من الموجود عندي؟" — يبحث بوصفات قسم وجبات الدايت الحقيقية عن أعلى تطابق
+// مكونات، صفر تسجيل وجبة (نفس ضمان WHAT_IF أعلاه، راجع handleCookFromIngredients).
+export const COOK_FROM_INGREDIENTS = "COOK_FROM_INGREDIENTS";
 // حارس أمان عام (راجع detectIntent أسفل) — أي سؤال عن أكل ما طابق نية محددة، يرجع هذا بدل
 // LOG_MEAL الافتراضي حتى ما ينسجل بالغلط كوجبة حقيقية (Bug حقيقي انكشف: "شكد حجم البيتزا؟"
 // كانت تتسجل كوجبة أكل فعلية لأن "بيتزا" تتطابق بثقة كاملة وماكو حارس يفرّق سؤال عن استهلاك).
@@ -164,6 +167,17 @@ export const SUBSTITUTION_MARKERS = [
 // كثيرة ("لو اخذت"، "شنو اذا سويت")، والشرط الفعلي بـdetectIntent يجمعها مع hasConsumptionHint
 // فقط — صفر خطر مصادفة مع رسالة عادية بدون فعل استهلاك.
 export const WHAT_IF_PARTICLES = ["اذا", "إذا", "لو", "شنو لو", "شنو اذا", "شنو إذا"];
+
+// "عندي بيض وبطاطا، شنو اگدر اطبخ؟" — تصريح مكونات متوفرة، مو تسجيل استهلاك أبدًا. "عندي" وحدها
+// كافية كمؤشر أولي (تحقّق حقيقي لاحقًا بالمعالج: صفر طعام معروف يتطابق = سؤال توضيحي، مو تخمين
+// وصفة). **ملاحظة أمان مهمة**: "عدي" (بدون ن) اتحذفت عمدًا بعد اكتشاف تصادم حقيقي — سلسلة فرعية
+// جوا "تعدي"/"يعدي" (فعل التجاوز، مستخدم فعليًا بـFOOD_FIT_QUESTION_MARKERS أسفل)، كانت
+// تخطف رسائل زي "الدولمة تعدي سعراتي؟" لهذا القسم بالغلط.
+export const COOK_FROM_INGREDIENTS_MARKERS = [
+  "شنو اگدر اطبخ", "شنو أگدر أطبخ", "شنو اقدر اطبخ", "شنو أقدر أطبخ",
+  "شنو اطبخ من", "شنو أطبخ من", "اسوي من الي عندي", "أسوي من الي عندي",
+  "عندي",
+];
 
 // أفعال استهلاك صريحة — تُستخدم بحارس الأمان العام (أسفل detectIntent) لتمييز جملة استهلاك
 // حقيقية عن سؤال يذكر نفس الطعام صدفة (مثلاً "شكد حجم البيتزا؟" ما فيها أي من هذي).
@@ -314,6 +328,7 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   // الفرضية نفسها — هذا بالضبط ما كان يخلي hasConsumptionHint يتفعّل بالغلط ويُسقِط الرسالة
   // لـLOG_MEAL الافتراضي (Bug حقيقي حي مُصلَح هنا).
   if (includesAny(textNorm, WHAT_IF_PARTICLES) && WHAT_IF_CONSUMPTION_HINTS.some((w) => textNorm.includes(w))) return WHAT_IF;
+  if (includesAny(textNorm, COOK_FROM_INGREDIENTS_MARKERS)) return COOK_FROM_INGREDIENTS;
 
   // أسئلة معلوماتية صرفة عن طعام (سعرات/حجم/وحدة/ملاءمة/بديل) — لازم تُفحص قبل PORTION_QUESTION_
   // MARKERS/LOG_MEAL لأنها لا تطلب توصية كمية ولا تعبّر عن نية أكل، بس معلومة. هذا يسد بالضبط

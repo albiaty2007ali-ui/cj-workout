@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, type ChatReply, type MeResponse } from "../lib/api";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { api, type ChatReply, type MeResponse, type SuggestedRecipe } from "../lib/api";
 import type { GreetingResponse } from "../lib/greetingApi";
 import type { DailyResponse, WeightStatsResponse } from "../lib/progressApi";
 import type { DailySummaryResponse } from "../lib/intelligenceApi";
@@ -10,6 +10,7 @@ import { useI18n } from "../i18n/I18nContext";
 interface Message {
   role: "user" | "bot";
   text: string;
+  recipeCard?: SuggestedRecipe;
 }
 
 const STATIC_PROMPTS = [
@@ -95,7 +96,7 @@ export default function Chat() {
         return;
       }
       const reply = res.data?.reply ?? "...";
-      setMessages((prev) => [...prev, { role: "bot", text: reply }]);
+      setMessages((prev) => [...prev, { role: "bot", text: reply, recipeCard: res.data?.suggested_recipe ?? undefined }]);
       if (typeof res.data?.remaining === "number") setRemaining(res.data.remaining);
       if (typeof res.data?.today_calories === "number" && daily) {
         setDaily({ ...daily, target_calories: daily.target_calories });
@@ -180,7 +181,21 @@ export default function Chat() {
             </>
           )}
           {messages.map((m, i) => (
-            <div key={i} className={`bubble ${m.role}`}>{m.text}</div>
+            <div key={i}>
+              <div className={`bubble ${m.role}`}>{m.text}</div>
+              {m.recipeCard && (
+                <Link className="recipe-card chat-recipe-card" to={`/recipes/${encodeURIComponent(m.recipeCard.slug)}`}>
+                  <div className="recipe-card-img-placeholder">🍽️</div>
+                  <div className="recipe-card-body">
+                    <p className="recipe-card-name">{m.recipeCard.name}</p>
+                    <p className="recipe-card-macros">
+                      {m.recipeCard.calories} kcal · بروتين {m.recipeCard.protein}غ · كارب {m.recipeCard.carbs}غ · دهون {m.recipeCard.fat}غ
+                    </p>
+                    <span className="btn btn-outline-dark recipe-card-btn">عرض الوصفة</span>
+                  </div>
+                </Link>
+              )}
+            </div>
           ))}
           {sending && (
             <div className="bubble bot typing-bubble" aria-label="جاري الكتابة">
