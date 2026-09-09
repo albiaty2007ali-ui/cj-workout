@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CJ WORKOUT is a Flask server-rendered web app (Arabic/Iraqi-dialect UI) combining subscription/payment management with a **local-first nutrition chat assistant**. "Local-first" is a hard architectural constraint here, not an implementation detail: there is no external LLM/nutrition API call at runtime. All food matching, quantity resolution, and calorie math run against a local SQLite database and hand-written Arabic NLP rules in this repo.
 
+> **Note — parallel Netlify/TypeScript engine also exists in this repo.** Everything below in this
+> file documents the *original* Flask/Python app (`nutrition_ai/`, `templates/`, etc.), which is
+> still present and functional. A second, actively-deployed implementation of the same nutrition
+> engine — TypeScript, ported layer-for-layer from `nutrition_ai/` — lives in
+> `shared/nutrition-engine/` + `netlify/functions/` + `frontend/` (React), deployed to Netlify/
+> Firebase. It is "local-first" in the same sense (calories/portions/business rules never come
+> from an LLM), but it *does* optionally call Gemini as a bounded NLU layer — see
+> **[AI_ARCHITECTURE.md](AI_ARCHITECTURE.md)** for that design and its safety guarantees. This
+> CLAUDE.md was never updated when that migration happened; treat the Flask docs below as accurate
+> for `app.py`/`nutrition_ai/` only, not for the Netlify/TS engine.
+
 ## Commands
 
 ```bash

@@ -28,6 +28,9 @@ import * as weightOps from "./weightOps.js";
 import * as xpEngine from "./xpEngine.js";
 import { getPortionsFor } from "./foodSearch.js";
 import { getCurrentPeriod, relevantMealForPeriod, todayBaghdadIso } from "./iraqTime.js";
+import * as nluConfig from "./nlu/config.js";
+import { NLU_ALLOWED_INTENTS } from "./nlu/knownIntents.js";
+import type { NLUContext } from "./nlu/types.js";
 import { pyFloatStr } from "./pyRound.js";
 import { FREE_MEALS_CAP } from "./userStatus.js";
 import type { Repository, UserRecord } from "./db/repository.js";
@@ -490,8 +493,15 @@ async function handleFoodTopic(repo: Repository, user: UserRecord, textNorm: str
   return { reply: ack, meal_logged: false };
 }
 
-async function handlePortionForFood(repo: Repository, user: UserRecord, textNorm: string, now: Date): Promise<DispatchResult> {
+async function handlePortionForFood(
+  repo: Repository, user: UserRecord, textNorm: string, now: Date, nluFoodQuery: string | null = null,
+): Promise<DispatchResult> {
   let [foodId, foodName] = await extractFirstFood(textNorm);
+  // Gemini NLU (لو فعّال ووصل هالمعالج) نظّف اسم الطعام (مثلاً غلطة إملائية) — نجرب فيه بس إذا
+  // الاستخراج المحلي المباشر فشل، صفر أولوية عليه أبدًا.
+  if (foodId === null && nluFoodQuery) {
+    [foodId, foodName] = await extractFirstFood(nluFoodQuery);
+  }
   if (foodId === null && user.pending_food_topic_json) {
     const topic = JSON.parse(user.pending_food_topic_json) as { food_id: number; food_name: string };
     foodId = topic.food_id;
@@ -638,16 +648,96 @@ export async function handleMessage(repo: Repository, user: UserRecord, text: st
     has_pending_recipe: user.pending_recipe_confirmation_id !== null,
     has_pending_food_topic: user.pending_food_topic_json !== null,
   };
-  const intent = intents.detectIntent(textNorm, ctxFlags);
+  const localIntent = intents.detectIntent(textNorm, ctxFlags);
 
-  return dispatch(repo, user, textNorm, intent, pending, target, now);
+  const { intent, nluFoodQuery } = await resolveIntentViaNlu(repo, user, textNorm, localIntent, pending, profile, now);
+
+  return dispatch(repo, user, textNorm, intent, pending, target, now, nluFoodQuery);
+}
+
+/**
+ * مرحلة 3 — Gemini كطبقة NLU Hybrid فوق النظام المحلي (راجع AI_ARCHITECTURE.md للتفصيل الكامل).
+ * يُستدعى فقط لما النظام المحلي نفسه يعترف إنه ما فهم بوضوح (ASK_GENERAL_FOOD_INFO — نفس حارس
+ * الأمان من المرحلة 1)، صفر استدعاء Gemini على أي رسالة أخرى (Local-First Routing، بند 5+23).
+ * قاعدة أمان حرجة غير قابلة للتفاوض (بند 6): NLU_ALLOWED_INTENTS تستثني LOG_MEAL بالذات، فمهما
+ * ادّعى Gemini (حتى should_log_meal=true)، أبدًا ما ينتج عنه تسجيل وجبة — الرسالة الأصلية تبقى
+ * مصدر الحقيقة (بند 7)، والتحقق (validateNluResult) يرفض أي نية غير مدرجة أصلاً.
+ */
+async function resolveIntentViaNlu(
+  repo: Repository, user: UserRecord, textNorm: string, localIntent: string,
+  pending: PendingMeal | null, profile: Awaited<ReturnType<Repository["findNutritionProfile"]>>, now: Date,
+): Promise<{ intent: string; nluFoodQuery: string | null }> {
+  if (localIntent !== intents.ASK_GENERAL_FOOD_INFO || !nluConfig.isNluEnabled()) {
+    return { intent: localIntent, nluFoodQuery: null };
+  }
+
+  const provider = nluConfig.getNluProvider();
+  const nluContext = await buildNluContext(repo, user, profile, pending, now);
+  const result = await provider.understand(textNorm, nluContext);
+
+  if (!result) {
+    console.log("[nlu]", JSON.stringify({ local_intent: localIntent, gemini_intent: null, fallback_reason: "unavailable_or_invalid" }));
+    return { intent: localIntent, nluFoodQuery: null };
+  }
+
+  const shadow = nluConfig.isShadowMode();
+  console.log("[nlu]", JSON.stringify({
+    local_intent: localIntent, gemini_intent: result.intent, gemini_confidence: result.confidence,
+    agreement: result.intent === localIntent, shadow_mode: shadow, food_query: result.entities.food_query,
+  }));
+
+  if (shadow) {
+    // وضع الظل: نراقب ونسجّل بس — القرار المحلي يبقى الفعلي دايمًا، صفر تأثير على الرد.
+    return { intent: localIntent, nluFoodQuery: null };
+  }
+
+  // دفاع بعمق (Defense in Depth) — تحقق مستقل هنا كمان، صفر ثقة عمياء بمصدر النتيجة (حتى لو
+  // GeminiNLUProvider نفسها تحقّقت داخليًا أصلاً عبر validateNluResult). أي NLUProvider مستقبلي
+  // قد لا يتحقق بنفس الصرامة — orchestrator.ts، مصدر القرار الفعلي، ما يثق بأي intent خارج
+  // اللائحة البيضاء تحت أي ظرف، بغض النظر شنو يدّعي should_log_meal. هذا بالضبط اللي يمنع سيناريو
+  // كارثي: رسالة سؤال بريئة ("ليش بيضة غالية هسه؟") تحتوي صدفة اسم طعام يتطابق بثقة كاملة —
+  // لو النية غير المفحوصة "LOG_MEAL" مرّت لـdispatch()، كانت راح تُسجَّل مباشرة (DIRECT_LOG).
+  if (!NLU_ALLOWED_INTENTS.has(result.intent)) {
+    console.warn("[nlu] rejected intent outside whitelist despite passing provider validation:", result.intent);
+    return { intent: localIntent, nluFoodQuery: null };
+  }
+
+  return { intent: result.intent, nluFoodQuery: result.entities.food_query };
+}
+
+async function buildNluContext(
+  repo: Repository, user: UserRecord, profile: Awaited<ReturnType<Repository["findNutritionProfile"]>>,
+  pending: PendingMeal | null, now: Date,
+): Promise<NLUContext> {
+  const ctx = await context.build(repo, user.id, profile, now);
+  let pendingFoodTopic: string | null = null;
+  if (user.pending_food_topic_json) {
+    try {
+      const topic = JSON.parse(user.pending_food_topic_json) as { food_name?: string };
+      pendingFoodTopic = topic.food_name ?? null;
+    } catch {
+      // JSON تالف — تجاهل بأمان، نفس تسامح بقية الكود مع pending_*_json
+    }
+  }
+  return {
+    current_time_iraq: getCurrentPeriod(now),
+    remaining_calories: profile ? ctx.remaining_calories : null,
+    target_calories: profile ? ctx.target_calories : null,
+    goal: profile ? ctx.goal : null,
+    pending_food_topic: pendingFoodTopic,
+    has_pending_meal: pending !== null,
+  };
 }
 
 async function dispatch(
   repo: Repository, user: UserRecord, textNorm: string, intent: string,
-  pendingIn: PendingMeal | null, target: number, now: Date,
+  pendingIn: PendingMeal | null, target: number, now: Date, nluFoodQuery: string | null = null,
 ): Promise<DispatchResult> {
   let pending = pendingIn;
+  // اسم طعام منظّف من Gemini NLU (لو انفعّل ووُثق بيه) — يُستخدم فقط لاستخراج الطعام بمعالجات
+  // الأسئلة المعلوماتية أدناه (بند 10 بالطلب: Gemini يعطي نص منظّف، الاستخراج/الحساب يبقى محليًا
+  // بالكامل عبر نفس extractFirstFood الحقيقي). لا تأثير على أي مسار تسجيل وجبة.
+  const foodLookupText = nluFoodQuery ?? textNorm;
 
   if (REOPEN_INTENTS.has(intent) && pending === null) {
     const reopened = await directLog.reopenMealForEdit(repo, user, now);
@@ -669,15 +759,15 @@ async function dispatch(
     return { reply: "تمام، خبرني لما تاكل 🌱 أو گلي شنو تشتهي وأقترحلك شي مناسب لسعراتك المتبقية.", meal_logged: false };
   }
   if (intent === intents.EXPRESS_DESIRE) return handleExpressDesire(repo, user, textNorm, now);
-  if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, textNorm, "craving");
-  if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, textNorm, "plan");
-  if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now);
-  if (intent === intents.ASK_CALORIES) return handleFoodInfoQuestion(repo, user, textNorm, now, "calories");
-  if (intent === intents.ASK_FOOD_SIZE) return handleFoodInfoQuestion(repo, user, textNorm, now, "size");
-  if (intent === intents.ASK_FOOD_FIT) return handleFoodInfoQuestion(repo, user, textNorm, now, "fit");
-  if (intent === intents.ASK_SUBSTITUTION) return handleFoodInfoQuestion(repo, user, textNorm, now, "substitution");
+  if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, foodLookupText, "craving");
+  if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, foodLookupText, "plan");
+  if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now, nluFoodQuery);
+  if (intent === intents.ASK_CALORIES) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "calories");
+  if (intent === intents.ASK_FOOD_SIZE) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "size");
+  if (intent === intents.ASK_FOOD_FIT) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "fit");
+  if (intent === intents.ASK_SUBSTITUTION) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "substitution");
   if (intent === intents.ASK_UNIT) return handleUnitQuestion(textNorm);
-  if (intent === intents.ASK_GENERAL_FOOD_INFO) return handleGeneralFoodInfo(textNorm);
+  if (intent === intents.ASK_GENERAL_FOOD_INFO) return handleGeneralFoodInfo(foodLookupText);
   if (intent === intents.GREETING) return handleGreeting(user, now);
   if (intent === intents.FAREWELL) return { reply: responses.farewell(), meal_logged: false };
   if (intent === intents.THANKS) return { reply: responses.thanksAck(), meal_logged: false };
