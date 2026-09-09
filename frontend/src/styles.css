@@ -319,6 +319,50 @@ body {
 .chat-calorie-cards .cc-value { font-size: 0.95rem; margin-top: 2px; }
 @media (max-width: 480px) { .chat-calorie-cards { grid-template-columns: repeat(2, 1fr); } }
 .side-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; color: var(--text); }
+
+/* ---- شارة المستوى التجميلية (Profile) ---- */
+.level-badge-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface-solid); border: 1px solid var(--gold); border-radius: 14px;
+  padding: 12px 16px; margin-top: 16px;
+}
+.level-badge-banner .badge-icon { font-size: 1.8rem; line-height: 1; }
+.level-badge-banner .badge-title { font-weight: 700; color: var(--heading); margin: 0; }
+.level-badge-banner .badge-sub { margin: 2px 0 0; font-size: 0.82rem; color: var(--text-muted); }
+
+/* ---- الإنجازات (Achievement Showcase) ---- */
+.achievement-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;
+}
+.achievement-badge {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+  background: var(--surface-solid); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px;
+}
+.achievement-badge .ab-icon { font-size: 1.6rem; }
+.achievement-badge .ab-value { font-weight: 700; color: var(--heading); font-size: 1.05rem; }
+.achievement-badge .ab-label { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ---- تقويم التغذية (Nutrition Calendar) ---- */
+.calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.calendar-nav button { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px; cursor: pointer; color: var(--heading); }
+.calendar-nav button:disabled { opacity: 0.35; cursor: default; }
+.calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+.calendar-weekdays span { text-align: center; font-size: 0.72rem; color: var(--text-muted); }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.calendar-day {
+  aspect-ratio: 1; border-radius: 8px; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--text);
+  background: var(--border);
+}
+.calendar-day.empty { visibility: hidden; cursor: default; }
+.calendar-day.status-green { background: var(--moss); color: #fff; }
+.calendar-day.status-yellow { background: var(--gold); color: #fff; }
+.calendar-day.status-orange { background: #c97a3d; color: #fff; }
+.calendar-day.is-today { outline: 2px solid var(--heading); outline-offset: 1px; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); }
+.calendar-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.calendar-legend .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.calendar-day-detail { margin-top: 10px; padding: 10px 12px; background: var(--surface); border-radius: 10px; font-size: 0.85rem; }
 .chat-page .side-panel { margin: 10px 20px 0; }
 .chat-page .side-panel p { margin: 4px 0; font-size: 0.88rem; }
 .chat-messages {

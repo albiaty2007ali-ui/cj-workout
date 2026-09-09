@@ -129,9 +129,9 @@ export class InMemoryRepository implements Repository {
     return this.waterLogs.filter((w) => w.user_id === userId).length;
   }
 
-  levels: { level: number; required_xp: number; title: string; reward: string | null }[] = [];
+  levels: { level: number; required_xp: number; title: string; reward: { badge_icon: string; badge_title: string } | null }[] = [];
 
-  async listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: string | null }[]> {
+  async listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: { badge_icon: string; badge_title: string } | null }[]> {
     return [...this.levels].sort((a, b) => a.level - b.level);
   }
 

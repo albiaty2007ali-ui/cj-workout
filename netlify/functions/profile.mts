@@ -12,10 +12,22 @@ import {
 import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import { xpProgress } from "../../shared/nutrition-engine/levels.js";
-import { recentActiveDates, daysAbsent } from "../../shared/nutrition-engine/streaks.js";
+import { daysAbsent } from "../../shared/nutrition-engine/streaks.js";
 import { todayBaghdadIso, addDaysIso } from "../../shared/nutrition-engine/iraqTime.js";
+import { recentBehavior } from "../../shared/nutrition-engine/behaviorAggregator.js";
+import { listChallenges } from "../../shared/nutrition-engine/challenges.js";
+import type { BehaviorDailyRecord } from "../../shared/nutrition-engine/db/repository.js";
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+const CALENDAR_DAYS = 90;
+
+/** حالة اليوم لتقويم التغذية — مشتقة من behavior_daily الحقيقي فقط، صفر تخمين. */
+function dayStatus(record: BehaviorDailyRecord | undefined): "green" | "yellow" | "orange" | "none" {
+  if (!record || record.meals_logged === 0) return "none";
+  if (record.meals_logged >= 2 && record.protein_hit_target && record.water_hit_target) return "green";
+  if (record.protein_hit_target || record.water_hit_target) return "yellow";
+  return "orange";
+}
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
@@ -30,19 +42,29 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       if (!user) return jsonError(404, "USER_NOT_FOUND", "الحساب غير موجود.");
       const display = await getUserDisplayFields(db, claims.sub);
 
-      const [levels, mealsLogged, waterLogs, activeDates] = await Promise.all([
+      const [levels, mealsLogged, waterLogs, behaviorRows, challenges] = await Promise.all([
         repo.listLevels(),
         repo.countMealLogsForUser(claims.sub),
         repo.countWaterLogsForUser(claims.sub),
-        recentActiveDates(repo, user, 30),
+        recentBehavior(repo, claims.sub, CALENDAR_DAYS),
+        listChallenges(repo, user),
       ]);
 
+      const behaviorByDate = new Map(behaviorRows.map((r) => [r.date, r]));
       const today = todayBaghdadIso();
-      const calendar = Array.from({ length: 30 }, (_, i) => {
-        const offset = 29 - i;
+      const calendar = Array.from({ length: CALENDAR_DAYS }, (_, i) => {
+        const offset = CALENDAR_DAYS - 1 - i;
         const date = addDaysIso(today, -offset);
-        return { date, active: activeDates.has(date), is_today: offset === 0 };
+        const record = behaviorByDate.get(date);
+        return {
+          date, is_today: offset === 0, status: dayStatus(record),
+          meals_logged: record?.meals_logged ?? 0,
+          protein_hit_target: record?.protein_hit_target ?? false,
+          water_hit_target: record?.water_hit_target ?? false,
+        };
       });
+
+      const challengesCompleted = challenges.filter((c) => c.status === "completed").length;
 
       return jsonOk({
         name: display?.name, username: display?.username, bio: display?.bio,
@@ -50,6 +72,13 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         xp: user.xp, streak_days: user.streak_days, longest_streak: user.longest_streak,
         days_absent: daysAbsent(user), progress: xpProgress(levels, user.xp),
         stats: { meals_logged: mealsLogged, water_logs: waterLogs, calendar },
+        achievements: {
+          level: xpProgress(levels, user.xp).level,
+          streak_days: user.streak_days,
+          longest_streak: user.longest_streak,
+          meals_logged: mealsLogged,
+          challenges_completed: challengesCompleted,
+        },
       });
     }
 

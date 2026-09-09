@@ -1,7 +1,10 @@
 export interface CalendarDay {
   date: string;
-  active: boolean;
   is_today: boolean;
+  status: "green" | "yellow" | "orange" | "none";
+  meals_logged: number;
+  protein_hit_target: boolean;
+  water_hit_target: boolean;
 }
 
 export interface XpProgress {
@@ -14,6 +17,16 @@ export interface XpProgress {
   span?: number | null;
   needed_for_next: number | null;
   is_max_level?: boolean;
+  badge_icon?: string | null;
+  badge_title?: string | null;
+}
+
+export interface AchievementSummary {
+  level: number;
+  streak_days: number;
+  longest_streak: number;
+  meals_logged: number;
+  challenges_completed: number;
 }
 
 export interface ProfileResponse {
@@ -32,4 +45,5 @@ export interface ProfileResponse {
     water_logs: number;
     calendar: CalendarDay[];
   };
+  achievements: AchievementSummary;
 }

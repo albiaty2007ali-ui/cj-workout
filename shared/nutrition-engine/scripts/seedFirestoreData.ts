@@ -118,6 +118,13 @@ const DEFAULT_MILESTONES = [
 
 // ---- نفس منحنى/العناوين بالضبط من nutrition_ai/levels.py ----
 const SPECIAL_TITLES: Record<number, string> = { 1: "البداية", 5: "ملتزم", 10: "مستمر", 20: "منضبط", 30: "محترف" };
+// مكافآت تجميلية بحتة (شارة+لقب) تُعرَض بالبروفايل عند وصول المستوى — صفر تأثير على أي حساب حقيقي.
+const SPECIAL_REWARDS: Record<number, { badge_icon: string; badge_title: string }> = {
+  5: { badge_icon: "🥉", badge_title: "شارة الالتزام" },
+  10: { badge_icon: "🥈", badge_title: "شارة الاستمرارية" },
+  20: { badge_icon: "🥇", badge_title: "شارة الانضباط" },
+  30: { badge_icon: "🏆", badge_title: "شارة الاحتراف" },
+};
 
 // ---- نفس TIPS_SEED بالضبط من nutrition_ai/tips_seed.py ----
 const TIPS_SEED = [
@@ -234,7 +241,8 @@ async function main() {
     for (let level = 1; level <= 30; level++) {
       const requiredXp = level > 1 ? Math.round(50 * Math.pow(level, 1.6)) : 0;
       const title = SPECIAL_TITLES[level] ?? `مستوى ${level}`;
-      batch.set(db.collection("levels").doc(String(level)), { level, required_xp: requiredXp, title, reward: null });
+      const reward = SPECIAL_REWARDS[level] ?? null;
+      batch.set(db.collection("levels").doc(String(level)), { level, required_xp: requiredXp, title, reward });
     }
     await batch.commit();
   });

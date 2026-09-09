@@ -308,9 +308,9 @@ export class FirestoreRepository implements Repository {
     return snap.data().count;
   }
 
-  async listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: string | null }[]> {
+  async listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: { badge_icon: string; badge_title: string } | null }[]> {
     const snap = await this.db.collection("levels").orderBy("level").get();
-    return snap.docs.map((d) => d.data() as { level: number; required_xp: number; title: string; reward: string | null });
+    return snap.docs.map((d) => d.data() as { level: number; required_xp: number; title: string; reward: { badge_icon: string; badge_title: string } | null });
   }
 
   async insertMealLog(row: MealLogInput): Promise<MealLogRecord> {

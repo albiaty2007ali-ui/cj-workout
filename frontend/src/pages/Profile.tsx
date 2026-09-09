@@ -1,8 +1,29 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
-import type { ProfileResponse } from "../lib/profileApi";
+import type { ProfileResponse, CalendarDay } from "../lib/profileApi";
 import AppShell from "../components/AppShell";
+
+const WEEKDAY_LABELS = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
+const STATUS_LABEL: Record<CalendarDay["status"], string> = {
+  green: "يوم ممتاز 🟢", yellow: "يوم جزئي 🟡", orange: "سجّلت بس ناقص هدف 🟠", none: "ماكو بيانات ⚪",
+};
+
+function monthKey(iso: string): string {
+  return iso.slice(0, 7);
+}
+function daysInMonth(year: number, month1based: number): number {
+  return new Date(Date.UTC(year, month1based, 0)).getUTCDate();
+}
+function firstWeekday(year: number, month1based: number): number {
+  return new Date(Date.UTC(year, month1based - 1, 1)).getUTCDay();
+}
+function shiftMonth(key: string, delta: number): string {
+  const [y, m] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+const MONTH_LABELS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -14,6 +35,8 @@ export default function Profile() {
   const [bio, setBio] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [viewMonth, setViewMonth] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   async function load() {
     const [meRes, profileRes] = await Promise.all([
@@ -30,6 +53,9 @@ export default function Profile() {
       setName(profileRes.data.name);
       setUsername(profileRes.data.username ?? "");
       setBio(profileRes.data.bio ?? "");
+      if (profileRes.data.stats.calendar.length > 0) {
+        setViewMonth((prev) => prev ?? monthKey(profileRes.data!.stats.calendar[profileRes.data!.stats.calendar.length - 1].date));
+      }
     }
   }
 
@@ -55,7 +81,27 @@ export default function Profile() {
     }
   }
 
+  const calendarByDate = useMemo(() => {
+    const map = new Map<string, CalendarDay>();
+    profile?.stats.calendar.forEach((d) => map.set(d.date, d));
+    return map;
+  }, [profile]);
+
+  const earliestMonth = profile && profile.stats.calendar.length > 0 ? monthKey(profile.stats.calendar[0].date) : null;
+  const latestMonth = profile && profile.stats.calendar.length > 0 ? monthKey(profile.stats.calendar[profile.stats.calendar.length - 1].date) : null;
+
   if (!me || !profile) return null;
+
+  const selectedDay = selectedDate ? calendarByDate.get(selectedDate) : null;
+
+  const monthGrid = (() => {
+    if (!viewMonth) return null;
+    const [y, m] = viewMonth.split("-").map(Number);
+    const total = daysInMonth(y, m);
+    const offset = firstWeekday(y, m);
+    const cells: (string | null)[] = [...Array(offset).fill(null), ...Array.from({ length: total }, (_, i) => `${viewMonth}-${String(i + 1).padStart(2, "0")}`)];
+    return cells;
+  })();
 
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
@@ -115,6 +161,16 @@ export default function Profile() {
           </div>
         </div>
 
+        {profile.progress.badge_icon && (
+          <div className="level-badge-banner">
+            <span className="badge-icon">{profile.progress.badge_icon}</span>
+            <div>
+              <p className="badge-title">{profile.progress.badge_title}</p>
+              <p className="badge-sub">شارة تجميلية وصلتلها بمستوى {profile.progress.level}</p>
+            </div>
+          </div>
+        )}
+
         {!profile.progress.is_max_level && (
           <div className="notice-box" style={{ marginTop: 16 }}>
             باقيلك <strong>{profile.progress.needed_for_next}</strong> XP للمستوى الجاي
@@ -122,20 +178,85 @@ export default function Profile() {
         )}
 
         <div className="notice-box" style={{ marginTop: 16 }}>
-          <h3 style={{ marginTop: 0 }}>آخر 30 يوم</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 6 }}>
-            {profile.stats.calendar.map((day) => (
-              <div
-                key={day.date}
-                title={day.date}
-                style={{
-                  aspectRatio: "1", borderRadius: 6,
-                  background: day.active ? "var(--moss, var(--moss))" : "var(--border)",
-                  border: day.is_today ? "2px solid var(--heading)" : "none",
-                }}
-              />
-            ))}
+          <h3 style={{ marginTop: 0 }}>🏅 الإنجازات</h3>
+          <div className="achievement-grid">
+            <div className="achievement-badge">
+              <span className="ab-icon">⭐</span>
+              <span className="ab-value">{profile.achievements.level}</span>
+              <span className="ab-label">المستوى الحالي</span>
+            </div>
+            <div className="achievement-badge">
+              <span className="ab-icon">🔥</span>
+              <span className="ab-value">{profile.achievements.streak_days}</span>
+              <span className="ab-label">ستريك حالي</span>
+            </div>
+            <div className="achievement-badge">
+              <span className="ab-icon">🏔️</span>
+              <span className="ab-value">{profile.achievements.longest_streak}</span>
+              <span className="ab-label">أطول ستريك</span>
+            </div>
+            <div className="achievement-badge">
+              <span className="ab-icon">🍽️</span>
+              <span className="ab-value">{profile.achievements.meals_logged}</span>
+              <span className="ab-label">وجبات مسجّلة</span>
+            </div>
+            <div className="achievement-badge">
+              <span className="ab-icon">🏆</span>
+              <span className="ab-value">{profile.achievements.challenges_completed}</span>
+              <span className="ab-label">تحديات مكتملة</span>
+            </div>
           </div>
+        </div>
+
+        <div className="notice-box" style={{ marginTop: 16 }}>
+          <h3 style={{ marginTop: 0 }}>📅 تقويم التغذية</h3>
+          {viewMonth && monthGrid && (
+            <>
+              <div className="calendar-nav">
+                <button type="button" disabled={!earliestMonth || viewMonth <= earliestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, -1) : v); setSelectedDate(null); }}>→ الشهر السابق</button>
+                <strong>{MONTH_LABELS[Number(viewMonth.split("-")[1]) - 1]} {viewMonth.split("-")[0]}</strong>
+                <button type="button" disabled={!latestMonth || viewMonth >= latestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, 1) : v); setSelectedDate(null); }}>الشهر الجاي ←</button>
+              </div>
+              <div className="calendar-weekdays">
+                {WEEKDAY_LABELS.map((d) => <span key={d}>{d}</span>)}
+              </div>
+              <div className="calendar-grid">
+                {monthGrid.map((date, i) => {
+                  if (!date) return <div key={`empty-${i}`} className="calendar-day empty" />;
+                  const rec = calendarByDate.get(date);
+                  const status = rec?.status ?? "none";
+                  return (
+                    <button
+                      type="button" key={date}
+                      className={`calendar-day status-${status}${rec?.is_today ? " is-today" : ""}`}
+                      title={date}
+                      onClick={() => setSelectedDate(date)}
+                    >
+                      {Number(date.split("-")[2])}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="calendar-legend">
+                <span><span className="dot" style={{ background: "var(--moss)" }} />ممتاز</span>
+                <span><span className="dot" style={{ background: "var(--gold)" }} />جزئي</span>
+                <span><span className="dot" style={{ background: "#c97a3d" }} />ناقص هدف</span>
+                <span><span className="dot" style={{ background: "var(--border)" }} />ماكو بيانات</span>
+              </div>
+              {selectedDate && (
+                <div className="calendar-day-detail">
+                  <strong>{selectedDate}</strong> — {STATUS_LABEL[selectedDay?.status ?? "none"]}
+                  {selectedDay && selectedDay.status !== "none" && (
+                    <p style={{ margin: "6px 0 0" }}>
+                      🍽️ {selectedDay.meals_logged} وجبة مسجّلة
+                      {selectedDay.protein_hit_target && " · ✅ هدف البروتين تحقق"}
+                      {selectedDay.water_hit_target && " · ✅ هدف الماي تحقق"}
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </main>
     </AppShell>

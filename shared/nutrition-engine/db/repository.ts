@@ -142,7 +142,8 @@ export interface Repository {
   insertShownTip(userId: string, tipId: string): Promise<void>;
 
   // ---- Levels ----
-  listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: string | null }[]>;
+  // reward: مكافأة تجميلية بحتة (شارة/لقب) تُعرَض عند وصول المستخدم للمستوى — صفر تأثير على أي حساب.
+  listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: { badge_icon: string; badge_title: string } | null }[]>;
 
   // ---- Recipes ----
   findActiveRecipes(categoryId?: string | null): Promise<RecipeRecord[]>; // مرتبة بالاسم

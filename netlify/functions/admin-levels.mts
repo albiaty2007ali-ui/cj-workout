@@ -5,6 +5,14 @@ import { getFirebaseApp, genId } from "../../shared/nutrition-engine/db/firestor
 import { authenticateRequest, isAdminClaims } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 
+/** مكافأة تجميلية بحتة (شارة+لقب) — null لو الأيقونة أو اللقب فاضي، صفر تخمين قيمة جزئية. */
+function parseReward(body: Record<string, unknown>): { badge_icon: string; badge_title: string } | null {
+  const icon = typeof body.badge_icon === "string" ? body.badge_icon.trim() : "";
+  const title = typeof body.badge_title === "string" ? body.badge_title.trim() : "";
+  if (!icon || !title) return null;
+  return { badge_icon: icon, badge_title: title };
+}
+
 export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
   if (!claims) return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
@@ -34,8 +42,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       if ((await ref.get()).exists) return jsonError(400, "VALIDATION_ERROR", "هذا المستوى موجود أصلاً — عدّله بدل إضافته من جديد");
       if (!title) return jsonError(400, "VALIDATION_ERROR", "لازم تكتب عنوان للمستوى");
 
-      const reward = typeof body.reward === "string" && body.reward.trim() ? body.reward.trim() : null;
-      await ref.set({ level, required_xp: requiredXp, title, reward });
+      await ref.set({ level, required_xp: requiredXp, title, reward: parseReward(body) });
       await db.collection("admin_logs").doc(genId()).set({ admin_id: claims.sub, action: "level_added", target_id: String(level), details: title, timestamp: new Date() });
       return jsonOk({ ok: true });
     }
@@ -50,7 +57,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       const patch: Record<string, unknown> = {};
       if (Number.isInteger(Number(body.required_xp))) patch.required_xp = Number(body.required_xp);
       if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim();
-      patch.reward = typeof body.reward === "string" && body.reward.trim() ? body.reward.trim() : null;
+      patch.reward = parseReward(body);
       await ref.update(patch);
       await db.collection("admin_logs").doc(genId()).set({ admin_id: claims.sub, action: "level_updated", target_id: levelParam, details: patch.title ?? doc.data()?.title, timestamp: new Date() });
       return jsonOk({ ok: true });

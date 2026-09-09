@@ -3,11 +3,17 @@
  * البيانات. seed_default_levels غير منفَّذ هنا (بذر بيانات لمرة واحدة، ليس منطق أعمال).
  */
 
+/** مكافأة تجميلية بحتة (شارة/لقب) — لا تؤثر أبدًا على XP/المستوى/أي حساب حقيقي، عرض فقط. */
+export interface LevelReward {
+  badge_icon: string;
+  badge_title: string;
+}
+
 export interface LevelRecord {
   level: number;
   required_xp: number;
   title: string;
-  reward: string | null;
+  reward: LevelReward | null;
 }
 
 export interface XpProgress {
@@ -20,6 +26,8 @@ export interface XpProgress {
   span?: number | null;
   needed_for_next: number | null;
   is_max_level?: boolean;
+  badge_icon?: string | null;
+  badge_title?: string | null;
 }
 
 export function xpProgress(levels: LevelRecord[], xp: number): XpProgress {
@@ -50,5 +58,7 @@ export function xpProgress(levels: LevelRecord[], xp: number): XpProgress {
     next_level_xp: nextLevel ? nextLevel.required_xp : null,
     progress_in_level: progressInLevel, span,
     needed_for_next: neededForNext, is_max_level: nextLevel === null,
+    badge_icon: current.reward?.badge_icon ?? null,
+    badge_title: current.reward?.badge_title ?? null,
   };
 }
