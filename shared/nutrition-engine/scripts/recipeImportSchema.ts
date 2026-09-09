@@ -33,6 +33,8 @@ export interface RecipeImportEntry {
   fat: number;
   fiber: number | null;
   match_keywords: string[];
+  /** كلمات تصنيف خفيفة اختيارية (مثلاً "عالي البروتين"، "سريع") — مصفوفة فاضية لو غير موجودة. */
+  tags?: string[];
   ingredients: RecipeImportIngredient[];
   steps: RecipeImportStep[];
   substitutions: Record<string, string>;
@@ -76,6 +78,9 @@ export function validateRecipeEntry(entry: unknown, index: number): ValidationIs
 
   if (!Array.isArray(e.match_keywords) || e.match_keywords.length === 0 || !e.match_keywords.every((k) => typeof k === "string")) {
     push("match_keywords لازم مصفوفة نصوص غير فاضية");
+  }
+  if (e.tags !== undefined && (!Array.isArray(e.tags) || !e.tags.every((t) => typeof t === "string"))) {
+    push("tags (لو موجودة) لازم مصفوفة نصوص");
   }
   if (!Array.isArray(e.ingredients) || e.ingredients.length === 0) {
     push("ingredients لازم مصفوفة غير فاضية");
