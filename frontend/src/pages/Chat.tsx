@@ -38,6 +38,10 @@ export default function Chat() {
         navigate("/login");
         return;
       }
+      if (!res.data.intro_completed) {
+        navigate("/intro");
+        return;
+      }
       if (!res.data.onboarding_completed) {
         navigate("/onboarding");
         return;

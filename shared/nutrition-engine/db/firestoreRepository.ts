@@ -373,6 +373,9 @@ export interface UserDisplayFields {
   photo_url: string | null;
   profile_visibility: string;
   role: string;
+  /** جولة "هلا بيك" التعريفية (Onboarding التسويقي) — منفصلة تمامًا عن onboarding_completed
+   * بـme.mts (ذاك يعني "أكمل بروفايله الغذائي"، هذا يعني "شاف جولة تعريف الميزات"). */
+  intro_completed: boolean;
 }
 
 export async function getUserDisplayFields(db: Firestore, userId: string): Promise<UserDisplayFields | null> {
@@ -383,6 +386,7 @@ export async function getUserDisplayFields(db: Firestore, userId: string): Promi
     name: d.name ?? "", email: d.email ?? "", username: d.username ?? null,
     bio: d.bio ?? null, photo_url: d.photo_url ?? null,
     profile_visibility: d.profile_visibility ?? "public", role: d.role ?? "user",
+    intro_completed: d.intro_completed ?? false,
   };
 }
 

@@ -95,6 +95,13 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonOk({ ok: true }, { headers: { "Set-Cookie": buildLogoutCookie() } });
     }
 
+    if (action === "intro") {
+      // جولة "هلا بيك" التعريفية — تُعلَّم مكتملة لما المستخدم يخلّصها أو يضغط "تخطي"، وكلاهما
+      // "شافها" بمعنى ما تظهر تلقائيًا مرة ثانية (يبقى فيه "إعادة مشاهدة المقدمة" من الإعدادات).
+      await userRef.set({ intro_completed: true }, { merge: true });
+      return jsonOk({ ok: true });
+    }
+
     if (action === "notifications") {
       const patch: Record<string, unknown> = {};
       if (typeof body.enabled === "boolean") patch.enabled = body.enabled;

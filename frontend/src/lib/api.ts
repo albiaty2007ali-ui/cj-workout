@@ -47,6 +47,7 @@ export interface MeResponse {
   free_meals_remaining: number;
   trial_exhausted: boolean;
   onboarding_completed: boolean;
+  intro_completed: boolean;
   profile: { calorie_target: number; water_target_ml: number } | null;
 }
 

@@ -4,6 +4,7 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
+import IntroTour from "./pages/IntroTour";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -30,6 +31,8 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/intro" element={<IntroTour />} />
+      <Route path="/intro/replay" element={<IntroTour replayOnly />} />
       <Route path="/chat" element={<Chat />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />

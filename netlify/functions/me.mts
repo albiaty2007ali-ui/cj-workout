@@ -29,6 +29,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       longest_streak: user.longest_streak, is_premium: user.is_premium,
       free_meals_remaining: freeMealsRemaining(user), trial_exhausted: trialExhausted(user),
       onboarding_completed: profile !== null, profile,
+      intro_completed: display?.intro_completed ?? false,
     });
   } catch (err) {
     console.error("me error:", err);
