@@ -67,6 +67,7 @@ export interface RecipeDetail {
 
 export interface RecipeDetailResponse {
   recipe: RecipeDetail;
+  original_servings: number;
   over_target: boolean;
   remaining_calories: number;
 }

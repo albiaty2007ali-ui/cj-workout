@@ -466,6 +466,12 @@ body {
   font-size: 4rem; background: var(--surface); border-radius: 24px;
 }
 .recipe-meta-row { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; color: var(--text-muted); font-size: 0.88rem; }
+.recipe-servings-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.recipe-servings-stepper button {
+  width: 22px; height: 22px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-solid);
+  color: var(--text); cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0;
+}
+.recipe-servings-stepper button:disabled { opacity: 0.4; cursor: default; }
 .recipe-macro-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
 .recipe-macro-box { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: center; }
 .recipe-macro-box .val { font-weight: 700; color: var(--heading); font-size: 1.05rem; margin: 0; }

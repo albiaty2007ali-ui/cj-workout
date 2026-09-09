@@ -12,6 +12,8 @@ export default function RecipeDetail() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [data, setData] = useState<RecipeDetailResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [servings, setServings] = useState<number | null>(null);
+  const [scaling, setScaling] = useState(false);
 
   const [mode, setMode] = useState<"view" | "blocked" | "tutorial">("view");
   const [blockedMessage, setBlockedMessage] = useState("");
@@ -35,6 +37,7 @@ export default function RecipeDetail() {
     api.get<RecipeDetailResponse>(`/recipes/detail?slug=${encodeURIComponent(slug)}`).then((res) => {
       if (!res.success || !res.data) { setNotFound(true); return; }
       setData(res.data);
+      setServings(res.data.original_servings);
       try {
         const saved = sessionStorage.getItem(storageKey);
         if (saved !== null) {
@@ -58,6 +61,17 @@ export default function RecipeDetail() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, stepIdx, steps.length]);
+
+  async function changeServings(next: number) {
+    if (next < 1 || scaling) return;
+    setScaling(true);
+    const res = await api.get<RecipeDetailResponse>(`/recipes/detail?slug=${encodeURIComponent(slug)}&servings=${next}`);
+    setScaling(false);
+    if (res.success && res.data) {
+      setData(res.data);
+      setServings(next);
+    }
+  }
 
   function saveStep(idx: number) {
     setStepIdx(idx);
@@ -109,7 +123,12 @@ export default function RecipeDetail() {
             <div className="recipe-meta-row">
               {recipe.prep_time_min && <span>⏱️ تحضير {recipe.prep_time_min} د</span>}
               {recipe.cook_time_min && <span>🔥 طبخ {recipe.cook_time_min} د</span>}
-              <span>🍽️ {recipe.servings} حصة</span>
+              <span className="recipe-servings-stepper">
+                🍽️
+                <button type="button" onClick={() => changeServings((servings ?? recipe.servings) - 1)} disabled={scaling || (servings ?? recipe.servings) <= 1} aria-label="تقليل الحصص">−</button>
+                <span>{servings ?? recipe.servings} حصة</span>
+                <button type="button" onClick={() => changeServings((servings ?? recipe.servings) + 1)} disabled={scaling} aria-label="زيادة الحصص">+</button>
+              </span>
               <span>📊 {DIFFICULTY_LABELS[recipe.difficulty] ?? recipe.difficulty}</span>
             </div>
 

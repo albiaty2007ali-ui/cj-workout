@@ -11,6 +11,7 @@ interface AdminRecipeFull {
   id: string; name: string; description: string | null; category_id: string; active: boolean;
   calories: number; protein: number; carbs: number; fat: number; fiber: number | null;
   prep_time_min: number | null; cook_time_min: number | null; servings: number; difficulty: string;
+  match_keywords: string | null;
   ingredients: Ingredient[]; steps: Step[]; substitutions: Substitution[];
 }
 interface Category { id: string; name: string; icon: string; }
@@ -49,6 +50,7 @@ export default function AdminRecipeEdit() {
           servings: String(r.servings), prep_time_min: r.prep_time_min != null ? String(r.prep_time_min) : "",
           cook_time_min: r.cook_time_min != null ? String(r.cook_time_min) : "", calories: String(r.calories),
           protein: String(r.protein), carbs: String(r.carbs), fat: String(r.fat), fiber: r.fiber != null ? String(r.fiber) : "",
+          match_keywords: r.match_keywords ?? "",
         });
       }
     });
@@ -63,6 +65,7 @@ export default function AdminRecipeEdit() {
       servings: Number(form.servings), prep_time_min: form.prep_time_min ? Number(form.prep_time_min) : null,
       cook_time_min: form.cook_time_min ? Number(form.cook_time_min) : null, calories: Number(form.calories),
       protein: Number(form.protein), carbs: Number(form.carbs), fat: Number(form.fat), fiber: form.fiber ? Number(form.fiber) : null,
+      match_keywords: form.match_keywords || null,
     });
     if (!res.success) { setError(res.error?.message ?? "صار خطأ"); return; }
     load();
@@ -111,6 +114,11 @@ export default function AdminRecipeEdit() {
           <form onSubmit={saveBase} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <input required minLength={2} value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <textarea rows={2} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <input
+              placeholder="كلمات مطابقة للبحث (مفصولة بـ |) — مثال: فطور|صحي|سريع"
+              value={form.match_keywords ?? ""}
+              onChange={(e) => setForm({ ...form, match_keywords: e.target.value })}
+            />
             <div className="admin-form-row">
               <select required value={form.category_id ?? ""} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
                 {categories.map((c) => <option value={c.id} key={c.id}>{c.icon} {c.name}</option>)}
