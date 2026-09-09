@@ -30,9 +30,7 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-        <LanguageToggle persistToBackend={false} />
-      </div>
+      <LanguageToggle persistToBackend={false} />
       <form className="auth-card" onSubmit={onSubmit}>
         <h1>{t("auth.loginTitle")}</h1>
         <div className="field">
