@@ -35,10 +35,11 @@ export default function RecipeDetail() {
   }, [navigate]);
 
   useEffect(() => {
-    api.get<RecipeDetailResponse>(`/recipes/detail?slug=${encodeURIComponent(slug)}`).then((res) => {
+    // نبدأ دائمًا بحصة شخص وحد (1) — تحجيم حقيقي فعلي من الـBackend (scaleRecipe)، مو خدعة واجهة.
+    api.get<RecipeDetailResponse>(`/recipes/detail?slug=${encodeURIComponent(slug)}&servings=1`).then((res) => {
       if (!res.success || !res.data) { setNotFound(true); return; }
       setData(res.data);
-      setServings(res.data.original_servings);
+      setServings(1);
       try {
         const saved = sessionStorage.getItem(storageKey);
         if (saved !== null) {
