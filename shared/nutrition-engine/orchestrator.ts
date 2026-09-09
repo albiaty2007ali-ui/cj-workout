@@ -504,13 +504,78 @@ async function handlePortionForFood(repo: Repository, user: UserRecord, textNorm
 
   const profile = await repo.findNutritionProfile(user.id);
   const ctx = await context.build(repo, user.id, profile, now);
-  let reply = await recommendations.suggestPortionForFood(foodId, foodName!, ctx.remaining_calories);
+  // رقم هدف صريح مذكور بنفس الرسالة ("مشتهي دولمة" ← "أريدها 500 سعرة") — نختار أقرب كمية
+  // حقيقية لهذا الرقم بدل أكبر كمية تدخل بالباقي (نية مختلفة جوهريًا عن سؤال "شكد آكل؟" العادي).
+  const targetMatch = textNorm.match(/(\d+)\s*سعر/);
+  let reply = targetMatch
+    ? await recommendations.suggestPortionNearTarget(foodId, foodName!, parseInt(targetMatch[1], 10))
+    : await recommendations.suggestPortionForFood(foodId, foodName!, ctx.remaining_calories);
   const tipCategory = tipsEngine.chooseCategoryForContext(ctx, null);
   const tipText = await tipsEngine.pickTip(repo, user.id, tipCategory);
   if (tipText) reply += `\n\n🌱 ${tipText}`;
   user.pending_food_topic_json = JSON.stringify({ food_id: foodId, food_name: foodName, kind: "portion_given" });
   await repo.saveUser(user);
   return { reply, meal_logged: false };
+}
+
+/**
+ * أسئلة معلوماتية صرفة عن طعام محدد (ASK_CALORIES/ASK_FOOD_SIZE/ASK_FOOD_FIT/ASK_SUBSTITUTION) —
+ * صفر تسجيل وجبة أبدًا (meal_logged: false دايمًا)، بس معلومة حقيقية من قاعدة البيانات. يعتمد
+ * نفس منطق استخراج الطعام المستخدم بـASK_PORTION_FOR_FOOD (رسالة حالية، أو موضوع طعام سابق).
+ */
+async function handleFoodInfoQuestion(
+  repo: Repository, user: UserRecord, textNorm: string, now: Date,
+  mode: "calories" | "size" | "fit" | "substitution",
+): Promise<DispatchResult> {
+  let [foodId, foodName] = await extractFirstFood(textNorm);
+  if (foodId === null && user.pending_food_topic_json) {
+    const topic = JSON.parse(user.pending_food_topic_json) as { food_id: number; food_name: string };
+    foodId = topic.food_id;
+    foodName = topic.food_name;
+  }
+  if (foodId === null) {
+    return { reply: "شنو الأكلة اللي تسأل عنها بالضبط؟ گلي اسمها وأفيدك.", meal_logged: false };
+  }
+
+  if (mode === "fit") {
+    const profile = await repo.findNutritionProfile(user.id);
+    const ctx = await context.build(repo, user.id, profile, now);
+    return { reply: await recommendations.checkFoodFits(foodId, foodName!, ctx.remaining_calories), meal_logged: false };
+  }
+  if (mode === "substitution") {
+    return { reply: await recommendations.suggestLighterAlternative(foodId, foodName!), meal_logged: false };
+  }
+  // calories/size — نفس المصدر (كل الكميات الحقيقية المعروفة)، الفرق بس بصياغة نية السؤال
+  return { reply: await recommendations.describeFoodPortions(foodId, foodName!), meal_logged: false };
+}
+
+/** "شكد يعني صحن؟" بدون اسم طعام — سؤال عام عن وحدة قياس، صفر تسجيل. */
+async function handleUnitQuestion(textNorm: string): Promise<DispatchResult> {
+  const unit = intents.GENERIC_UNIT_WORDS.find((w) => textNorm.includes(w));
+  if (!unit) {
+    return { reply: "شنو الوحدة اللي تسأل عنها بالضبط؟ (مثلاً: صحن، حبة، خاشوقة، استكان)", meal_logged: false };
+  }
+  return { reply: await recommendations.describeGenericUnit(unit), meal_logged: false };
+}
+
+/**
+ * حارس الأمان العام (ASK_GENERAL_FOOD_INFO) — أي سؤال عن أكل ما طابق نية محددة فوق. يحاول يفيد
+ * لو عرف الطعام المذكور (نفس المصدر الحقيقي)، وإلا يوضح بصراحة إنه ما فهم — بس أبدًا ما يسجّل
+ * وجبة. هذا بالضبط الحارس اللي يمنع تكرار Bug "شكد حجم البيتزا؟ ← تسجيل وهمي".
+ */
+async function handleGeneralFoodInfo(textNorm: string): Promise<DispatchResult> {
+  const [foodId, foodName] = await extractFirstFood(textNorm);
+  if (foodId === null) {
+    return {
+      reply: "ما فهمت سؤالك بوضوح 🙏 جرب تسأل بشكل أوضح (مثلاً: \"شكد سعرات الدولمة؟\" أو \"شكد آكل من التمن؟\")، أو گلي شنو أكلت فعليًا لو تريد تسجلها.",
+      meal_logged: false,
+    };
+  }
+  const info = await recommendations.describeFoodPortions(foodId, foodName!);
+  return {
+    reply: `${info}\n\n(إذا تريد تسجلها كوجبة أكلتها فعلاً، گلي بوضوح "اكلت ${foodName}" مع الكمية.)`,
+    meal_logged: false,
+  };
 }
 
 async function handleWaterLog(repo: Repository, user: UserRecord, textNorm: string, now: Date): Promise<DispatchResult> {
@@ -607,6 +672,12 @@ async function dispatch(
   if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, textNorm, "craving");
   if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, textNorm, "plan");
   if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now);
+  if (intent === intents.ASK_CALORIES) return handleFoodInfoQuestion(repo, user, textNorm, now, "calories");
+  if (intent === intents.ASK_FOOD_SIZE) return handleFoodInfoQuestion(repo, user, textNorm, now, "size");
+  if (intent === intents.ASK_FOOD_FIT) return handleFoodInfoQuestion(repo, user, textNorm, now, "fit");
+  if (intent === intents.ASK_SUBSTITUTION) return handleFoodInfoQuestion(repo, user, textNorm, now, "substitution");
+  if (intent === intents.ASK_UNIT) return handleUnitQuestion(textNorm);
+  if (intent === intents.ASK_GENERAL_FOOD_INFO) return handleGeneralFoodInfo(textNorm);
   if (intent === intents.GREETING) return handleGreeting(user, now);
   if (intent === intents.FAREWELL) return { reply: responses.farewell(), meal_logged: false };
   if (intent === intents.THANKS) return { reply: responses.thanksAck(), meal_logged: false };

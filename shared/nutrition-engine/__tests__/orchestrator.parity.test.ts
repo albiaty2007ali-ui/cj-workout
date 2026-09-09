@@ -61,6 +61,7 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
   it("'شربت نص لتر' -> 500 مل + محطة 'أول يوم' +5XP (أجزاء حتمية داخل رد فيه قوالب عشوائية)", async () => {
     const user = await freshUser(repo, "g4");
     const now = new Date("2026-09-08T10:00:00Z");
+    repo.now = now; // InMemoryRepository تختم created_at بالساعة الحقيقية إلا لو انضبطت صراحة
     const r = await handleMessage(repo, user, "شربت نص لتر", now);
     expect(r.reply).toContain("مجموع اليوم: 500 مل 💧");
     expect(r.reply).toContain('🔥 أول يوم 🔥! +5 XP');
@@ -122,6 +123,7 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
   it("'اكلت بيضتين' (DIRECT_LOG) -> تطابق حرفي كامل مع الحقول الرقمية الحقيقية", async () => {
     const user = await freshUser(repo, "direct1");
     const now = new Date("2026-09-08T10:00:00Z");
+    repo.now = now; // InMemoryRepository تختم created_at بالساعة الحقيقية إلا لو انضبطت صراحة
     const r = await handleMessage(repo, user, "اكلت بيضتين", now);
     expect(r.meal_logged).toBe(true);
     expect(r.today_calories).toBe(155); // بيضتين = 2×50غ -> computeNutrition(1,100) = 155 kcal

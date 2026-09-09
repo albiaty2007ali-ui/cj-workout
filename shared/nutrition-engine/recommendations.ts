@@ -2,7 +2,7 @@
  * منفذ حرفي من nutrition_ai/recommendations.py — يبحث بقاعدة الأكل المحلية (foods.sqlite) حسب
  * السعرات المتبقية/الهدف/البروتين الناقص، ولا يخترع أي وجبة أبدًا.
  */
-import { getFoodDb, queryAll } from "./db/foodDb.js";
+import { getFoodDb, queryAll, queryOne } from "./db/foodDb.js";
 import { computeFood } from "./calculator.js";
 import { getPortionsFor } from "./foodSearch.js";
 import { pyRound } from "./pyRound.js";
@@ -124,4 +124,114 @@ export async function suggestPortionForFood(foodId: number, foodName: string, re
     `أعلى شوي من سعراتك المتبقية (~${remainingCalories}) — القرار إلك طبعًا، ` +
     `بس خل الوجبة الجاية أخف حتى توازن يومك.\n\n${lines.join("\n")}`
   );
+}
+
+/**
+ * "شكد آكل دولمة؟" ← "500 سعرة" — يختار أقرب كمية حقيقية معروفة لهذا الرقم المستهدف، مو أكبر
+ * كمية تدخل بالباقي (فرق جوهري عن suggestPortionForFood). صفر اختراع كمية غير مسجّلة بالقاعدة.
+ */
+export async function suggestPortionNearTarget(foodId: number, foodName: string, targetCalories: number): Promise<string> {
+  const portions = await getPortionsFor(foodId);
+  const scored: { portion_name: string; calories: number; diff: number }[] = [];
+  for (const p of portions) {
+    const grams = p.grams;
+    if (!grams) continue;
+    const nutrition = await computeFood(foodId, Number(grams));
+    scored.push({ portion_name: (p.portion_name as string) || "حصة", calories: nutrition.calories, diff: Math.abs(nutrition.calories - targetCalories) });
+  }
+  if (scored.length === 0) {
+    return `ماكو عندي معلومة كمية دقيقة عن ${foodName} بقاعدة البيانات الحالية، بس گلي الوزن بالغرام وأحسبلك أقرب شي لـ${targetCalories} سعرة.`;
+  }
+  scored.sort((a, b) => a.diff - b.diff || a.calories - b.calories);
+  const best = scored[0];
+  return `أقرب كمية حقيقية لـ${targetCalories} سعرة من ${foodName} عندي: ${best.portion_name} — ~${best.calories} kcal.`;
+}
+
+/**
+ * سؤال معلوماتي صرف عن أحجام/سعرات طعام معيّن ("شكد سعرات X؟"/"شكد حجم X؟") — بدون أي افتراض
+ * نية أكل أو ربط بالسعرات المتبقية (يفرق عن suggestPortionForFood المخصص لتوصية "شكد آكل؟").
+ */
+export async function describeFoodPortions(foodId: number, foodName: string): Promise<string> {
+  const portions = await getPortionsFor(foodId);
+  const rows: { portion_name: string; calories: number }[] = [];
+  for (const p of portions) {
+    const grams = p.grams;
+    if (!grams) continue;
+    const nutrition = await computeFood(foodId, Number(grams));
+    rows.push({ portion_name: (p.portion_name as string) || "حصة", calories: nutrition.calories });
+  }
+  if (rows.length === 0) {
+    return `ماكو عندي معلومة كمية دقيقة عن ${foodName} بقاعدة البيانات الحالية، بس گلي الوزن بالغرام وأحسبلك السعرات بالضبط.`;
+  }
+  rows.sort((a, b) => a.calories - b.calories);
+  const lines = rows.map((r) => `🍽️ ${r.portion_name} — ~${r.calories} kcal`);
+  return `الأحجام/الكميات الحقيقية المعروفة إلي عن ${foodName} 🌱:\n${lines.join("\n")}`;
+}
+
+/** "شكد يعني صحن؟" بدون اسم طعام محدد — أمثلة حقيقية من قاعدة البيانات لنفس اسم الوحدة، بدون تخمين. */
+export async function describeGenericUnit(unitWord: string): Promise<string> {
+  const db = await getFoodDb();
+  const rows = queryAll(
+    db,
+    `SELECT f.name AS name, fp.grams AS grams FROM food_portions fp JOIN foods f ON f.id = fp.food_id
+     WHERE fp.normalized_portion_name LIKE ? ORDER BY f.name LIMIT 4`,
+    [`%${unitWord}%`],
+  ) as unknown as { name: string; grams: number }[];
+  if (rows.length === 0) {
+    return `ماكو عندي أمثلة حقيقية بقاعدة بياناتي لوحدة "${unitWord}" حاليًا — الوزن يختلف حسب الأكلة نفسها. گلي اسم الأكلة المحددة وأحاول أفيدك.`;
+  }
+  const lines = rows.map((r) => `• ${r.name}: ${unitWord} ≈ ${Math.round(r.grams)}غ`);
+  return `الوزن يختلف حسب الأكلة نفسها، بس هذي أمثلة حقيقية من قاعدة بياناتي:\n${lines.join("\n")}`;
+}
+
+/** "هذا الأكل يناسب سعراتي؟" — يتحقق هل حتى أصغر كمية حقيقية معروفة تدخل بالباقي من السعرات. */
+export async function checkFoodFits(foodId: number, foodName: string, remainingCalories: number): Promise<string> {
+  const portions = await getPortionsFor(foodId);
+  let smallest: number | null = null;
+  for (const p of portions) {
+    const grams = p.grams;
+    if (!grams) continue;
+    const nutrition = await computeFood(foodId, Number(grams));
+    if (smallest === null || nutrition.calories < smallest) smallest = nutrition.calories;
+  }
+  if (smallest === null) {
+    return `ماكو عندي معلومة كمية دقيقة عن ${foodName}، گلي الوزن بالغرام وأحسبلك بالضبط إذا يناسب سعراتك.`;
+  }
+  if (remainingCalories <= 0) {
+    return `وصلت لهدفك اليوم فعلاً، فحتى أصغر كمية من ${foodName} (~${smallest} kcal) راح تخليك تتجاوزه.`;
+  }
+  if (smallest <= remainingCalories) {
+    return `أي، ${foodName} يناسب سعراتك المتبقية (~${remainingCalories} سعرة) — حتى أصغر كمية معروفة إلي عنه ~${smallest} kcal.`;
+  }
+  return `لأ، حتى أصغر كمية معروفة من ${foodName} (~${smallest} kcal) أعلى من الباقي إلك (~${remainingCalories} سعرة).`;
+}
+
+interface FoodCategoryRow { category_id: number | null; calories_per_100g: number }
+interface LighterAltRow { name: string; calories_per_100g: number }
+
+/** "أريد بديل أخف" — يبحث عن طعام حقيقي بنفس التصنيف بسعرات أقل لكل 100غ، صفر اختراع بديل. */
+export async function suggestLighterAlternative(foodId: number, foodName: string): Promise<string> {
+  const db = await getFoodDb();
+  const current = queryOne(
+    db,
+    `SELECT f.category_id AS category_id, fn.calories_per_100g AS calories_per_100g
+     FROM foods f JOIN food_nutrients fn ON fn.food_id = f.id WHERE f.id = ?`,
+    [foodId],
+  ) as unknown as FoodCategoryRow | null;
+  if (!current || current.category_id === null) {
+    return `ماكو عندي تصنيف كافي لـ${foodName} حتى أگترحلك بديل دقيق — گلي شنو تفضّل وأساعدك بشي ثاني.`;
+  }
+  const rows = queryAll(
+    db,
+    `SELECT f.name AS name, fn.calories_per_100g AS calories_per_100g
+     FROM foods f JOIN food_nutrients fn ON fn.food_id = f.id
+     WHERE f.category_id = ? AND f.id <> ? AND fn.calories_per_100g < ?
+     ORDER BY fn.calories_per_100g ASC, f.name LIMIT 2`,
+    [current.category_id, foodId, current.calories_per_100g],
+  ) as unknown as LighterAltRow[];
+  if (rows.length === 0) {
+    return `ماكو عندي بديل أخف حقيقي لـ${foodName} بنفس التصنيف بقاعدة بياناتي الحالية — بس تگدر تقلل الكمية بدالها وتوصل نفس الهدف.`;
+  }
+  const lines = rows.map((r) => `• ${r.name} (أخف بحدود ${Math.round(current.calories_per_100g - r.calories_per_100g)} سعرة لكل 100غ)`);
+  return `بدائل أخف حقيقية من ${foodName} بنفس التصنيف عندي:\n${lines.join("\n")}`;
 }

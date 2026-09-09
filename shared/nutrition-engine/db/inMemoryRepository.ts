@@ -15,6 +15,18 @@ function genId(): string {
 }
 
 export class InMemoryRepository implements Repository {
+  /**
+   * ساعة قابلة للتثبيت للاختبارات — لو اختبار مرّر `now` ثابتة تاريخية لـhandleMessage() (حتى
+   * تتحكم بحساب "اليوم"/بغداد بشكل حتمي)، لازم يحطها هنا كمان قبل أي insert*، وإلا الصفوف
+   * تنختم بـnew Date() الحقيقية (تاريخ اليوم الفعلي) وتوقع خارج مدى "اليوم" المحسوب بالاختبار —
+   * هذا بالضبط سبب فشل صامت لاختبارات "امجموع اليوم"/"today_calories" أول ما يتغيّر تاريخ النظام
+   * الحقيقي عن التاريخ الثابت المستخدم بالاختبار.
+   */
+  now: Date | null = null;
+  private clockNow(): Date {
+    return this.now ?? new Date();
+  }
+
   users = new Map<string, UserRecord>();
 
   async findUser(userId: string): Promise<UserRecord | null> {
@@ -83,7 +95,7 @@ export class InMemoryRepository implements Repository {
   }
 
   async insertWeightHistory(row: WeightHistoryInput): Promise<WeightHistoryRecord> {
-    const record: WeightHistoryRecord = { id: genId(), recorded_at: new Date(), ...row };
+    const record: WeightHistoryRecord = { id: genId(), recorded_at: this.clockNow(), ...row };
     this.weightHistory.push(record);
     return record;
   }
@@ -123,7 +135,7 @@ export class InMemoryRepository implements Repository {
   }
 
   async insertMealLog(row: MealLogInput): Promise<MealLogRecord> {
-    const record: MealLogRecord = { id: genId(), created_at: new Date(), ...row };
+    const record: MealLogRecord = { id: genId(), created_at: this.clockNow(), ...row };
     this.mealLogs.push(record);
     return record;
   }
@@ -143,7 +155,7 @@ export class InMemoryRepository implements Repository {
   }
 
   async insertWaterLog(row: WaterLogInput): Promise<WaterLogRecord> {
-    const record: WaterLogRecord = { id: genId(), created_at: new Date(), ...row };
+    const record: WaterLogRecord = { id: genId(), created_at: this.clockNow(), ...row };
     this.waterLogs.push(record);
     return record;
   }
@@ -190,7 +202,7 @@ export class InMemoryRepository implements Repository {
   }
 
   async insertShownTip(userId: string, tipId: string): Promise<void> {
-    this.shownTips.push({ user_id: userId, tip_id: tipId, shown_at: new Date() });
+    this.shownTips.push({ user_id: userId, tip_id: tipId, shown_at: this.clockNow() });
   }
 
   recipes: RecipeRecord[] = [];

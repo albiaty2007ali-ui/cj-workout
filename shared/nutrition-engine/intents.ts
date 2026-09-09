@@ -28,6 +28,15 @@ export const EXPRESS_DESIRE = "EXPRESS_DESIRE";
 export const EXPRESS_CRAVING = "EXPRESS_CRAVING";
 export const PLAN_TO_EAT = "PLAN_TO_EAT";
 export const ASK_PORTION_FOR_FOOD = "ASK_PORTION_FOR_FOOD";
+export const ASK_CALORIES = "ASK_CALORIES";
+export const ASK_FOOD_SIZE = "ASK_FOOD_SIZE";
+export const ASK_UNIT = "ASK_UNIT";
+export const ASK_FOOD_FIT = "ASK_FOOD_FIT";
+export const ASK_SUBSTITUTION = "ASK_SUBSTITUTION";
+// حارس أمان عام (راجع detectIntent أسفل) — أي سؤال عن أكل ما طابق نية محددة، يرجع هذا بدل
+// LOG_MEAL الافتراضي حتى ما ينسجل بالغلط كوجبة حقيقية (Bug حقيقي انكشف: "شكد حجم البيتزا؟"
+// كانت تتسجل كوجبة أكل فعلية لأن "بيتزا" تتطابق بثقة كاملة وماكو حارس يفرّق سؤال عن استهلاك).
+export const ASK_GENERAL_FOOD_INFO = "ASK_GENERAL_FOOD_INFO";
 export const GREETING = "GREETING";
 export const FAREWELL = "FAREWELL";
 export const THANKS = "THANKS";
@@ -47,6 +56,10 @@ export const SUGGEST_QUERY_PHRASES = [
   "اختارلي شي آكله", "اختارلي شي اكله", "عندك اقتراح", "شنو تنصحني",
 ];
 export const CALORIE_TARGET_MEAL_PHRASES = ["اريد وجبة", "أريد وجبة", "وجبة بحدود", "وجبة تكون"];
+// صيغ أوسع لنفس النية ("سويلي الغداء 600 سعرة") — فعل تحضير/رغبة + كلمة وجبة + رقم + "سعرة"
+// بدل الاعتماد على عبارات ثابتة بس (تُفحص كـAND مركّب بـdetectIntent، مو substring مباشر هنا).
+export const MEAL_BUDGET_VERB_MARKERS = ["سوي", "سوّي", "سويلي", "خلي", "خلّي", "خليلي", "اريد", "أريد", "ابغى", "أبغى"];
+export const MEAL_TYPE_WORDS = ["وجبة", "غداء", "فطور", "عشاء", "سناك", "أكلة", "اكلة", "الغدا", "غدا", "عشا"];
 export const COOKING_START_PHRASES = ["هسه شنو أسوي", "هسه شنو اسوي", "وين أبدأ", "خلينا نطبخ", "علمني أسويها", "علمني اسويها", "ابدأ الطبخ"];
 export const COOKING_NEXT_PHRASES = ["بعد شنو", "شنو بعدين", "الخطوة الجاية", "وبعدين"];
 export const MISSING_INGREDIENT_TRIGGERS = ["ما عندي", "ماعندي", "ماكو عندي"];
@@ -114,6 +127,47 @@ export const PLAN_TO_EAT_MARKERS = ["راح آكل", "راح اكل", "ناوي 
 // أعلى من CRAVING_MARKERS/PLAN_TO_EAT_MARKERS حتى رسالة مركّبة متل "مشتهي دولمه شكد لازم اكل؟"
 // تروح لتوصية الكمية مباشرة، مو لرد اشتهاء عام بس.
 export const PORTION_QUESTION_MARKERS = ["شكد لازم آكل", "شكد لازم اكل", "شكد اخلي", "شكد آكل", "شكد اكل", "قديش آكل"];
+
+// سؤال معلوماتي صرف عن سعرات/حجم/وحدة/ملاءمة طعام معيّن — يفرق جوهري عن PORTION_QUESTION_MARKERS
+// (اللي يطلب توصية "شكد لازم آكل")، هذا بس معلومة بدون أي نية أكل أو توصية كمية.
+export const CALORIES_QUESTION_MARKERS = [
+  "شكد سعرات", "شكد سعره", "شكد سعرة", "كم سعرة", "كم سعرات", "شكد سعراتها",
+  "سعراتها شكد", "سعراته شكد", "شكد فيها سعرة", "شكد فيه سعرة", "شكد تحسب",
+];
+export const FOOD_SIZE_QUESTION_MARKERS = [
+  "شكد حجم", "شنو حجم", "حجمها شكد", "حجمه شكد", "شكد كبيرة", "شكد صغيرة", "أي حجم", "اي حجم",
+];
+// سؤال تعريف وحدة قياس عامة (مو مرتبط بطعام محدد بالضرورة) — "خاشوقة"/"استكان" لازم تُفحص قبل
+// "حبة" لأنها أوضح، بس الترتيب هنا غير حساس لأن الشرط "AND" مع كلمة وحدة فعلية.
+export const UNIT_DEFINITION_MARKERS = ["شكد يعني", "شنو يعني", "چم غرام", "كم غرام", "شكد بالغرام"];
+export const GENERIC_UNIT_WORDS = ["صحن", "حبة", "خاشوقة", "ملعقة", "استكان", "كوب", "قطعة", "شريحة", "رغيف", "حصة"];
+export const FOOD_FIT_QUESTION_MARKERS = [
+  "يناسب سعراتي", "تناسب سعراتي", "يضبط وياي", "مناسب لسعراتي", "يعدي سعراتي",
+  "يتجاوز سعراتي", "ينفع وياي", "مناسبة لسعراتي", "تعدي سعراتي",
+];
+export const SUBSTITUTION_MARKERS = [
+  "بديل أخف", "بديل اخف", "بديل أقل سعرات", "بديل اقل سعرات", "شنو البديل",
+  "أخف منها", "اخف منها", "بديل صحي", "شي أخف", "شي اخف",
+];
+
+// أفعال استهلاك صريحة — تُستخدم بحارس الأمان العام (أسفل detectIntent) لتمييز جملة استهلاك
+// حقيقية عن سؤال يذكر نفس الطعام صدفة (مثلاً "شكد حجم البيتزا؟" ما فيها أي من هذي).
+export const CONSUMPTION_VERB_HINTS = [
+  "اكلت", "أكلت", "تغديت", "تغذيت", "فطرت", "تعشيت", "طعمت", "ذقت", "تناولت",
+  "شربت", "سويت", "حطيت", "ضفت", "أضفت", "اضفت",
+];
+// أدوات استفهام عراقية عامة — أي رسالة تحتوي إحداها (أو علامة ؟) ومالها فعل استهلاك صريح
+// أعلاه، تُعتبر سؤال معلوماتي، مو تسجيل وجبة، بغض النظر هل طابقت نية محددة فوق أو لا.
+export const QUESTION_INDICATORS = ["شكد", "كم", "شنو", "هل", "شلون", "وين", "متى", "ليش", "أي حجم", "اي حجم"];
+
+export function looksLikeQuestion(textNorm: string): boolean {
+  if (textNorm.includes("؟") || textNorm.includes("?")) return true;
+  return QUESTION_INDICATORS.some((w) => textNorm.includes(w));
+}
+
+export function hasConsumptionHint(textNorm: string): boolean {
+  return CONSUMPTION_VERB_HINTS.some((w) => textNorm.includes(w));
+}
 
 // عبارات اجتماعية قصيرة — تُفحص بمطابقة شبه-تامة (مو substring حر) حتى ما تبلع رسالة أكل حقيقية
 // تبدأ برسالة ترحيب صدفة (مثلاً "هلا اكلت بيضتين وصمونة" لازم تضل LOG_MEAL)
@@ -193,6 +247,9 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   if (hasPendingFoodTopic && !hasPending && !hasPendingRecipe) {
     if (CANCEL_PHRASES.includes(textNorm)) return CANCEL;
     if (CONFIRM_PHRASES.includes(textNorm)) return CONFIRM;
+    // "مشتهي دولمة" ← "500 سعرة" / "أريدها 500 سعرة" — رقم هدف يخص نفس الطعام المطروح توًا،
+    // مو محادثة جديدة (نفس التوجيه اللي يستلمه ASK_PORTION_FOR_FOOD أصلاً، انظر handlePortionForFood)
+    if (/\d/.test(textNorm) && (textNorm.includes("سعر"))) return ASK_PORTION_FOR_FOOD;
   }
 
   // وجبة اتسجّلت مباشرة (DIRECT_LOG) وبعدها ضمن نافذة التراجع — نفس عائلة أوامر التعديل
@@ -213,6 +270,13 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
     return GENERAL_NUTRITION;
   }
   if (includesAny(textNorm, CALORIE_TARGET_MEAL_PHRASES)) return ASK_CALORIE_TARGET_MEAL;
+  // صيغة أوسع: فعل تحضير/رغبة + كلمة وجبة + رقم + "سعرة" ("سويلي الغداء 600 سعرة")
+  if (
+    /\d/.test(textNorm) && textNorm.includes("سعر") &&
+    includesAny(textNorm, MEAL_TYPE_WORDS) && includesAny(textNorm, MEAL_BUDGET_VERB_MARKERS)
+  ) {
+    return ASK_CALORIE_TARGET_MEAL;
+  }
   if (includesAny(textNorm, SUGGEST_QUERY_PHRASES)) return ASK_RECOMMENDATION;
   if (includesAny(textNorm, ASK_TIP_PHRASES)) return ASK_TIP;
   if (includesAny(textNorm, WEIGHT_PHRASES)) return WEIGHT_UPDATE;
@@ -223,6 +287,16 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   }
   if (hasRecipe && includesAny(textNorm, MISSING_INGREDIENT_TRIGGERS)) return COOKING_STEP;
   if (includesAny(textNorm, RECIPE_TRIGGERS) || includesAny(textNorm, RECIPE_CATEGORY_PHRASES)) return ASK_RECIPE;
+
+  // أسئلة معلوماتية صرفة عن طعام (سعرات/حجم/وحدة/ملاءمة/بديل) — لازم تُفحص قبل PORTION_QUESTION_
+  // MARKERS/LOG_MEAL لأنها لا تطلب توصية كمية ولا تعبّر عن نية أكل، بس معلومة. هذا يسد بالضبط
+  // ثغرة "شكد حجم البيتزا؟" اللي كانت تتسجل كوجبة أكل فعلية (بيتزا تتطابق بثقة كاملة وما فيه
+  // نية سابقة توقفها قبل LOG_MEAL الافتراضي).
+  if (includesAny(textNorm, FOOD_FIT_QUESTION_MARKERS)) return ASK_FOOD_FIT;
+  if (includesAny(textNorm, UNIT_DEFINITION_MARKERS) && includesAny(textNorm, GENERIC_UNIT_WORDS)) return ASK_UNIT;
+  if (includesAny(textNorm, FOOD_SIZE_QUESTION_MARKERS)) return ASK_FOOD_SIZE;
+  if (includesAny(textNorm, CALORIES_QUESTION_MARKERS)) return ASK_CALORIES;
+  if (includesAny(textNorm, SUBSTITUTION_MARKERS)) return ASK_SUBSTITUTION;
 
   // ترتيب مقصود بالأولوية: سؤال الكمية أولاً (حتى رسالة مركّبة "مشتهي دولمه شكد لازم اكل؟"
   // تروح لتوصية كمية مباشرة)، ثم الاشتهاء، ثم النية المستقبلية — الثلاثة قبل LOG_MEAL الافتراضي
@@ -242,6 +316,13 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   // رغبة/احتمال ("أريد بيض"، "يمكن آكل تمن") — مو استهلاك فعلي، لازم تُفحص قبل LOG_MEAL
   // الافتراضي، وإلا "أريد بيض" كانت راح تتسجل direct-log كبيضة وحدة فعلية
   if (includesAny(textNorm, DESIRE_MARKERS)) return EXPRESS_DESIRE;
+
+  // حارس أمان عام أخير: أي رسالة تقرأ كسؤال (أداة استفهام أو "؟") ومالها فعل استهلاك صريح
+  // (اكلت/تغديت/فطرت...) ما تنعامل أبدًا كتسجيل وجبة افتراضي — حتى لو ذكرت اسم طعام يتطابق
+  // بثقة كاملة. أفضل رد "ما فهمت سؤالك بوضوح" من تسجيل وجبة وهمية بحساب المستخدم بالغلط.
+  if (!hasConsumptionHint(textNorm) && looksLikeQuestion(textNorm)) {
+    return ASK_GENERAL_FOOD_INFO;
+  }
 
   // افتراضي: نحاول نطابقها كوجبة جديدة (المتصل orchestrator يقرر UNKNOWN إذا ما لقى أكل)
   return LOG_MEAL;
