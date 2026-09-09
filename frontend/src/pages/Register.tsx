@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useI18n } from "../i18n/I18nContext";
+import LanguageToggle from "../components/LanguageToggle";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,32 +32,35 @@ export default function Register() {
 
   return (
     <div className="auth-page">
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+        <LanguageToggle persistToBackend={false} />
+      </div>
       <form className="auth-card" onSubmit={onSubmit}>
-        <h1>حساب جديد — CJ WORKOUT</h1>
+        <h1>{t("auth.registerTitle")}</h1>
         <div className="field">
-          <label htmlFor="name">الاسم</label>
+          <label htmlFor="name">{t("auth.name")}</label>
           <input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
           {errors.name && <p className="field-error">{errors.name}</p>}
         </div>
         <div className="field">
-          <label htmlFor="email">البريد الإلكتروني</label>
+          <label htmlFor="email">{t("auth.email")}</label>
           <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           {errors.email && <p className="field-error">{errors.email}</p>}
         </div>
         <div className="field">
-          <label htmlFor="password">كلمة المرور</label>
+          <label htmlFor="password">{t("auth.password")}</label>
           <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
           {errors.password && <p className="field-error">{errors.password}</p>}
         </div>
         <div className="field">
-          <label htmlFor="confirm">تأكيد كلمة المرور</label>
+          <label htmlFor="confirm">{t("auth.confirmPassword")}</label>
           <input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password" />
           {errors.confirm && <p className="field-error">{errors.confirm}</p>}
         </div>
         {errors._ && <p className="field-error">{errors._}</p>}
-        <button className="btn" type="submit" disabled={loading}>{loading ? "..." : "إنشاء الحساب"}</button>
+        <button className="btn" type="submit" disabled={loading}>{loading ? t("common.loading") : t("auth.createAccount")}</button>
         <p className="auth-switch">
-          عندك حساب؟ <Link to="/login">سجّل دخولك</Link>
+          {t("auth.haveAccount")} <Link to="/login">{t("auth.loginLink")}</Link>
         </p>
       </form>
     </div>

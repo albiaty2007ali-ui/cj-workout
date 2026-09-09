@@ -95,6 +95,13 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonOk({ ok: true }, { headers: { "Set-Cookie": buildLogoutCookie() } });
     }
 
+    if (action === "language") {
+      const language = body.language;
+      if (language !== "ar" && language !== "en") return jsonError(400, "VALIDATION_ERROR", "خيار غير صحيح");
+      await userRef.set({ language }, { merge: true });
+      return jsonOk({ language });
+    }
+
     if (action === "intro") {
       // جولة "هلا بيك" التعريفية — تُعلَّم مكتملة لما المستخدم يخلّصها أو يضغط "تخطي"، وكلاهما
       // "شافها" بمعنى ما تظهر تلقائيًا مرة ثانية (يبقى فيه "إعادة مشاهدة المقدمة" من الإعدادات).

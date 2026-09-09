@@ -376,6 +376,9 @@ export interface UserDisplayFields {
   /** جولة "هلا بيك" التعريفية (Onboarding التسويقي) — منفصلة تمامًا عن onboarding_completed
    * بـme.mts (ذاك يعني "أكمل بروفايله الغذائي"، هذا يعني "شاف جولة تعريف الميزات"). */
   intro_completed: boolean;
+  /** تفضيل لغة الواجهة — "ar" افتراضي. الردود الفعلية بالشات (Gemini/القوالب) لسا عربي فقط
+   * بغض النظر عن هذا الحقل، هذا يخص واجهة React فقط بالمرحلة الحالية. */
+  language: "ar" | "en";
 }
 
 export async function getUserDisplayFields(db: Firestore, userId: string): Promise<UserDisplayFields | null> {
@@ -387,6 +390,7 @@ export async function getUserDisplayFields(db: Firestore, userId: string): Promi
     bio: d.bio ?? null, photo_url: d.photo_url ?? null,
     profile_visibility: d.profile_visibility ?? "public", role: d.role ?? "user",
     intro_completed: d.intro_completed ?? false,
+    language: d.language === "en" ? "en" : "ar",
   };
 }
 

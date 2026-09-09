@@ -30,6 +30,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       free_meals_remaining: freeMealsRemaining(user), trial_exhausted: trialExhausted(user),
       onboarding_completed: profile !== null, profile,
       intro_completed: display?.intro_completed ?? false,
+      language: display?.language ?? "ar",
     });
   } catch (err) {
     console.error("me error:", err);

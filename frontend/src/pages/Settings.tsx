@@ -4,7 +4,9 @@ import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
 import ThemeToggle from "../components/ThemeToggle";
 import { pushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from "../lib/push";
-import { INTRO_SLIDES } from "./IntroTour";
+import { useIntroSlides } from "./IntroTour";
+import { useI18n } from "../i18n/I18nContext";
+import LanguageToggle from "../components/LanguageToggle";
 
 interface SettingsData {
   ai_response_style: string;
@@ -24,6 +26,8 @@ interface NotificationSettingsData {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { t } = useI18n();
+  const introSlides = useIntroSlides();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [savedMsg, setSavedMsg] = useState("");
@@ -168,25 +172,30 @@ export default function Settings() {
         </div>
 
         <div className="notice-box">
-          <h3 style={{ marginTop: 0 }}>ℹ️ عن CJ WORKOUT</h3>
+          <h3 style={{ marginTop: 0 }}>{t("settings.languageTitle")}</h3>
+          <LanguageToggle />
+        </div>
+
+        <div className="notice-box">
+          <h3 style={{ marginTop: 0 }}>{t("settings.aboutTitle")}</h3>
           <div className="about-sections">
-            {INTRO_SLIDES.map((s) => (
+            {introSlides.map((s) => (
               <div className="about-item" key={s.title}>
                 <p className="about-item-title">{s.icon} {s.title}</p>
                 <p className="about-item-body">{s.body}</p>
               </div>
             ))}
             <div className="about-item">
-              <p className="about-item-title">💎 الاشتراك</p>
-              <p className="about-item-body">تجربة مجانية محدودة، وبعدها اشتراك شهري يفتح كل شي بدون حدود. راجع صفحة "الاشتراك" من القائمة.</p>
+              <p className="about-item-title">{t("settings.subscriptionTitle")}</p>
+              <p className="about-item-body">{t("settings.subscriptionBody")}</p>
             </div>
             <div className="about-item">
-              <p className="about-item-title">🔒 الخصوصية</p>
-              <p className="about-item-body">بياناتك الغذائية والصحية خاصة بيك. تگدر تحمّل بياناتك أو تحذف حسابك بأي وقت من تحت بهذي الصفحة.</p>
+              <p className="about-item-title">{t("settings.privacyTitle")}</p>
+              <p className="about-item-body">{t("settings.privacyBody")}</p>
             </div>
           </div>
           <button type="button" className="btn btn-outline-dark" style={{ marginTop: 14 }} onClick={() => navigate("/intro/replay")}>
-            🔁 إعادة مشاهدة المقدمة
+            {t("settings.replayIntro")}
           </button>
         </div>
 
