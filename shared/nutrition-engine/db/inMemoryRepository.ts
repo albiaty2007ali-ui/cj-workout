@@ -7,7 +7,7 @@ import type {
   Repository, XpTransactionInput, ActiveDayRecord, StreakMilestoneRecord,
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
-  MealStatusRecord, NutritionTipRecord, UserRecord, RecipeRecord,
+  MealStatusRecord, NutritionTipRecord, UserRecord, RecipeRecord, BehaviorDailyRecord,
 } from "./repository.js";
 
 function genId(): string {
@@ -229,6 +229,24 @@ export class InMemoryRepository implements Repository {
 
   async listRecipeCategories(): Promise<{ id: string; name: string; icon: string; order_index: number }[]> {
     return [...this.recipeCategories].sort((a, b) => a.order_index - b.order_index);
+  }
+
+  private behaviorDaily: BehaviorDailyRecord[] = [];
+
+  async findBehaviorDaily(userId: string, date: string): Promise<BehaviorDailyRecord | null> {
+    return this.behaviorDaily.find((b) => b.user_id === userId && b.date === date) ?? null;
+  }
+
+  async upsertBehaviorDaily(row: BehaviorDailyRecord): Promise<void> {
+    const idx = this.behaviorDaily.findIndex((b) => b.user_id === row.user_id && b.date === row.date);
+    if (idx >= 0) this.behaviorDaily[idx] = { ...row };
+    else this.behaviorDaily.push({ ...row });
+  }
+
+  async findBehaviorDailyInRange(userId: string, startIso: string, endIso: string): Promise<BehaviorDailyRecord[]> {
+    return this.behaviorDaily
+      .filter((b) => b.user_id === userId && b.date >= startIso && b.date <= endIso)
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   async incrementFreeMealsUsedIfBelowCap(userId: string, cap: number): Promise<boolean> {

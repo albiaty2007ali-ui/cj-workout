@@ -23,7 +23,7 @@ import type {
   Repository, UserRecord, XpTransactionInput, ActiveDayRecord, StreakMilestoneRecord,
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
-  MealStatusRecord, NutritionTipRecord, RecipeRecord,
+  MealStatusRecord, NutritionTipRecord, RecipeRecord, BehaviorDailyRecord,
 } from "./repository.js";
 
 export function genId(): string {
@@ -165,6 +165,32 @@ export class FirestoreRepository implements Repository {
       .where("days", "<=", days)
       .get();
     return snap.docs.map((d) => d.data() as StreakMilestoneRecord);
+  }
+
+  // ---- Behavior Aggregator ----
+  private behaviorDailyDocId(userId: string, date: string): string {
+    return `${userId}_${date}`;
+  }
+
+  async findBehaviorDaily(userId: string, date: string): Promise<BehaviorDailyRecord | null> {
+    const doc = await this.db.collection("behavior_daily").doc(this.behaviorDailyDocId(userId, date)).get();
+    return doc.exists ? (doc.data() as BehaviorDailyRecord) : null;
+  }
+
+  async upsertBehaviorDaily(row: BehaviorDailyRecord): Promise<void> {
+    // set() بدون merge عمدًا — كل استدعاء يعيد حساب اليوم بالكامل من meal_logs/water_logs
+    // الحقيقية (راجع behaviorAggregator.ts)، فالكتابة الكاملة أضمن من دمج جزئي قد ينحرف.
+    await this.db.collection("behavior_daily").doc(this.behaviorDailyDocId(row.user_id, row.date)).set(row);
+  }
+
+  async findBehaviorDailyInRange(userId: string, startIso: string, endIso: string): Promise<BehaviorDailyRecord[]> {
+    const snap = await this.db.collection("behavior_daily")
+      .where("user_id", "==", userId)
+      .where("date", ">=", startIso)
+      .where("date", "<=", endIso)
+      .orderBy("date", "asc")
+      .get();
+    return snap.docs.map((d) => d.data() as BehaviorDailyRecord);
   }
 
   // ---- Nutrition Profile / Weight ----

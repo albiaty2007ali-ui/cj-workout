@@ -11,6 +11,7 @@
  * (فشل الإرسال لا يوقف ولا يؤخر تسجيل الوجبة/الماي أبدًا — راجع notifications/engine.ts).
  */
 import { normalize } from "./arabicNormalize.js";
+import * as behaviorAggregator from "./behaviorAggregator.js";
 import * as calculator from "./calculator.js";
 import * as context from "./context.js";
 import * as corrections from "./corrections.js";
@@ -343,6 +344,7 @@ async function finalizeMeal(
   const overTarget = remaining < 0;
 
   const profile = await repo.findNutritionProfile(user.id);
+  await behaviorAggregator.recordDailyBehavior(repo, user.id, profile, now);
   const ctx = await context.build(repo, user.id, profile, now);
   const tipCategory = tipsEngine.chooseCategoryForContext(ctx, pending.meal_type);
   const tipText = await tipsEngine.pickTip(repo, user.id, tipCategory);
@@ -616,6 +618,9 @@ async function handleWaterLog(repo: Repository, user: UserRecord, textNorm: stri
   const log = await repo.insertWaterLog({ user_id: user.id, ml: Math.trunc(ml) });
   const streakSnapshot = await streaks.recordActiveDay(repo, user, now);
   await repo.saveUser(user);
+
+  const profile = await repo.findNutritionProfile(user.id);
+  await behaviorAggregator.recordDailyBehavior(repo, user.id, profile, now);
 
   const snapshot = directLog.buildWaterSnapshot(log.id, Math.trunc(ml), streakSnapshot, now);
   await directLog.save(repo, user, snapshot);

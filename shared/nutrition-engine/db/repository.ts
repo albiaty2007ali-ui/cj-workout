@@ -48,6 +48,20 @@ export interface StreakMilestoneRecord {
   active: boolean;
 }
 
+/**
+ * لقطة سلوك يومية حقيقية (Behavior Aggregator، أساس Personal Score/Anomaly Detection لاحقًا) —
+ * تُعاد كتابتها بالكامل (مو دمج تدريجي) في كل مرة تُسجَّل وجبة/ماء، حتى تبقى مطابقة تمامًا
+ * لمحتوى meal_logs/water_logs الحقيقي لنفس اليوم — صفر احتمال Drift من دمج جزئي.
+ */
+export interface BehaviorDailyRecord {
+  user_id: string;
+  date: string; // "YYYY-MM-DD" بتوقيت بغداد
+  meals_logged: number;
+  protein_hit_target: boolean;
+  water_hit_target: boolean;
+  logged_before_noon: boolean;
+}
+
 export interface NutritionProfileRecord {
   user_id: string;
   age: number;
@@ -132,6 +146,11 @@ export interface Repository {
   findRecipeBySlug(slug: string): Promise<RecipeRecord | null>;
   findRecipeCategoryByName(name: string): Promise<{ id: string; name: string } | null>;
   listRecipeCategories(): Promise<{ id: string; name: string; icon: string; order_index: number }[]>; // مرتبة بـorder_index
+
+  // ---- Behavior Aggregator ----
+  findBehaviorDaily(userId: string, date: string): Promise<BehaviorDailyRecord | null>;
+  upsertBehaviorDaily(row: BehaviorDailyRecord): Promise<void>;
+  findBehaviorDailyInRange(userId: string, startIso: string, endIso: string): Promise<BehaviorDailyRecord[]>; // مرتبة تصاعديًا بالتاريخ
 
   /**
    * تحديث ذري لعداد الوجبات المجانية — يطابق `UPDATE users SET free_meals_used =

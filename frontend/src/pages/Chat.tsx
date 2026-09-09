@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, type ChatReply, type MeResponse } from "../lib/api";
 import type { GreetingResponse } from "../lib/greetingApi";
 import type { DailyResponse, WeightStatsResponse } from "../lib/progressApi";
+import type { DailySummaryResponse } from "../lib/intelligenceApi";
 import AppShell from "../components/AppShell";
 import { useI18n } from "../i18n/I18nContext";
 
@@ -25,13 +26,14 @@ export default function Chat() {
   const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
   const [daily, setDaily] = useState<DailyResponse | null>(null);
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
+  const [intelligence, setIntelligence] = useState<DailySummaryResponse | null>(null);
   const [showProgress, setShowProgress] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { syncFromAccount } = useI18n();
+  const { t, syncFromAccount } = useI18n();
 
   useEffect(() => {
     api.get<MeResponse>("/me").then((res) => {
@@ -63,6 +65,9 @@ export default function Chat() {
     // يعتمد عليه هنا (نفس مصدر الحقيقة الوحيد: weightStats.ts، مستخدم فعليًا بصفحة "متابعة الوزن").
     api.get<WeightStatsResponse>("/progress/weight?period=30").then((res) => {
       if (res.success && res.data) setCurrentWeight(res.data.current_weight);
+    });
+    api.get<DailySummaryResponse>("/intelligence?action=daily-summary").then((res) => {
+      if (res.success && res.data) setIntelligence(res.data);
     });
   }, [navigate]);
 
@@ -152,6 +157,17 @@ export default function Chat() {
               {me.profile ? ` / ${me.profile.water_target_ml} مل` : ""}
             </p>
             <p>⚖️ آخر وزن مسجّل: {currentWeight !== null ? `${currentWeight} كغم` : "ماكو تسجيل بعد"}</p>
+            {intelligence && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                <p className="font-display" style={{ fontWeight: 700, margin: 0 }}>
+                  {t("intelligence.scoreLabel")}: {intelligence.score}/100
+                </p>
+                <div className="tutorial-progress-bar">
+                  <div className="tutorial-progress-fill" style={{ width: `${intelligence.score}%` }} />
+                </div>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: 0 }}>{intelligence.insight}</p>
+              </div>
+            )}
           </div>
         )}
 
