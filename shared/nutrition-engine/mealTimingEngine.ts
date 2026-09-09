@@ -86,6 +86,17 @@ export function waterWindowForSchedule(schedule: SleepSchedule): MinuteRange {
   return { startMinuteOfDay: parseHm(schedule.wake_time), endMinuteOfDay: parseHm(schedule.sleep_time) };
 }
 
+// نافذة ثابتة افتراضية (21:00-22:00 بغداد) لمن ما ضبط جدول نوم — نفس فلسفة DEFAULT_MEAL_WINDOWS بـscheduled-reminders.mts.
+const DEFAULT_NIGHT_REVIEW_WINDOW: MinuteRange = { startMinuteOfDay: 21 * 60, endMinuteOfDay: 22 * 60 };
+
+/** نافذة "مراجعة الليل" (CJ Night Review) — ساعة وحدة قبل وقت النوم الحقيقي المضبوط، Fallback لنافذة ثابتة مسائية. */
+export function nightReviewWindowForSchedule(schedule: SleepSchedule | null): MinuteRange {
+  if (!schedule) return DEFAULT_NIGHT_REVIEW_WINDOW;
+  const sleep = parseHm(schedule.sleep_time);
+  const start = (sleep - 60 + 24 * 60) % (24 * 60);
+  return { startMinuteOfDay: start, endMinuteOfDay: sleep };
+}
+
 /** هل "الآن" (دقيقة من اليوم) داخل نافذة زمنية — يتعامل صح مع اللف حول منتصف الليل. */
 export function isWithinMinuteRange(nowMinuteOfDay: number, range: MinuteRange): boolean {
   const { startMinuteOfDay: start, endMinuteOfDay: end } = range;

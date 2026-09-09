@@ -51,3 +51,45 @@ export interface LeaderboardResponse {
   my_rank: number | null;
   my_streak_days: number;
 }
+
+export interface GoalForecastResponse {
+  forecast_available: boolean;
+  weeks_estimate: number | null;
+  reason: string | null;
+  distance_to_goal: number | null;
+  goal_direction: string | null;
+  weekly_change: number | null;
+}
+
+export interface ConsistencyScoreResponse {
+  score: number;
+  window_days: number;
+  days_with_activity: number;
+  breakdown: ScoreBreakdownItem[];
+}
+
+export interface WeekdayStat {
+  weekday: number;
+  label: string;
+  avg_score: number;
+  sample_size: number;
+}
+
+export interface BestWorstDayResponse {
+  available: boolean;
+  reason: string | null;
+  best: WeekdayStat | null;
+  worst: WeekdayStat | null;
+}
+
+export interface ReplayEvent {
+  type: "first_meal" | "streak_milestone" | "challenge_completed";
+  date: string;
+  label: string;
+}
+
+export interface ProgressReplayResponse {
+  available: boolean;
+  reason: string | null;
+  events: ReplayEvent[];
+}

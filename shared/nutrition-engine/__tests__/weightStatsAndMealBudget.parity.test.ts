@@ -10,7 +10,7 @@
  *   distribute_remaining_budget(1000, [breakfast,dinner], 'evening') -> {breakfast:176, dinner:824}
  */
 import { describe, it, expect } from "vitest";
-import { computeWeightStats, type WeightEntry } from "../weightStats.js";
+import { computeWeightStats, computeGoalForecast, type WeightEntry } from "../weightStats.js";
 import { distributeRemainingBudget } from "../mealBudget.js";
 
 describe("computeWeightStats — تكافؤ حرفي مع weight_stats.py", () => {
@@ -51,6 +51,53 @@ describe("computeWeightStats — تكافؤ حرفي مع weight_stats.py", () =
     const stats = computeWeightStats([{ date: new Date(), weight_kg: 80 }], null, null);
     expect(stats.trend).toBe("INSUFFICIENT_DATA");
     expect(stats.current_weight).toBe(80);
+  });
+});
+
+describe("computeGoalForecast — أسابيع = المسافة ÷ التغيّر الأسبوعي، صفر توقع مضلِّل", () => {
+  it("نزول حقيقي (5كغم متبقية، تغيّر -2كغم/أسبوع) -> توقع 2.5 أسبوع", () => {
+    const now = new Date();
+    const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+    const stats = computeWeightStats([
+      { date: daysAgo(20), weight_kg: 84.0 }, { date: daysAgo(13), weight_kg: 83.0 },
+      { date: daysAgo(7), weight_kg: 82.0 }, { date: now, weight_kg: 80.0 },
+    ], 75, "lose");
+    const forecast = computeGoalForecast(stats, "lose");
+    expect(forecast.forecast_available).toBe(true);
+    expect(forecast.weeks_estimate).toBe(2.5);
+  });
+
+  it("ماكو هدف وزن محدد -> forecast_available=false مع سبب صريح", () => {
+    const stats = computeWeightStats([{ date: new Date(), weight_kg: 80 }], null, null);
+    const forecast = computeGoalForecast(stats, null);
+    expect(forecast.forecast_available).toBe(false);
+    expect(forecast.weeks_estimate).toBeNull();
+    expect(forecast.reason).toBeTruthy();
+  });
+
+  it("weekly_change=null (بيانات غير كافية) -> forecast_available=false، صفر توقع من عدم", () => {
+    const stats = computeWeightStats([{ date: new Date(), weight_kg: 80 }, { date: new Date(), weight_kg: 79 }, { date: new Date(), weight_kg: 78 }], 70, "lose");
+    const forecast = computeGoalForecast(stats, "lose");
+    expect(forecast.forecast_available).toBe(false);
+  });
+
+  it("الاتجاه الأسبوعي معاكس للهدف (هدف نزول لكن الوزن طالع) -> صفر توقع مضلِّل", () => {
+    const now = new Date();
+    const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+    const stats = computeWeightStats([
+      { date: daysAgo(20), weight_kg: 78.0 }, { date: daysAgo(13), weight_kg: 79.0 },
+      { date: daysAgo(7), weight_kg: 80.0 }, { date: now, weight_kg: 82.0 },
+    ], 75, "lose");
+    const forecast = computeGoalForecast(stats, "lose");
+    expect(forecast.forecast_available).toBe(false);
+    expect(forecast.reason).toContain("مو باتجاه هدفك");
+  });
+
+  it("وصل الهدف فعلاً (REACHED) -> صفر توقع، السبب واضح", () => {
+    const stats = computeWeightStats([{ date: new Date(), weight_kg: 75 }, { date: new Date(), weight_kg: 75 }, { date: new Date(), weight_kg: 75 }], 75, "lose");
+    const forecast = computeGoalForecast(stats, "lose");
+    expect(forecast.forecast_available).toBe(false);
+    expect(forecast.reason).toBe("وصلت لهدفك فعلاً.");
   });
 });
 

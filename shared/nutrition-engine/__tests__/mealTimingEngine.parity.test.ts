@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   currentPeriodForUser, mealWindowsForSchedule, waterWindowForSchedule, isWithinMinuteRange,
-  type SleepSchedule,
+  nightReviewWindowForSchedule, type SleepSchedule,
 } from "../mealTimingEngine.js";
 import { getCurrentPeriod } from "../iraqTime.js";
 
@@ -50,6 +50,22 @@ describe("mealWindowsForSchedule / waterWindowForSchedule — نوافذ حقي�
     const water = waterWindowForSchedule(schedule);
     expect(water.startMinuteOfDay).toBe(7 * 60);
     expect(water.endMinuteOfDay).toBe(23 * 60);
+  });
+});
+
+describe("nightReviewWindowForSchedule — نافذة CJ Night Review (ساعة قبل النوم)", () => {
+  it("بدون جدول نوم -> نافذة ثابتة 21:00-22:00", () => {
+    expect(nightReviewWindowForSchedule(null)).toEqual({ startMinuteOfDay: 21 * 60, endMinuteOfDay: 22 * 60 });
+  });
+
+  it("نوم الساعة 00:00 -> النافذة 23:00-00:00 (تتعامل صح مع اللف حول منتصف الليل)", () => {
+    const schedule: SleepSchedule = { wake_time: "08:00", sleep_time: "00:00" };
+    expect(nightReviewWindowForSchedule(schedule)).toEqual({ startMinuteOfDay: 23 * 60, endMinuteOfDay: 0 });
+  });
+
+  it("نوم الساعة 23:00 -> النافذة 22:00-23:00", () => {
+    const schedule: SleepSchedule = { wake_time: "07:00", sleep_time: "23:00" };
+    expect(nightReviewWindowForSchedule(schedule)).toEqual({ startMinuteOfDay: 22 * 60, endMinuteOfDay: 23 * 60 });
   });
 });
 

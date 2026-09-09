@@ -123,6 +123,16 @@ export class FirestoreRepository implements Repository {
     }
   }
 
+  async listXpTransactionsByReason(userId: string, reason: string): Promise<{ amount: number; source: string | null; created_at: Date }[]> {
+    const snap = await this.db.collection("xp_transactions")
+      .where("user_id", "==", userId).where("reason", "==", reason)
+      .orderBy("created_at", "asc").get();
+    return snap.docs.map((d) => {
+      const data = d.data();
+      return { amount: data.amount, source: data.source ?? null, created_at: toDate(data.created_at) };
+    });
+  }
+
   // ---- Active Days / Streaks ----
   private activeDayDocId(userId: string, date: string): string {
     return `${userId}_${date}`;
@@ -306,6 +316,14 @@ export class FirestoreRepository implements Repository {
   async countWaterLogsForUser(userId: string): Promise<number> {
     const snap = await this.db.collection("water_logs").where("user_id", "==", userId).count().get();
     return snap.data().count;
+  }
+
+  async findFirstMealLogForUser(userId: string): Promise<MealLogRecord | null> {
+    const snap = await this.db.collection("meal_logs").where("user_id", "==", userId).orderBy("created_at", "asc").limit(1).get();
+    if (snap.empty) return null;
+    const doc = snap.docs[0];
+    const d = doc.data();
+    return { id: doc.id, ...(d as Omit<MealLogRecord, "id" | "created_at">), created_at: toDate(d.created_at) };
   }
 
   async listLevels(): Promise<{ level: number; required_xp: number; title: string; reward: { badge_icon: string; badge_title: string } | null }[]> {

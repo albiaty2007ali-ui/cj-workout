@@ -19,7 +19,7 @@ import { getFirebaseApp, FirestoreRepository } from "../../shared/nutrition-engi
 import { getSettings, canSendNow, sendNotification } from "../../shared/nutrition-engine/notifications/engine.js";
 import { nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
 import * as calculator from "../../shared/nutrition-engine/calculator.js";
-import { mealWindowsForSchedule, waterWindowForSchedule, isWithinMinuteRange, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
+import { mealWindowsForSchedule, waterWindowForSchedule, isWithinMinuteRange, nightReviewWindowForSchedule, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
 import { checkStreakRisk, pickUnseenBaselineInsight } from "../../shared/nutrition-engine/patternDetection.js";
 import { listMissionsForToday } from "../../shared/nutrition-engine/missions.js";
 import { evaluateChallenges, CHALLENGE_DEFS } from "../../shared/nutrition-engine/challenges.js";
@@ -64,6 +64,7 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
   let insightSent = 0;
   let missionReminderSent = 0;
   let challengeProgressSent = 0;
+  let nightReviewSent = 0;
 
   for (const userId of userIds) {
     const settings = await getSettings(db, userId);
@@ -159,11 +160,26 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
         }
       }
     }
+    // مراجعة الليل (CJ Night Review، المرحلة 6) — ملخص حقيقي ليوم اليوم قبل وقت النوم بساعة،
+    // مرة وحدة باليوم. صفر إرسال لو ماكو أي نشاط حقيقي مسجّل (تجنّب رسالة فارغة/حكمية).
+    if (canSendNow(settings, "DAILY_SUMMARY", now)) {
+      const nightWindow = nightReviewWindowForSchedule(sleepSchedule);
+      if (isWithinMinuteRange(nowMinuteOfDay, nightWindow)) {
+        const todayBehavior = await repo.findBehaviorDaily(userId, today);
+        if (todayBehavior && todayBehavior.meals_logged > 0) {
+          const parts = [`🍽️ ${todayBehavior.meals_logged} وجبة اليوم`];
+          if (todayBehavior.protein_hit_target) parts.push("✅ هدف البروتين تحقق");
+          if (todayBehavior.water_hit_target) parts.push("✅ هدف الماي تحقق");
+          await sendNotification(db, userId, "DAILY_SUMMARY", `night_review_${today}`, "/profile", "🌙 ملخص يومك مع الكابتن", parts.join(" · "));
+          nightReviewSent++;
+        }
+      }
+    }
   }
 
   return new Response(JSON.stringify({
     ok: true, checked: userIds.length, mealSent, waterSent, streakRiskSent,
-    insightSent, missionReminderSent, challengeProgressSent,
+    insightSent, missionReminderSent, challengeProgressSent, nightReviewSent,
   }), {
     headers: { "Content-Type": "application/json" },
   });

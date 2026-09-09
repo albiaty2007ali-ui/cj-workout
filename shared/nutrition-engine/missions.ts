@@ -28,7 +28,7 @@ export const MISSION_DEFS: MissionDef[] = [
   { id: "hit_water_target", title: "أكمل هدف الماي", description: "اشرب كمية الماي المستهدفة اليوم", xp_reward: 5 },
 ];
 
-function checkMission(id: string, behavior: BehaviorDailyRecord | null): boolean {
+export function checkMission(id: string, behavior: BehaviorDailyRecord | null): boolean {
   if (!behavior) return false;
   switch (id) {
     case "log_first_meal": return behavior.meals_logged >= 1;

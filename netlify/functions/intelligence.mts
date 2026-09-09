@@ -2,7 +2,8 @@
  * /api/intelligence — نقطة نهاية Captain CJ Intelligence، ?action= يحدد السلوك (نفس نمط
  * `/api/settings`/`/api/progress/*`). المرحلة 1: daily-summary (Personal Score). المرحلة 2:
  * missions/challenges. المرحلة 3: streak-freeze (POST use)، leaderboard (GET Top 10). المرحلة 4:
- * recovery-day (GET حالة اليوم + POST تفعيل/إلغاء).
+ * recovery-day (GET حالة اليوم + POST تفعيل/إلغاء). المرحلة 6 (Smart Food Intelligence):
+ * goal-forecast/consistency-score/best-worst-day/progress-replay (كلها GET، قراءة فقط).
  */
 import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
@@ -15,6 +16,10 @@ import { listChallenges, startChallenge } from "../../shared/nutrition-engine/ch
 import { useStreakFreeze } from "../../shared/nutrition-engine/streakFreeze.js";
 import { todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
 import type { RecoveryDayRecord } from "../../shared/nutrition-engine/db/repository.js";
+import { computeWeightStats, computeGoalForecast, type WeightEntry } from "../../shared/nutrition-engine/weightStats.js";
+import { computeConsistencyScore } from "../../shared/nutrition-engine/consistencyScore.js";
+import { analyzeBestWorstDay } from "../../shared/nutrition-engine/bestWorstDay.js";
+import { buildProgressReplay } from "../../shared/nutrition-engine/progressReplay.js";
 
 function insightText(score: number, hasData: boolean): string {
   if (!hasData) return "لسا ماكو نشاط كافي نحسب عليه نقاطك — سجّل وجباتك وراح نبني لك صورة واضحة كابتن.";
@@ -90,6 +95,32 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         getStreakLeaderboard(db), getUserStreakRank(db, claims.sub),
       ]);
       return jsonOk({ leaderboard, my_rank: myRank, my_streak_days: user.streak_days });
+    }
+
+    if (req.method === "GET" && action === "goal-forecast") {
+      const [profile, history] = await Promise.all([
+        repo.findNutritionProfile(claims.sub),
+        repo.findWeightHistory(claims.sub),
+      ]);
+      const entries: WeightEntry[] = history.map((h) => ({ date: h.recorded_at, weight_kg: h.weight_kg }));
+      const stats = computeWeightStats(entries, profile?.goal_weight ?? null, profile?.goal ?? null);
+      const forecast = computeGoalForecast(stats, profile?.goal ?? null);
+      return jsonOk({ ...forecast, distance_to_goal: stats.distance_to_goal, goal_direction: stats.goal_direction, weekly_change: stats.weekly_change });
+    }
+
+    if (req.method === "GET" && action === "consistency-score") {
+      const result = await computeConsistencyScore(repo, claims.sub);
+      return jsonOk(result);
+    }
+
+    if (req.method === "GET" && action === "best-worst-day") {
+      const result = await analyzeBestWorstDay(repo, claims.sub);
+      return jsonOk(result);
+    }
+
+    if (req.method === "GET" && action === "progress-replay") {
+      const result = await buildProgressReplay(repo, user);
+      return jsonOk(result);
     }
 
     if (req.method === "GET" && action === "recovery-day") {

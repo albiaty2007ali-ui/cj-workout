@@ -110,6 +110,39 @@ function computeTrend(entries: WeightEntry[]): Trend {
   return diff > 0 ? "INCREASING" : "DECREASING";
 }
 
+export interface GoalForecastResult {
+  forecast_available: boolean;
+  weeks_estimate: number | null;
+  reason: string | null;
+}
+
+/**
+ * Goal Forecast — أسابيع متبقية = distance_to_goal ÷ |weekly_change| (كلاهما محسوب أصلاً
+ * بـcomputeWeightStats، صفر مصدر بيانات جديد). لغة احتمالية دائمًا بالعرض (مو هنا — هذا رقم خام)،
+ * و"أحتاج بيانات أكثر" الصريح عبر forecast_available=false لأي حالة غير كافية أو غير منطقية
+ * (مثلاً التغيّر الأسبوعي بالاتجاه المعاكس للهدف — صفر توقع سلبي مضلِّل).
+ */
+export function computeGoalForecast(stats: WeightStatsResult, goalType: string | null): GoalForecastResult {
+  if (stats.distance_to_goal === null) {
+    return { forecast_available: false, weeks_estimate: null, reason: "ماكو هدف وزن محدد بعد." };
+  }
+  if (stats.goal_direction === "REACHED") {
+    return { forecast_available: false, weeks_estimate: null, reason: "وصلت لهدفك فعلاً." };
+  }
+  if (stats.weekly_change === null) {
+    return { forecast_available: false, weeks_estimate: null, reason: stats.weekly_change_note ?? "نحتاج بيانات أكثر لحساب توقع واقعي." };
+  }
+  const movingTowardGoal =
+    goalType === "lose" ? stats.weekly_change < 0
+    : goalType === "gain" ? stats.weekly_change > 0
+    : Math.abs(stats.weekly_change) < 0.05;
+  if (!movingTowardGoal) {
+    return { forecast_available: false, weeks_estimate: null, reason: "التغيّر الأسبوعي الحالي مو باتجاه هدفك، صعب نحسب توقع واقعي هسه." };
+  }
+  const weeks = stats.distance_to_goal / Math.abs(stats.weekly_change);
+  return { forecast_available: true, weeks_estimate: pyRound(weeks, 1), reason: null };
+}
+
 function goalDistance(currentWeight: number, goalWeight: number | null, goalType: string | null): [number | null, GoalDirection] {
   if (goalWeight === null) return [null, null];
   const diff = pyRound(goalWeight - currentWeight, 1);

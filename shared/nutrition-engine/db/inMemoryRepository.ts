@@ -39,7 +39,7 @@ export class InMemoryRepository implements Repository {
     this.users.set(user.id, { ...user });
   }
 
-  private xpTransactions: (XpTransactionInput & { id: string })[] = [];
+  private xpTransactions: (XpTransactionInput & { id: string; created_at: Date })[] = [];
   private activeDays: ActiveDayRecord[] = [];
   streakMilestones: StreakMilestoneRecord[] = [];
 
@@ -48,7 +48,14 @@ export class InMemoryRepository implements Repository {
   }
 
   async insertXpTransaction(tx: XpTransactionInput): Promise<void> {
-    this.xpTransactions.push({ ...tx, id: genId() });
+    this.xpTransactions.push({ ...tx, id: genId(), created_at: this.clockNow() });
+  }
+
+  async listXpTransactionsByReason(userId: string, reason: string): Promise<{ amount: number; source: string | null; created_at: Date }[]> {
+    return this.xpTransactions
+      .filter((t) => t.user_id === userId && t.reason === reason)
+      .sort((a, b) => a.created_at.getTime() - b.created_at.getTime())
+      .map((t) => ({ amount: t.amount, source: t.source, created_at: t.created_at }));
   }
 
   async findActiveDay(userId: string, date: string): Promise<ActiveDayRecord | null> {
@@ -127,6 +134,11 @@ export class InMemoryRepository implements Repository {
 
   async countWaterLogsForUser(userId: string): Promise<number> {
     return this.waterLogs.filter((w) => w.user_id === userId).length;
+  }
+
+  async findFirstMealLogForUser(userId: string): Promise<MealLogRecord | null> {
+    const rows = this.mealLogs.filter((m) => m.user_id === userId).sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
+    return rows[0] ?? null;
   }
 
   levels: { level: number; required_xp: number; title: string; reward: { badge_icon: string; badge_title: string } | null }[] = [];

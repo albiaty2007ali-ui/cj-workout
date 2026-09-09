@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
-import type { DailySummaryResponse, MissionStatus, ChallengeStatus, LeaderboardResponse } from "../lib/intelligenceApi";
+import type {
+  DailySummaryResponse, MissionStatus, ChallengeStatus, LeaderboardResponse,
+  GoalForecastResponse, ConsistencyScoreResponse, BestWorstDayResponse, ProgressReplayResponse,
+} from "../lib/intelligenceApi";
 import AppShell from "../components/AppShell";
 import { useI18n } from "../i18n/I18nContext";
 
@@ -13,6 +16,10 @@ export default function Intelligence() {
   const [missions, setMissions] = useState<MissionStatus[] | null>(null);
   const [challenges, setChallenges] = useState<ChallengeStatus[] | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardResponse | null>(null);
+  const [goalForecast, setGoalForecast] = useState<GoalForecastResponse | null>(null);
+  const [consistency, setConsistency] = useState<ConsistencyScoreResponse | null>(null);
+  const [bestWorstDay, setBestWorstDay] = useState<BestWorstDayResponse | null>(null);
+  const [replay, setReplay] = useState<ProgressReplayResponse | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [freezeError, setFreezeError] = useState("");
 
@@ -28,6 +35,18 @@ export default function Intelligence() {
     });
     api.get<LeaderboardResponse>("/intelligence?action=leaderboard").then((res) => {
       if (res.success && res.data) setLeaderboard(res.data);
+    });
+    api.get<GoalForecastResponse>("/intelligence?action=goal-forecast").then((res) => {
+      if (res.success && res.data) setGoalForecast(res.data);
+    });
+    api.get<ConsistencyScoreResponse>("/intelligence?action=consistency-score").then((res) => {
+      if (res.success && res.data) setConsistency(res.data);
+    });
+    api.get<BestWorstDayResponse>("/intelligence?action=best-worst-day").then((res) => {
+      if (res.success && res.data) setBestWorstDay(res.data);
+    });
+    api.get<ProgressReplayResponse>("/intelligence?action=progress-replay").then((res) => {
+      if (res.success && res.data) setReplay(res.data);
     });
   }
 
@@ -173,6 +192,67 @@ export default function Intelligence() {
             </p>
           )}
         </div>
+
+        {consistency && (
+          <div className="notice-box">
+            <h3 style={{ marginTop: 0 }}>{t("intelligence.consistencyScoreTitle")}</h3>
+            <p style={{ fontSize: "2rem", fontWeight: 700, margin: "4px 0" }}>{consistency.score}/100</p>
+            <div className="tutorial-progress-bar">
+              <div className="tutorial-progress-fill" style={{ width: `${consistency.score}%` }} />
+            </div>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+              {t("intelligence.consistencyDaysActive")} {consistency.days_with_activity} {t("intelligence.consistencyOfWindow")} {consistency.window_days}
+            </p>
+            {consistency.breakdown.map((b, i) => (
+              <p key={i} style={{ fontSize: "0.85rem", margin: "4px 0" }}>
+                +{b.delta} — {b.label} <span style={{ color: "var(--text-muted)" }}>({b.reason})</span>
+              </p>
+            ))}
+          </div>
+        )}
+
+        {goalForecast && goalForecast.distance_to_goal !== null && (
+          <div className="notice-box">
+            <h3 style={{ marginTop: 0 }}>{t("intelligence.goalForecastTitle")}</h3>
+            {goalForecast.forecast_available ? (
+              <p>{t("intelligence.goalForecastEstimate")} <strong>{goalForecast.weeks_estimate}</strong> {t("intelligence.goalForecastWeeks")}</p>
+            ) : (
+              <p style={{ color: "var(--text-muted)" }}>{goalForecast.reason}</p>
+            )}
+          </div>
+        )}
+
+        {bestWorstDay && (
+          <div className="notice-box">
+            <h3 style={{ marginTop: 0 }}>{t("intelligence.bestWorstDayTitle")}</h3>
+            {bestWorstDay.available && bestWorstDay.best && bestWorstDay.worst ? (
+              <>
+                <p>🟢 {t("intelligence.bestDayLabel")} <strong>{bestWorstDay.best.label}</strong></p>
+                <p>🟡 {t("intelligence.worstDayLabel")} <strong>{bestWorstDay.worst.label}</strong></p>
+              </>
+            ) : (
+              <p style={{ color: "var(--text-muted)" }}>{bestWorstDay.reason ?? t("intelligence.insufficientData")}</p>
+            )}
+          </div>
+        )}
+
+        {replay && (
+          <div className="notice-box">
+            <h3 style={{ marginTop: 0 }}>{t("intelligence.progressReplayTitle")}</h3>
+            {replay.available ? (
+              <ul className="weight-history-list">
+                {replay.events.map((e, i) => (
+                  <li key={i}>
+                    <span>{e.date}</span>
+                    <span>{e.label}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ color: "var(--text-muted)" }}>{replay.reason ?? t("intelligence.insufficientData")}</p>
+            )}
+          </div>
+        )}
       </main>
     </AppShell>
   );

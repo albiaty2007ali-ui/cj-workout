@@ -103,6 +103,8 @@ export interface Repository {
   // ---- XP Ledger ----
   findXpTransactionBySource(userId: string, source: string): Promise<boolean>;
   insertXpTransaction(tx: XpTransactionInput): Promise<void>;
+  // مرتبة تصاعديًا بالتاريخ — لأغراض عرض فقط (مثلاً Progress Replay)، صفر استخدام بمنطق منح XP.
+  listXpTransactionsByReason(userId: string, reason: string): Promise<{ amount: number; source: string | null; created_at: Date }[]>;
 
   // ---- Active Days / Streaks ----
   findActiveDay(userId: string, date: string): Promise<ActiveDayRecord | null>;
@@ -123,6 +125,7 @@ export interface Repository {
   // ---- Meal Logs / Water Logs ----
   countMealLogsForUser(userId: string): Promise<number>;
   countWaterLogsForUser(userId: string): Promise<number>;
+  findFirstMealLogForUser(userId: string): Promise<MealLogRecord | null>;
   insertMealLog(row: MealLogInput): Promise<MealLogRecord>;
   findMealLog(id: string): Promise<MealLogRecord | null>;
   deleteMealLog(id: string): Promise<void>;
