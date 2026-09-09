@@ -10,7 +10,7 @@ import { InMemoryRepository } from "../db/inMemoryRepository.js";
 import { makeUser } from "./testHelpers.js";
 import { handleMessage } from "../orchestrator.js";
 import { detectIntent, WHAT_IF, LOG_MEAL } from "../intents.js";
-import type { NutritionProfileRecord } from "../db/repository.js";
+import type { NutritionProfileRecord, RecipeRecord } from "../db/repository.js";
 
 const STANDARD_PROFILE: Omit<NutritionProfileRecord, "user_id"> = {
   age: 25, weight_kg: 80, height_cm: 175, sex: "male", goal: "lose", activity_level: "moderate",
@@ -85,6 +85,24 @@ describe("🚨 What If Simulator — Regression الأمان الحرج: صفر 
     expect(r.meal_logged).toBe(false);
     // صفر صف MealLog جديد غير الصف اللي زرعناه احنا يدويًا فوق (يبقى 1 بالضبط، مو 2)
     expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+  });
+
+  it("تجاوز واضح + وصفة حقيقية ضمن الميزانية المتبقية -> suggested_recipe حقيقي (بطاقة وصفة بالشات، المرحلة 5/Prompt 2)", async () => {
+    const repo = setupRepo();
+    const user = await freshUser(repo, "u_recipe_alt");
+    const recipe: RecipeRecord = {
+      id: "r1", name: "سلطة خفيفة", slug: "light-salad", description: null, category_id: "c1",
+      active: true, calories: 300, protein: 20, carbs: 20, fat: 10, fiber: null,
+      prep_time_min: null, cook_time_min: null, servings: 1, difficulty: "easy",
+      match_keywords: null, source: null, tags: [], ingredients: [], steps: [], substitutions: [],
+    };
+    repo.recipes = [recipe];
+    const r = await handleMessage(repo, user, "اذا اكلت وجبة 3000 سعرة هسه؟");
+    expect(r.meal_logged).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+    expect(r.suggested_recipe).not.toBeNull();
+    expect((r.suggested_recipe as { slug: string }).slug).toBe("light-salad");
+    expect(r.reply).toContain("سلطة خفيفة");
   });
 
   it("رقم سعرات صريح بدون اسم طعام ('اذا اخذت وجبة 700 سعرة؟') -> يحسب من الرقم مباشرة، صفر تسجيل", async () => {

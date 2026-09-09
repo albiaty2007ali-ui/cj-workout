@@ -714,7 +714,7 @@ async function handleWhatIf(repo: Repository, user: UserRecord, textNorm: string
   } else {
     // صفر طعام معروف اتطابق — نجرب رقم سعرات صريح بنفس الرسالة ("إذا أخذت وجبة 700 سعرة؟")
     const calorieMatch = textNorm.match(/(\d+)\s*سعر/);
-    if (!calorieMatch) return { reply: responses.whatIfNoFood(), meal_logged: false };
+    if (!calorieMatch) return { reply: responses.whatIfNoFood(), meal_logged: false, suggested_recipe: null };
     simulatedCalories = parseInt(calorieMatch[1], 10);
     label = "هذي الوجبة";
   }
@@ -729,6 +729,10 @@ async function handleWhatIf(repo: Repository, user: UserRecord, textNorm: string
     reply += `\n\n${await recommendations.suggestPortionForFood(singleFoodId, label, ctx.remaining_calories)}`;
   }
 
+  // بديل حقيقي من قسم وجبات الدايت لو تجاوز واضح — recipeAlts[0] يصير suggested_recipe حقيقي
+  // (المرحلة 5/Prompt 2: كان يُذكَر بالرد كنص فقط، بدون بطاقة وصفة تفاعلية بالشات — نفس بيانات
+  // recipeSearch.suggestRecipesWithin الحقيقية الموجودة أصلاً، صفر مصدر بيانات جديد).
+  let suggestedRecipe: { id: string; slug: string; name: string; calories: number; protein: number; carbs: number; fat: number } | null = null;
   if (after < -100) {
     if (singleFoodId !== null) {
       reply += `\n\n${await recommendations.suggestLighterAlternative(singleFoodId, label)}`;
@@ -737,10 +741,12 @@ async function handleWhatIf(repo: Repository, user: UserRecord, textNorm: string
     if (recipeAlts.length > 0) {
       reply += `\n\n${responses.whatIfAlternativesIntro()}`;
       for (const r of recipeAlts) reply += `\n🍽️ ${r.name} — ~${r.calories} kcal (موجودة بقسم وجبات الدايت)`;
+      const top = recipeAlts[0]!;
+      suggestedRecipe = { id: top.id, slug: top.slug, name: top.name, calories: top.calories, protein: top.protein, carbs: top.carbs, fat: top.fat };
     }
   }
 
-  return { reply, meal_logged: false };
+  return { reply, meal_logged: false, suggested_recipe: suggestedRecipe };
 }
 
 /** "شكد يعني صحن؟" بدون اسم طعام — سؤال عام عن وحدة قياس، صفر تسجيل. */
