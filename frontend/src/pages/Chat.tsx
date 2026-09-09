@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, type ChatReply, type MeResponse } from "../lib/api";
 import type { GreetingResponse } from "../lib/greetingApi";
-import type { DailyResponse } from "../lib/progressApi";
+import type { DailyResponse, WeightStatsResponse } from "../lib/progressApi";
 import AppShell from "../components/AppShell";
 import AdSlot from "../components/AdSlot";
 import { AD_SLOTS } from "../lib/adsConfig";
@@ -26,6 +26,7 @@ export default function Chat() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
   const [daily, setDaily] = useState<DailyResponse | null>(null);
+  const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [showProgress, setShowProgress] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -59,6 +60,11 @@ export default function Chat() {
     });
     api.get<DailyResponse>("/progress/daily").then((res) => {
       if (res.success && res.data && res.data.meals) setDaily(res.data);
+    });
+    // آخر وزن مسجّل — عرض معلوماتي بس بالوحة التقدم (لوحة الدشبورد المصغّرة)، صفر حساب/قرار
+    // يعتمد عليه هنا (نفس مصدر الحقيقة الوحيد: weightStats.ts، مستخدم فعليًا بصفحة "متابعة الوزن").
+    api.get<WeightStatsResponse>("/progress/weight?period=30").then((res) => {
+      if (res.success && res.data) setCurrentWeight(res.data.current_weight);
     });
   }, [navigate]);
 
@@ -143,7 +149,11 @@ export default function Chat() {
             <p className="font-display" style={{ fontWeight: 700, margin: 0 }}>تقدمك</p>
             <p>⭐ XP: {me.xp}</p>
             <p>🔥 Streak: {me.streak_days} يوم</p>
-            <p>💧 هدف الماء اليومي: {me.profile ? `${me.profile.water_target_ml} مل` : "—"}</p>
+            <p>
+              💧 الماي اليوم: {daily?.water_ml ?? 0} مل
+              {me.profile ? ` / ${me.profile.water_target_ml} مل` : ""}
+            </p>
+            <p>⚖️ آخر وزن مسجّل: {currentWeight !== null ? `${currentWeight} كغم` : "ماكو تسجيل بعد"}</p>
           </div>
         )}
 

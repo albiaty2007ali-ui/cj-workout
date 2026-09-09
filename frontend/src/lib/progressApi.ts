@@ -17,6 +17,7 @@ export interface DailyResponse {
   over_target?: boolean;
   meals?: { breakfast: MealBucket; lunch: MealBucket; dinner: MealBucket; snack: MealBucket[] };
   budgets?: Record<string, number>;
+  water_ml?: number;
 }
 
 export interface WeightEntry {

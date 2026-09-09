@@ -57,10 +57,14 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       budgets = mealBudget.distributeRemainingBudget(remainingCalories, unlogged, getCurrentPeriod(now));
     }
 
+    // الماي متوفر فقط لـ"اليوم الحالي" (todayWaterMl يعتمد على "الآن" الفعلي، نفس قيد
+    // mealBudget أعلاه) — أيام ماضية تبقى بلا رقم ماي، صادق بدل تخمين.
+    const waterMl = isToday ? await calculator.todayWaterMl(repo, claims.sub, now) : undefined;
+
     return jsonOk({
       is_today: isToday, target_date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
       target_calories: targetCalories, remaining_calories: remainingCalories, over_target: overTarget,
-      meals, budgets,
+      meals, budgets, water_ml: waterMl,
     });
   } catch (err) {
     console.error("progress-daily error:", err);
