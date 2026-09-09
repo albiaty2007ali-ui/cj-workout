@@ -23,7 +23,7 @@ import type {
   Repository, UserRecord, XpTransactionInput, ActiveDayRecord, StreakMilestoneRecord,
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
-  MealStatusRecord, NutritionTipRecord, RecipeRecord, BehaviorDailyRecord,
+  MealStatusRecord, NutritionTipRecord, RecipeRecord, BehaviorDailyRecord, ChallengeProgressRecord,
 } from "./repository.js";
 
 export function genId(): string {
@@ -191,6 +191,25 @@ export class FirestoreRepository implements Repository {
       .orderBy("date", "asc")
       .get();
     return snap.docs.map((d) => d.data() as BehaviorDailyRecord);
+  }
+
+  // ---- Challenges ----
+  private challengeProgressDocId(userId: string, challengeId: string): string {
+    return `${userId}_${challengeId}`;
+  }
+
+  async findChallengeProgress(userId: string, challengeId: string): Promise<ChallengeProgressRecord | null> {
+    const doc = await this.db.collection("challenge_progress").doc(this.challengeProgressDocId(userId, challengeId)).get();
+    return doc.exists ? (doc.data() as ChallengeProgressRecord) : null;
+  }
+
+  async insertChallengeProgress(row: ChallengeProgressRecord): Promise<void> {
+    // create() يفشل لو موجودة مسبقًا — نفس ضمان "محاولة واحدة فقط" تبع active_days بالضبط.
+    await this.db.collection("challenge_progress").doc(this.challengeProgressDocId(row.user_id, row.challenge_id)).create(row);
+  }
+
+  async updateChallengeProgress(userId: string, challengeId: string, patch: Partial<ChallengeProgressRecord>): Promise<void> {
+    await this.db.collection("challenge_progress").doc(this.challengeProgressDocId(userId, challengeId)).set(patch, { merge: true });
   }
 
   // ---- Nutrition Profile / Weight ----

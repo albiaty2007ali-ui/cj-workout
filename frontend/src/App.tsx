@@ -12,6 +12,7 @@ import RecipesList from "./pages/RecipesList";
 import RecipeDetail from "./pages/RecipeDetail";
 import Daily from "./pages/Daily";
 import WeightProgress from "./pages/WeightProgress";
+import Intelligence from "./pages/Intelligence";
 import Subscribe from "./pages/Subscribe";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminTips from "./pages/admin/AdminTips";
@@ -40,6 +41,7 @@ export default function App() {
       <Route path="/recipes/:slug" element={<RecipeDetail />} />
       <Route path="/daily" element={<Daily />} />
       <Route path="/progress/weight" element={<WeightProgress />} />
+      <Route path="/intelligence" element={<Intelligence />} />
       <Route path="/subscribe" element={<Subscribe />} />
       <Route path="/admin" element={<AdminHome />} />
       <Route path="/admin/tips" element={<AdminTips />} />

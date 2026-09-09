@@ -13,3 +13,26 @@ export interface DailySummaryResponse {
   xp: number;
   insight: string;
 }
+
+export interface MissionStatus {
+  id: string;
+  title: string;
+  description: string;
+  xp_reward: number;
+  completed: boolean;
+  claimed: boolean;
+}
+
+export type ChallengeStatusValue = "not_started" | "active" | "completed";
+
+export interface ChallengeStatus {
+  id: string;
+  title: string;
+  description: string;
+  type: "meals" | "protein" | "water";
+  target_days: number;
+  xp_reward: number;
+  min_streak_days: number;
+  status: ChallengeStatusValue;
+  progress_days: number;
+}

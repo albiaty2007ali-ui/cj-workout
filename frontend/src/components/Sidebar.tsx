@@ -41,6 +41,7 @@ export default function Sidebar({ userName, isAdmin, onQuickPrompt }: SidebarPro
           <Link className="sidebar-item" to="/recipes" onClick={() => setOpen(false)}>{t("sidebar.recipes")}</Link>
           <Link className="sidebar-item" to="/daily" onClick={() => setOpen(false)}>{t("sidebar.daily")}</Link>
           <Link className="sidebar-item" to="/progress/weight" onClick={() => setOpen(false)}>{t("sidebar.weight")}</Link>
+          <Link className="sidebar-item" to="/intelligence" onClick={() => setOpen(false)}>{t("sidebar.intelligence")}</Link>
           <Link className="sidebar-item" to="/subscribe" onClick={() => setOpen(false)}>{t("sidebar.subscribe")}</Link>
         </nav>
         <div className="sidebar-bottom">

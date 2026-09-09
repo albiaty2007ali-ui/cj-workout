@@ -152,6 +152,11 @@ export interface Repository {
   upsertBehaviorDaily(row: BehaviorDailyRecord): Promise<void>;
   findBehaviorDailyInRange(userId: string, startIso: string, endIso: string): Promise<BehaviorDailyRecord[]>; // مرتبة تصاعديًا بالتاريخ
 
+  // ---- Challenges ----
+  findChallengeProgress(userId: string, challengeId: string): Promise<ChallengeProgressRecord | null>;
+  insertChallengeProgress(row: ChallengeProgressRecord): Promise<void>; // يفشل لو موجودة مسبقًا (محاولة واحدة فقط)
+  updateChallengeProgress(userId: string, challengeId: string, patch: Partial<ChallengeProgressRecord>): Promise<void>;
+
   /**
    * تحديث ذري لعداد الوجبات المجانية — يطابق `UPDATE users SET free_meals_used =
    * free_meals_used + 1 WHERE id=:uid AND free_meals_used < :cap` بايثون (منع تجاوز الحد تحت
@@ -242,4 +247,17 @@ export interface NutritionTipRecord {
   category: string;
   active: boolean;
   priority: number;
+}
+
+/**
+ * تقدّم تحدٍّ متعدد الأيام (Challenges، المرحلة 2 من ذكاء Captain CJ) — محاولة واحدة نشطة لكل
+ * (مستخدم، تحدٍّ) بأي وقت (معرّف الوثيقة `${userId}_${challengeId}`)، التقدم الفعلي يُحسب من
+ * behavior_daily الحقيقي بين start_date واليوم، صفر عداد منفصل يمكن أن ينحرف.
+ */
+export interface ChallengeProgressRecord {
+  user_id: string;
+  challenge_id: string;
+  start_date: string; // "YYYY-MM-DD" بتوقيت بغداد — بداية نافذة الحساب
+  status: "active" | "completed";
+  completed_at: string | null;
 }

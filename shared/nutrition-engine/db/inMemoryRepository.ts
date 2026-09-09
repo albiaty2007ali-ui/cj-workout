@@ -8,6 +8,7 @@ import type {
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
   MealStatusRecord, NutritionTipRecord, UserRecord, RecipeRecord, BehaviorDailyRecord,
+  ChallengeProgressRecord,
 } from "./repository.js";
 
 function genId(): string {
@@ -247,6 +248,25 @@ export class InMemoryRepository implements Repository {
     return this.behaviorDaily
       .filter((b) => b.user_id === userId && b.date >= startIso && b.date <= endIso)
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  private challengeProgress: ChallengeProgressRecord[] = [];
+
+  async findChallengeProgress(userId: string, challengeId: string): Promise<ChallengeProgressRecord | null> {
+    return this.challengeProgress.find((c) => c.user_id === userId && c.challenge_id === challengeId) ?? null;
+  }
+
+  async insertChallengeProgress(row: ChallengeProgressRecord): Promise<void> {
+    if (await this.findChallengeProgress(row.user_id, row.challenge_id)) {
+      throw new Error(`challenge_progress already exists: (${row.user_id}, ${row.challenge_id})`);
+    }
+    this.challengeProgress.push({ ...row });
+  }
+
+  async updateChallengeProgress(userId: string, challengeId: string, patch: Partial<ChallengeProgressRecord>): Promise<void> {
+    const existing = this.challengeProgress.find((c) => c.user_id === userId && c.challenge_id === challengeId);
+    if (!existing) throw new Error(`no challenge_progress for (${userId}, ${challengeId})`);
+    Object.assign(existing, patch);
   }
 
   async incrementFreeMealsUsedIfBelowCap(userId: string, cap: number): Promise<boolean> {
