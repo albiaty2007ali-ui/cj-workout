@@ -20,7 +20,9 @@ import { getSettings, canSendNow, sendNotification } from "../../shared/nutritio
 import { nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
 import * as calculator from "../../shared/nutrition-engine/calculator.js";
 import { mealWindowsForSchedule, waterWindowForSchedule, isWithinMinuteRange, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
-import { checkStreakRisk } from "../../shared/nutrition-engine/patternDetection.js";
+import { checkStreakRisk, pickUnseenBaselineInsight } from "../../shared/nutrition-engine/patternDetection.js";
+import { listMissionsForToday } from "../../shared/nutrition-engine/missions.js";
+import { evaluateChallenges, CHALLENGE_DEFS } from "../../shared/nutrition-engine/challenges.js";
 
 export const config: Config = { schedule: "*/30 * * * *" };
 
@@ -59,6 +61,9 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
   let mealSent = 0;
   let waterSent = 0;
   let streakRiskSent = 0;
+  let insightSent = 0;
+  let missionReminderSent = 0;
+  let challengeProgressSent = 0;
 
   for (const userId of userIds) {
     const settings = await getSettings(db, userId);
@@ -103,20 +108,63 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
         }
       }
     }
+    const user = await repo.findUser(userId);
+    if (!user) continue;
+
     // خطر انقطاع Streak حقيقي (المرحلة 5) — فحص مستقل عن الوجبات/الماي، مرة وحدة باليوم عبر dedup_key.
     if (canSendNow(settings, "STREAK_RISK", now)) {
-      const [user, todayBehavior] = await Promise.all([
-        repo.findUser(userId), repo.findBehaviorDaily(userId, today),
-      ]);
-      const risk = user ? checkStreakRisk(user, todayBehavior, now) : null;
+      const todayBehavior = await repo.findBehaviorDaily(userId, today);
+      const risk = checkStreakRisk(user, todayBehavior, now);
       if (risk) {
         await sendNotification(db, userId, "STREAK_RISK", `streak_risk_${today}`, "/chat", "🔥 خطر ينكسر الستريك!", risk.message);
         streakRiskSent++;
       }
     }
+
+    // ملاحظة سلوك حقيقية (المرحلة 5) — نفس pickUnseenBaselineInsight المستخدمة بالشات، Cooldown
+    // مشترك (insight_shown) يمنع تكرارها هنا لو انعرضت أصلاً بالشات اليوم، والعكس صحيح.
+    if (canSendNow(settings, "PERSONAL_INSIGHT", now)) {
+      const insightMessage = await pickUnseenBaselineInsight(repo, userId, now);
+      if (insightMessage) {
+        await sendNotification(db, userId, "PERSONAL_INSIGHT", `insight_${today}`, "/chat", "👀 لاحظت شي كابتن", insightMessage);
+        insightSent++;
+      }
+    }
+
+    // تذكير مهمة يومية مكتملة بس ما استُلمت (المرحلة 6) — مرة وحدة باليوم.
+    if (canSendNow(settings, "MISSION_REMINDER", now)) {
+      const missions = await listMissionsForToday(repo, userId, now);
+      const unclaimed = missions.find((m) => m.completed && !m.claimed);
+      if (unclaimed) {
+        await sendNotification(
+          db, userId, "MISSION_REMINDER", `mission_reminder_${today}`, "/intelligence",
+          "🎯 عندك مهمة مكتملة!", `"${unclaimed.title}" جاهزة تستلمها — ${unclaimed.xp_reward} XP بانتظارك.`,
+        );
+        missionReminderSent++;
+      }
+    }
+
+    // تحدٍّ اكتمل فعليًا (المرحلة 6) — evaluateChallenges تمنح XP إن لم تُمنح مسبقًا (idempotent)،
+    // هنا فقط نُعلِم المستخدم — dedup_key فريد لكل تحدٍّ (يُرسَل مرة وحدة طوال عمر التحدي).
+    if (canSendNow(settings, "CHALLENGE_PROGRESS", now)) {
+      await evaluateChallenges(repo, user, now);
+      for (const def of CHALLENGE_DEFS) {
+        const progress = await repo.findChallengeProgress(userId, def.id);
+        if (progress?.status === "completed" && progress.completed_at === today) {
+          await sendNotification(
+            db, userId, "CHALLENGE_PROGRESS", `challenge_${def.id}`, "/intelligence",
+            "🏆 أكملت تحدي!", `"${def.title}" — خلصته! +${def.xp_reward} XP.`,
+          );
+          challengeProgressSent++;
+        }
+      }
+    }
   }
 
-  return new Response(JSON.stringify({ ok: true, checked: userIds.length, mealSent, waterSent, streakRiskSent }), {
+  return new Response(JSON.stringify({
+    ok: true, checked: userIds.length, mealSent, waterSent, streakRiskSent,
+    insightSent, missionReminderSent, challengeProgressSent,
+  }), {
     headers: { "Content-Type": "application/json" },
   });
 };

@@ -18,7 +18,9 @@ const CATEGORY_GROUP: Record<string, NotificationGroup> = {
   BREAKFAST: "meals", LUNCH: "meals", DINNER: "meals", SNACK: "meals", MEAL_REMINDER: "meals",
   WATER: "water", HYDRATION: "water",
   STREAK: "streak", XP: "streak", MOTIVATION: "streak", CONSISTENCY: "streak", STREAK_RISK: "streak",
+  CHALLENGE_PROGRESS: "streak",
   RECIPE: "tips", PROGRESS: "tips", RETURN: "tips", DAILY_SUMMARY: "tips",
+  PERSONAL_INSIGHT: "tips", MISSION_REMINDER: "tips",
 };
 
 export interface NotificationSettings {

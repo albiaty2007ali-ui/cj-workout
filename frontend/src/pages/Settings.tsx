@@ -285,7 +285,7 @@ export default function Settings() {
                 </div>
 
                 <div style={{ marginTop: 16 }}>
-                  <p className="notif-row-label" style={{ marginBottom: 6 }}>😴 جدول نومك (اختياري — يخلي مواعيد تذكير الوجبات والماي تتكيّف مع وقتك الحقيقي بدل ساعات ثابتة)</p>
+                  <p className="notif-row-label" style={{ marginBottom: 6 }}>{t("settings.sleepScheduleLabel")}</p>
                   <div className="admin-form-row">
                     <input
                       type="time" value={notif.wake_time ?? ""}
@@ -305,12 +305,12 @@ export default function Settings() {
 
         {recoveryDayActive !== null && (
           <div className="notice-box">
-            <h3 style={{ marginTop: 0 }}>🔄 يوم مرن</h3>
+            <h3 style={{ marginTop: 0 }}>{t("settings.recoveryDayTitle")}</h3>
             <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-              يومك اليوم مختلف عن المعتاد؟ فعّل هذا وراح نعيد توزيع باقي وجباتك ونوقف تذكيرات وقت الوجبات لهذا اليوم بس — صفر تأثير على الستريك أو XP أو سجلّك السابق.
+              {t("settings.recoveryDayBody")}
             </p>
             <div className="notif-row">
-              <span className="notif-row-label">تفعيل اليوم المرن</span>
+              <span className="notif-row-label">{t("settings.recoveryDayToggle")}</span>
               <label className="switch">
                 <input type="checkbox" checked={recoveryDayActive} disabled={recoveryBusy} onChange={toggleRecoveryDay} />
                 <span className="switch-track" />

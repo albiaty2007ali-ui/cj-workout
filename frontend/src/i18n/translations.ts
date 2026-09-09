@@ -80,6 +80,10 @@ export const translations = {
       privacyBody: "بياناتك الغذائية والصحية خاصة بيك. تگدر تحمّل بياناتك أو تحذف حسابك بأي وقت من تحت بهذي الصفحة.",
       replayIntro: "🔁 إعادة مشاهدة المقدمة",
       languageTitle: "🌐 اللغة",
+      sleepScheduleLabel: "😴 جدول نومك (اختياري — يخلي مواعيد تذكير الوجبات والماي تتكيّف مع وقتك الحقيقي بدل ساعات ثابتة)",
+      recoveryDayTitle: "🔄 يوم مرن",
+      recoveryDayBody: "يومك اليوم مختلف عن المعتاد؟ فعّل هذا وراح نعيد توزيع باقي وجباتك ونوقف تذكيرات وقت الوجبات لهذا اليوم بس — صفر تأثير على الستريك أو XP أو سجلّك السابق.",
+      recoveryDayToggle: "تفعيل اليوم المرن",
     },
     intelligence: {
       scoreLabel: "نقاطك الشخصية",
@@ -173,6 +177,10 @@ export const translations = {
       privacyBody: "Your nutrition and health data is private to you. You can download your data or delete your account anytime from below on this page.",
       replayIntro: "🔁 Watch the intro again",
       languageTitle: "🌐 Language",
+      sleepScheduleLabel: "😴 Your sleep schedule (optional — makes meal/water reminder times adapt to your real schedule instead of fixed hours)",
+      recoveryDayTitle: "🔄 Flexible Day",
+      recoveryDayBody: "Is today different from your usual routine? Turn this on and we'll re-plan the rest of today's meals and pause meal-time reminders for today only — zero effect on your streak, XP, or past history.",
+      recoveryDayToggle: "Enable flexible day",
     },
     intelligence: {
       scoreLabel: "Your Personal Score",
