@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
-import type { DailySummaryResponse, MissionStatus, ChallengeStatus } from "../lib/intelligenceApi";
+import type { DailySummaryResponse, MissionStatus, ChallengeStatus, LeaderboardResponse } from "../lib/intelligenceApi";
 import AppShell from "../components/AppShell";
 import { useI18n } from "../i18n/I18nContext";
 
@@ -12,7 +12,9 @@ export default function Intelligence() {
   const [summary, setSummary] = useState<DailySummaryResponse | null>(null);
   const [missions, setMissions] = useState<MissionStatus[] | null>(null);
   const [challenges, setChallenges] = useState<ChallengeStatus[] | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardResponse | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [freezeError, setFreezeError] = useState("");
 
   function loadIntelligence() {
     api.get<DailySummaryResponse>("/intelligence?action=daily-summary").then((res) => {
@@ -24,6 +26,21 @@ export default function Intelligence() {
     api.get<{ challenges: ChallengeStatus[] }>("/intelligence?action=challenges").then((res) => {
       if (res.success && res.data) setChallenges(res.data.challenges);
     });
+    api.get<LeaderboardResponse>("/intelligence?action=leaderboard").then((res) => {
+      if (res.success && res.data) setLeaderboard(res.data);
+    });
+  }
+
+  async function useFreeze() {
+    setFreezeError("");
+    setBusyId("__freeze__");
+    const res = await api.post("/intelligence?action=streak-freeze");
+    setBusyId(null);
+    if (!res.success) {
+      setFreezeError(res.error?.message ?? "صار خطأ");
+      return;
+    }
+    loadIntelligence();
   }
 
   useEffect(() => {
@@ -72,6 +89,15 @@ export default function Intelligence() {
                 <span style={{ color: "var(--text-muted)" }}>({b.reason})</span>
               </p>
             ))}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <span>{t("intelligence.freezeBalance")}: {summary.freeze_balance}</span>
+              {summary.freeze_balance > 0 && (
+                <button className="btn btn-outline-dark" disabled={busyId === "__freeze__"} onClick={useFreeze}>
+                  {t("intelligence.useFreeze")}
+                </button>
+              )}
+            </div>
+            {freezeError && <p className="field-error">{freezeError}</p>}
           </div>
         )}
 
@@ -126,6 +152,26 @@ export default function Intelligence() {
               {c.status === "completed" && <span style={{ color: "var(--moss)", fontWeight: 700 }}>{t("intelligence.challengeCompleted")}</span>}
             </div>
           ))}
+        </div>
+
+        <div className="notice-box">
+          <h3 style={{ marginTop: 0 }}>{t("intelligence.leaderboardTitle")}</h3>
+          {leaderboard && leaderboard.leaderboard.length === 0 && <p>{t("intelligence.noLeaderboardYet")}</p>}
+          {leaderboard && leaderboard.leaderboard.length > 0 && (
+            <ul className="weight-history-list">
+              {leaderboard.leaderboard.map((entry) => (
+                <li key={entry.rank}>
+                  <span>#{entry.rank} — {entry.name}</span>
+                  <span>🔥 {entry.streak_days}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {leaderboard && leaderboard.my_rank !== null && leaderboard.my_rank > leaderboard.leaderboard.length && (
+            <p style={{ marginTop: 10, color: "var(--text-muted)" }}>
+              {t("intelligence.myRank")}: #{leaderboard.my_rank}
+            </p>
+          )}
         </div>
       </main>
     </AppShell>

@@ -94,6 +94,11 @@ export const translations = {
       startChallenge: "ابدأ التحدي",
       challengeCompleted: "✓ مكتمل",
       daysProgress: "أيام",
+      freezeBalance: "❄️ رصيد Streak Freeze",
+      useFreeze: "استخدم Freeze",
+      leaderboardTitle: "🥇 لوحة الصدارة (Streak)",
+      myRank: "ترتيبك الحالي",
+      noLeaderboardYet: "ماكو مستخدمين وصلوا 10 أيام Streak بعد.",
     },
   },
   en: {
@@ -182,6 +187,11 @@ export const translations = {
       startChallenge: "Start Challenge",
       challengeCompleted: "✓ Completed",
       daysProgress: "days",
+      freezeBalance: "❄️ Streak Freeze balance",
+      useFreeze: "Use Freeze",
+      leaderboardTitle: "🥇 Streak Leaderboard",
+      myRank: "Your current rank",
+      noLeaderboardYet: "No one has reached a 10-day streak yet.",
     },
   },
 } as const;

@@ -24,6 +24,7 @@ import type {
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
   MealStatusRecord, NutritionTipRecord, RecipeRecord, BehaviorDailyRecord, ChallengeProgressRecord,
+  StreakFreezeUsageRecord,
 } from "./repository.js";
 
 export function genId(): string {
@@ -79,6 +80,7 @@ export class FirestoreRepository implements Repository {
       pending_food_topic_json: d.pending_food_topic_json ?? null,
       pending_meal_json: d.pending_meal_json ?? null, last_direct_log_json: d.last_direct_log_json ?? null,
       ai_response_style: d.ai_response_style ?? "balanced",
+      streak_freeze_balance: d.streak_freeze_balance ?? 0,
     };
   }
 
@@ -91,6 +93,7 @@ export class FirestoreRepository implements Repository {
       pending_recipe_confirmation_id: user.pending_recipe_confirmation_id,
       pending_food_topic_json: user.pending_food_topic_json, pending_meal_json: user.pending_meal_json,
       last_direct_log_json: user.last_direct_log_json, ai_response_style: user.ai_response_style,
+      streak_freeze_balance: user.streak_freeze_balance,
       updated_at: FieldValue.serverTimestamp(),
     }, { merge: true });
   }
@@ -210,6 +213,11 @@ export class FirestoreRepository implements Repository {
 
   async updateChallengeProgress(userId: string, challengeId: string, patch: Partial<ChallengeProgressRecord>): Promise<void> {
     await this.db.collection("challenge_progress").doc(this.challengeProgressDocId(userId, challengeId)).set(patch, { merge: true });
+  }
+
+  // ---- Streak Freeze ----
+  async insertStreakFreezeUsage(row: StreakFreezeUsageRecord): Promise<void> {
+    await this.db.collection("streak_freeze_usage").doc(genId()).set(row);
   }
 
   // ---- Nutrition Profile / Weight ----
@@ -437,6 +445,54 @@ export async function getUserDisplayFields(db: Firestore, userId: string): Promi
     intro_completed: d.intro_completed ?? false,
     language: d.language === "en" ? "en" : "ar",
   };
+}
+
+// ---- Leaderboard (المرحلة 3 من ذكاء Captain CJ) — خارج Repository عمدًا لنفس سبب
+// UserDisplayFields أعلاه: قراءة عرض فقط عبر عدة مستخدمين، مو منطق أعمال لمستخدم واحد.
+
+export interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  username: string | null;
+  photo_url: string | null;
+  streak_days: number;
+}
+
+const LEADERBOARD_MIN_STREAK = 10;
+const LEADERBOARD_LIMIT = 10;
+
+/**
+ * Top 10 حسب Streak فقط (≥10 يوم) — صفر بيانات حساسة (بريد/سعرات/وزن/أهداف)، يستثني البروفايلات
+ * الخاصة. نجيب دفعة أكبر (30) ونفلتر profile_visibility بالكود بدل فهرس مركّب إضافي — Top 10
+ * حقيقي بعد الفلترة، مو أول 10 قبلها.
+ */
+export async function getStreakLeaderboard(db: Firestore): Promise<LeaderboardEntry[]> {
+  const snap = await db.collection("users")
+    .where("streak_days", ">=", LEADERBOARD_MIN_STREAK)
+    .orderBy("streak_days", "desc")
+    .limit(30)
+    .get();
+
+  const out: LeaderboardEntry[] = [];
+  for (const doc of snap.docs) {
+    if (out.length >= LEADERBOARD_LIMIT) break;
+    const d = doc.data();
+    if ((d.profile_visibility ?? "public") !== "public") continue;
+    out.push({
+      rank: out.length + 1, name: d.name ?? "مستخدم", username: d.username ?? null,
+      photo_url: d.photo_url ?? null, streak_days: d.streak_days ?? 0,
+    });
+  }
+  return out;
+}
+
+/** ترتيب المستخدم الحقيقي حتى لو خارج Top 10 (لعرض "ترتيبك الحالي: #37") — null لو تحت حد 10 أيام. */
+export async function getUserStreakRank(db: Firestore, userId: string): Promise<number | null> {
+  const userDoc = await db.collection("users").doc(userId).get();
+  const streakDays = (userDoc.data()?.streak_days as number | undefined) ?? 0;
+  if (streakDays < LEADERBOARD_MIN_STREAK) return null;
+  const higher = await db.collection("users").where("streak_days", ">", streakDays).count().get();
+  return higher.data().count + 1; // تقريبي عند تعادل Streak (Tie) — كافٍ لعرض إعلامي بس
 }
 
 export async function findUserIdByUsername(db: Firestore, username: string): Promise<string | null> {

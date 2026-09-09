@@ -6,6 +6,7 @@
 import type { Repository, UserRecord } from "./db/repository.js";
 import * as xpEngine from "./xpEngine.js";
 import { todayBaghdadIso, addDaysIso, diffDaysIso } from "./iraqTime.js";
+import { MAX_STREAK_FREEZE_BALANCE } from "./streakFreeze.js";
 
 export interface MilestoneAwarded {
   days: number;
@@ -67,6 +68,8 @@ async function awardMilestones(repo: Repository, user: UserRecord, currentStreak
     const granted = await xpEngine.awardXp(repo, user, m.xp_reward, "streak_milestone", `streak_milestone_${m.days}`);
     if (granted) {
       newlyAwarded.push({ days: m.days, label: m.label, xp_reward: m.xp_reward });
+      // محطة حقيقية جديدة = مصدر اكتساب Streak Freeze الوحيد (راجع streakFreeze.ts) — بحد أقصى موثَّق.
+      user.streak_freeze_balance = Math.min(MAX_STREAK_FREEZE_BALANCE, (user.streak_freeze_balance ?? 0) + 1);
     }
   }
   return newlyAwarded;

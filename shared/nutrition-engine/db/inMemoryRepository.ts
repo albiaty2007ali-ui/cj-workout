@@ -8,7 +8,7 @@ import type {
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
   MealStatusRecord, NutritionTipRecord, UserRecord, RecipeRecord, BehaviorDailyRecord,
-  ChallengeProgressRecord,
+  ChallengeProgressRecord, StreakFreezeUsageRecord,
 } from "./repository.js";
 
 function genId(): string {
@@ -267,6 +267,12 @@ export class InMemoryRepository implements Repository {
     const existing = this.challengeProgress.find((c) => c.user_id === userId && c.challenge_id === challengeId);
     if (!existing) throw new Error(`no challenge_progress for (${userId}, ${challengeId})`);
     Object.assign(existing, patch);
+  }
+
+  streakFreezeUsage: StreakFreezeUsageRecord[] = [];
+
+  async insertStreakFreezeUsage(row: StreakFreezeUsageRecord): Promise<void> {
+    this.streakFreezeUsage.push({ ...row });
   }
 
   async incrementFreeMealsUsedIfBelowCap(userId: string, cap: number): Promise<boolean> {

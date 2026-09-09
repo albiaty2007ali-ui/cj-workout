@@ -25,6 +25,10 @@ export interface UserRecord {
   pending_meal_json: string | null;
   last_direct_log_json: string | null;
   ai_response_style: string;
+  /** رصيد Streak Freeze الحالي (المرحلة 3 من ذكاء Captain CJ) — يُكتسَب من محطات Streak حقيقية
+   *  (streaks.ts)، يُستهلَك صراحة عبر streakFreeze.ts، أبدًا تلقائيًا. حد أقصى موثَّق (راجع
+   *  streakFreeze.MAX_STREAK_FREEZE_BALANCE) — صفر تراكم لا نهائي. */
+  streak_freeze_balance: number;
 }
 
 export interface XpTransactionInput {
@@ -157,6 +161,9 @@ export interface Repository {
   insertChallengeProgress(row: ChallengeProgressRecord): Promise<void>; // يفشل لو موجودة مسبقًا (محاولة واحدة فقط)
   updateChallengeProgress(userId: string, challengeId: string, patch: Partial<ChallengeProgressRecord>): Promise<void>;
 
+  // ---- Streak Freeze ----
+  insertStreakFreezeUsage(row: StreakFreezeUsageRecord): Promise<void>;
+
   /**
    * تحديث ذري لعداد الوجبات المجانية — يطابق `UPDATE users SET free_meals_used =
    * free_meals_used + 1 WHERE id=:uid AND free_meals_used < :cap` بايثون (منع تجاوز الحد تحت
@@ -260,4 +267,11 @@ export interface ChallengeProgressRecord {
   start_date: string; // "YYYY-MM-DD" بتوقيت بغداد — بداية نافذة الحساب
   status: "active" | "completed";
   completed_at: string | null;
+}
+
+/** سجل تدقيق فقط لاستخدام Streak Freeze — منطق الحماية الفعلي بـstreakFreeze.ts يعتمد على active_days الحقيقية، هذا للتاريخ/الشفافية فقط. */
+export interface StreakFreezeUsageRecord {
+  user_id: string;
+  date_covered: string; // اليوم اللي انحمى (عادة "أمس")
+  used_at: string; // اليوم اللي استُخدم فيه الـFreeze فعليًا
 }
