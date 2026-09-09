@@ -991,12 +991,19 @@ async function dispatch(
     const ctx = await context.build(repo, user.id, profile, now);
     const proteinNeeded = Math.max(0, (ctx.macro_targets.protein_g ?? 0) - ctx.consumed_protein);
     let reply = await recommendations.suggestMealWithin(ctx.remaining_calories, proteinNeeded);
+
+    // ربط حقيقي بقسم وجبات الدايت — نفس recipeSearch.ts الموجود، صفر بحث موازٍ جديد. أول
+    // وصفة حقيقية تصير suggested_recipe مهيكلة (recipe_id حقيقي، لاستخدام الفرونت إند لاحقًا
+    // ببطاقة وصفة حقيقية بدل نص فقط) — صفر recipe_id لو ماكو تطابق فعلي (صفر Hallucination).
     const matchingRecipes = await recipeSearch.suggestRecipesWithin(repo, ctx.remaining_calories);
+    let suggestedRecipe: { id: string; slug: string; name: string; calories: number; protein: number; carbs: number; fat: number } | null = null;
     if (matchingRecipes.length > 0) {
-      const lines = matchingRecipes.map((r) => `🍳 ${r.name} (~${r.calories} kcal) — /recipes/${r.slug}`).join("\n");
-      reply += `\n\nأو جرب وصفة جاهزة عندنا:\n${lines}`;
+      const top = matchingRecipes[0]!;
+      suggestedRecipe = { id: top.id, slug: top.slug, name: top.name, calories: top.calories, protein: top.protein, carbs: top.carbs, fat: top.fat };
+      const lines = matchingRecipes.map((r) => `🍳 ${r.name} (~${r.calories} kcal) — موجودة بقسم وجبات الدايت`).join("\n");
+      reply += `\n\nأو جرب وصفة جاهزة من قسم وجبات الدايت:\n${lines}`;
     }
-    return { reply, meal_logged: false };
+    return { reply, meal_logged: false, suggested_recipe: suggestedRecipe };
   }
 
   const hasRecipe = user.current_recipe_id !== null;

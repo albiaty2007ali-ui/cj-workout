@@ -61,6 +61,30 @@ describe("searchRecipes — تكافؤ حرفي مع recipe_search.py (4 وصف�
   });
 });
 
+describe("searchRecipes — بحث بالمكونات (المرحلة 2 من الذكاء الغذائي الذكي)", () => {
+  let repo: InMemoryRepository;
+
+  beforeEach(() => {
+    repo = new InMemoryRepository();
+    repo.recipes = [
+      makeRecipe({
+        name: "بولاو", slug: "pulao", calories: 450,
+        ingredients: [{ name: "دجاج", quantity: "200", unit: "غم" }, { name: "رز", quantity: "1", unit: "كوب" }],
+      }),
+      makeRecipe({ name: "سلطة خضراء", slug: "green-salad", calories: 90, ingredients: [{ name: "خس", quantity: "1", unit: "حبة" }] }),
+    ];
+  });
+
+  it("بحث 'دجاج' يلقى وصفة اسمها ما يذكر دجاج بس المكوّن يذكره (اسم/وصف/كلمات مفتاحية صفر تطابق)", async () => {
+    const names = (await searchRecipes(repo, "دجاج")).map((r) => r.name);
+    expect(names).toEqual(["بولاو"]);
+  });
+
+  it("بحث مكوّن غير موجود بأي وصفة -> صفر نتائج", async () => {
+    expect(await searchRecipes(repo, "سمك")).toEqual([]);
+  });
+});
+
 describe("suggestRecipesWithin — تكافؤ حرفي", () => {
   let repo: InMemoryRepository;
 

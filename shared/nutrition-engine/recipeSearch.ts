@@ -60,6 +60,12 @@ export async function searchRecipes(
       matched.push(r);
       continue;
     }
+    // بحث بالمكونات — يخلي "عندي بيض ابحثلي أكلة" أو "وصفة دجاج" يلقى وصفات تحتوي المكوّن حتى
+    // لو ماكو بالاسم/الوصف/match_keywords صراحة (مثلاً وصفة اسمها "بولاو" فيها دجاج كمكوّن).
+    if (r.ingredients.some((ing) => substringMatch(queryNorm, ing.name))) {
+      matched.push(r);
+      continue;
+    }
     if (fuzzyMatch(queryWords, r.name) || keywords.some((k) => fuzzyMatch(queryWords, k))) {
       matched.push(r);
     }
