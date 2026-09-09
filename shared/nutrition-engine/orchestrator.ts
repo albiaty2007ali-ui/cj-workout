@@ -35,7 +35,7 @@ import { NLU_ALLOWED_INTENTS } from "./nlu/knownIntents.js";
 import type { NLUContext } from "./nlu/types.js";
 import { pyFloatStr } from "./pyRound.js";
 import { FREE_MEALS_CAP } from "./userStatus.js";
-import type { Repository, UserRecord, RecipeRecord } from "./db/repository.js";
+import type { Repository, UserRecord, RecipeRecord, RecipeIngredientRecord } from "./db/repository.js";
 import type { PendingMeal, PendingItem } from "./corrections.js";
 
 // كلمات تصنيف تُمرَّر مباشرة لـrecipeSearch بدل بحث نصي حر — نفس عبارات
@@ -548,37 +548,68 @@ async function handlePortionForFood(
   return { reply, meal_logged: false };
 }
 
+/** EXACT/HIGH/PARTIAL/LOW حسب نسبة تطابق حقيقية — NO_MATCH (0%) لا يوصل هنا أصلاً (يُستبعَد قبلها). */
+function classifyMatchTier(percentage: number): "EXACT_MATCH" | "HIGH_MATCH" | "PARTIAL_MATCH" | "LOW_MATCH" {
+  if (percentage >= 1) return "EXACT_MATCH";
+  if (percentage >= 0.8) return "HIGH_MATCH";
+  if (percentage >= 0.6) return "PARTIAL_MATCH";
+  return "LOW_MATCH";
+}
+
 /**
  * Cook From What I Have — "عندي بيض وبطاطا، شنو اگدر اطبخ؟" — يبحث بوصفات قسم وجبات الدايت
  * الحقيقية عن أعلى نسبة تطابق مكونات، صفر تسجيل وجبة أبدًا (نفس ضمان handleWhatIf). يعيد
  * استخدام extractFoodEntities الموجودة (نفس محرك استخراج الطعام المتعدد لتسجيل الوجبات، يشمل
- * نظام Aliases الحقيقي لـfoods.sqlite تلقائيًا — "بطاطا"~"بطاطس" تُحل بنفس الآلية الموجودة).
+ * نظام Aliases الحقيقي لـfoods.sqlite تلقائيًا).
+ *
+ * المطابقة تقارن food_id حقيقية أولاً (المستخدم عبر extractFoodEntities، الوصفة عبر food_id
+ * المحلول مسبقًا وقت الاستيراد/الـBackfill — ingredientResolver.ts) — مقارنة أرقام سريعة،
+ * صفر بطء مع نمو عدد الوصفات. لأي مكوّن وصفة لم يتحلّل بعد (food_id=null، متوقع لكثير من
+ * المكونات — القاعدة صغيرة)، Fallback لنفس substring القديم (صفر تراجع بالتغطية). النسبة
+ * تُحسب على المكونات required فقط (الافتراضي لكل مكوّن)؛ الناقص من optional يُذكَر بس ما يخفّض
+ * النسبة أو يمنع تصنيف "جاهزة".
  */
 async function handleCookFromIngredients(repo: Repository, textNorm: string): Promise<DispatchResult> {
   const entities = await extractFoodEntities(textNorm);
   // نأخذ الهوية فقط (مو الكمية) — طعام واحد بدون رقم غالبًا يرجع "clarification: quantity/
   // confirm_match" مو resolved مباشرة (نفس اللي صار مع "عندي دجاج"، دجاج مقلي طابق بثقة كافية
   // للهوية بس احتاج سؤال كمية) — هذا لا يهمنا هنا أصلاً، نريد بس نعرف "شنو المكوّن المذكور؟".
-  const mentionedNames = [
-    ...entities.resolved.map((h) => h.food_name),
-    ...entities.clarifications.flatMap((c) => ("food_id" in c && c.food_id ? [c.food_name] : [])),
+  const mentioned: { food_id: number | null; food_name: string }[] = [
+    ...entities.resolved.map((h) => ({ food_id: h.food_id, food_name: h.food_name })),
+    ...entities.clarifications.flatMap((c) => ("food_id" in c && c.food_id ? [{ food_id: c.food_id, food_name: c.food_name }] : [])),
   ];
 
-  if (mentionedNames.length === 0) {
+  if (mentioned.length === 0) {
     return { reply: "گلي شنو عندك من مكونات وأشوفلك وصفة حقيقية تناسبها (مثلاً: عندي بيض وبطاطا وطماطة).", meal_logged: false, suggested_recipe: null };
   }
 
+  const mentionedFoodIds = new Set(mentioned.map((m) => m.food_id).filter((id): id is number => id !== null));
+  const mentionedNames = mentioned.map((m) => m.food_name);
+
+  const isMatched = (ing: RecipeIngredientRecord): boolean => {
+    if (ing.food_id != null && mentionedFoodIds.has(ing.food_id)) return true;
+    return mentionedNames.some((name) => ing.name.includes(name) || name.includes(ing.name));
+  };
+
   const recipes = await repo.findActiveRecipes(null);
-  const scored: { recipe: RecipeRecord; coverage: number; missing: string[] }[] = [];
+  const scored: { recipe: RecipeRecord; matchPercentage: number; missingRequired: string[]; missingOptional: string[] }[] = [];
   for (const r of recipes) {
     if (r.ingredients.length === 0) continue;
-    const missing = r.ingredients.filter(
-      (ing) => !mentionedNames.some((name) => ing.name.includes(name) || name.includes(ing.name)),
-    );
-    const coverage = (r.ingredients.length - missing.length) / r.ingredients.length;
-    if (coverage > 0) scored.push({ recipe: r, coverage, missing: missing.map((m) => m.name) });
+    const requiredIngredients = r.ingredients.filter((ing) => ing.required !== false);
+    const consideredIngredients = requiredIngredients.length > 0 ? requiredIngredients : r.ingredients;
+
+    const missingRequired = consideredIngredients.filter((ing) => !isMatched(ing));
+    const matchPercentage = (consideredIngredients.length - missingRequired.length) / consideredIngredients.length;
+    if (matchPercentage <= 0) continue;
+
+    const missingOptional = r.ingredients.filter((ing) => ing.required === false && !isMatched(ing));
+    scored.push({
+      recipe: r, matchPercentage,
+      missingRequired: missingRequired.map((m) => m.name),
+      missingOptional: missingOptional.map((m) => m.name),
+    });
   }
-  scored.sort((a, b) => b.coverage - a.coverage);
+  scored.sort((a, b) => b.matchPercentage - a.matchPercentage);
   const top = scored.slice(0, 3);
 
   if (top.length === 0) {
@@ -586,18 +617,37 @@ async function handleCookFromIngredients(repo: Repository, textNorm: string): Pr
   }
 
   const lines = top.map((s) => {
-    const pct = Math.round(s.coverage * 100);
-    const note = s.missing.length > 0 ? ` — ناقصك: ${s.missing.join("، ")}` : " — عندك كل المكونات المطلوبة 👍";
+    const pct = Math.round(s.matchPercentage * 100);
+    let note: string;
+    if (s.missingRequired.length === 0) {
+      note = s.missingOptional.length > 0
+        ? ` — عندك كل المكونات الأساسية 👍 (اختياري: ${s.missingOptional.join("، ")})`
+        : " — عندك كل المكونات المطلوبة 👍";
+    } else {
+      note = ` — ناقصك: ${s.missingRequired.join("، ")}`;
+    }
     return `🍽️ ${s.recipe.name} (${pct}% من المكونات متوفرة)${note}`;
   });
 
-  const bestFull = top.find((s) => s.coverage === 1);
-  const suggestedRecipe = bestFull
-    ? { id: bestFull.recipe.id, slug: bestFull.recipe.slug, name: bestFull.recipe.name, calories: bestFull.recipe.calories, protein: bestFull.recipe.protein, carbs: bestFull.recipe.carbs, fat: bestFull.recipe.fat }
+  // suggested_recipe من HIGH_MATCH فأعلى (≥80%) — كان 100% بس، الآن يعتمد على تصنيف حقيقي
+  const best = top[0];
+  const bestTier = classifyMatchTier(best.matchPercentage);
+  const suggestedRecipe = (bestTier === "EXACT_MATCH" || bestTier === "HIGH_MATCH")
+    ? { id: best.recipe.id, slug: best.recipe.slug, name: best.recipe.name, calories: best.recipe.calories, protein: best.recipe.protein, carbs: best.recipe.carbs, fat: best.recipe.fat }
     : null;
 
+  // صياغة صادقة: "تگدر تسويها" فقط لتطابق كامل، وإلا "تگدر تسويها إذا توفر X" (نفس مثال الطلب حرفيًا)
+  let intro: string;
+  if (bestTier === "EXACT_MATCH") {
+    intro = "من الي گلتلي عليه، تگدر تسوي هذي الوصفات الحقيقية من قسم وجبات الدايت:";
+  } else if (bestTier === "HIGH_MATCH") {
+    intro = `تگدر تسوي "${best.recipe.name}" إذا توفر: ${best.missingRequired.join("، ")}. وزائد خيارات ثانية قريبة:`;
+  } else {
+    intro = "من الي گلتلي عليه، أقرب وصفات حقيقية من قسم وجبات الدايت (مو جاهزة كاملة بعد):";
+  }
+
   return {
-    reply: `من الي گلتلي عليه، هذي وصفات حقيقية من قسم وجبات الدايت تگدر تسويها:\n${lines.join("\n")}`,
+    reply: `${intro}\n${lines.join("\n")}`,
     meal_logged: false,
     suggested_recipe: suggestedRecipe,
   };

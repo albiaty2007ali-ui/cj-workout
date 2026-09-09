@@ -82,3 +82,107 @@ describe("Cook From What I Have — تطابق مكونات حقيقي، صفر 
     expect(r.suggested_recipe).toBeNull();
   });
 });
+
+describe("Cook From What I Have — مطابقة عبر food_id حقيقي (ingredientResolver.ts، المرحلة 4)", () => {
+  it("100% تطابق عبر food_id (رز=8 حقيقي، مو substring) -> EXACT_MATCH، suggested_recipe حقيقي", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "u5");
+    repo.recipes = [
+      makeRecipe({
+        id: "r5", name: "رز بسيط", slug: "simple-rice", calories: 200, active: true,
+        ingredients: [{ name: "أرز أبيض مطبوخ", quantity: "1", unit: "كوب", food_id: 8, required: true }],
+      }),
+    ];
+    // "تمن" alias مختلفة لفظيًا عن "أرز أبيض مطبوخ" بالوصفة، بس نفس food_id=8 حقيقي بالقاعدة
+    const r = await handleMessage(repo, user, "عندي تمن، شنو اگدر اطبخ؟");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("100%");
+    expect(r.suggested_recipe).not.toBeNull();
+    expect((r.suggested_recipe as { id: string }).id).toBe("r5");
+  });
+
+  it("80% تطابق (HIGH_MATCH) -> suggested_recipe يُملأ الآن (كان محصور بـ100% بس قبل الترقية)، وصياغة صادقة 'إذا توفر'", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "u6");
+    repo.recipes = [
+      makeRecipe({
+        id: "r6", name: "دجاج ورز وطماطة وبطاطا", slug: "chicken-rice-tomato-potato", calories: 400, active: true,
+        ingredients: [
+          { name: "دجاج", quantity: "200", unit: "غم", food_id: 20, required: true },
+          { name: "رز", quantity: "1", unit: "كوب", food_id: 8, required: true },
+          { name: "طماطة", quantity: "1", unit: "حبة", food_id: 42, required: true },
+          { name: "بطاطا مسلوقة", quantity: "1", unit: "حبة", food_id: 11, required: true },
+          { name: "بصل", quantity: "1", unit: "حبة", food_id: 999999, required: true },
+        ],
+      }),
+    ];
+    const r = await handleMessage(repo, user, "عندي دجاج وتمن وطماطة وبطاطا مسلوقة، شنو اگدر اطبخ؟");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("80%");
+    expect(r.suggested_recipe).not.toBeNull();
+    expect(r.reply).toContain("إذا توفر");
+  });
+
+  it("60% تطابق (PARTIAL_MATCH) -> يُذكَر بالرد بس suggested_recipe يبقى null (تحت عتبة HIGH_MATCH)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "u7");
+    repo.recipes = [
+      makeRecipe({
+        id: "r7", name: "طبخة مشتركة", slug: "shared-dish", calories: 350, active: true,
+        ingredients: [
+          { name: "دجاج", quantity: "200", unit: "غم", food_id: 20, required: true },
+          { name: "رز", quantity: "1", unit: "كوب", food_id: 8, required: true },
+          { name: "بصل", quantity: "1", unit: "حبة", food_id: 999999, required: true },
+        ],
+      }),
+    ];
+    const r = await handleMessage(repo, user, "عندي دجاج وتمن، شنو اگدر اطبخ؟");
+    expect(r.reply).toContain("67%"); // 2 من 3 = 66.67% مقرّب لـ67%
+    expect(r.suggested_recipe).toBeNull();
+  });
+
+  it("مكوّن optional ناقص لا يمنع تصنيف 'جاهزة' ولا يخفّض النسبة", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "u8");
+    repo.recipes = [
+      makeRecipe({
+        id: "r8", name: "دجاج بالبهارات", slug: "spiced-chicken", calories: 300, active: true,
+        ingredients: [
+          { name: "دجاج", quantity: "200", unit: "غم", food_id: 20, required: true },
+          { name: "فلفل حار، اختياري", quantity: null, unit: "اختياري", food_id: 999996, required: false },
+        ],
+      }),
+    ];
+    const r = await handleMessage(repo, user, "عندي دجاج، شنو اگدر اطبخ؟");
+    expect(r.reply).toContain("100%");
+    expect(r.reply).toContain("اختياري");
+    expect(r.suggested_recipe).not.toBeNull();
+  });
+
+  it("مكوّن وصفة بـfood_id غير مذكور إطلاقًا -> صفر تطابق خاطئ (False Positive)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "u9");
+    repo.recipes = [
+      makeRecipe({
+        id: "r9", name: "وصفة بعيدة", slug: "unrelated-recipe", calories: 100, active: true,
+        ingredients: [{ name: "طعام غير مذكور", quantity: "1", unit: "حبة", food_id: 777, required: true }],
+      }),
+    ];
+    const r = await handleMessage(repo, user, "عندي دجاج، شنو اگدر اطبخ؟");
+    expect(r.reply).not.toContain("وصفة بعيدة");
+    expect(r.suggested_recipe).toBeNull();
+  });
+
+  it("مكوّن مذكور بمسافات زائدة بالرسالة -> يتطابق نفس الشي (arabicNormalize يطبّع المسافات)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "u10");
+    repo.recipes = [
+      makeRecipe({
+        id: "r10", name: "رز بسيط", slug: "simple-rice-2", calories: 200, active: true,
+        ingredients: [{ name: "رز", quantity: "1", unit: "كوب", food_id: 8, required: true }],
+      }),
+    ];
+    const r = await handleMessage(repo, user, "عندي   تمن   ،  شنو اگدر اطبخ؟");
+    expect(r.suggested_recipe).not.toBeNull();
+  });
+});
