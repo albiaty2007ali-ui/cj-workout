@@ -3,12 +3,15 @@
  * افتراضيًا (بتوقيت بغداد)؛ الأيام الماضية للقراءة فقط، بدون ميزانية توزيع (نفس قرار الأصل).
  */
 import type { Context } from "@netlify/functions";
-import { FirestoreRepository } from "../../shared/nutrition-engine/db/firestoreRepository.js";
+import { getFirestore } from "firebase-admin/firestore";
+import { FirestoreRepository, getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import * as calculator from "../../shared/nutrition-engine/calculator.js";
 import * as mealBudget from "../../shared/nutrition-engine/mealBudget.js";
-import { getCurrentPeriod, nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
+import { nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
+import { getSettings } from "../../shared/nutrition-engine/notifications/engine.js";
+import { currentPeriodForUser, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method !== "GET") return jsonError(405, "METHOD_NOT_ALLOWED", "استخدم GET فقط.");
@@ -54,7 +57,12 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     let budgets: Record<string, number> = {};
     if (isToday && !overTarget) {
       const unlogged = (["breakfast", "lunch", "dinner"] as const).filter((m) => meals[m].status === "NOT_STARTED");
-      budgets = mealBudget.distributeRemainingBudget(remainingCalories, unlogged, getCurrentPeriod(now));
+      // جدول نوم حقيقي (لو مضبوط بالإعدادات، المرحلة 4) يُستخدَم لحساب الفترة الحالية بدل فترات
+      // بغداد الثابتة — mealBudget.ts نفسه ما تغيّر، فقط الفترة المُمرَّرة له.
+      const notifSettings = await getSettings(getFirestore(getFirebaseApp()), claims.sub);
+      const sleepSchedule: SleepSchedule | null = notifSettings.wake_time && notifSettings.sleep_time
+        ? { wake_time: notifSettings.wake_time, sleep_time: notifSettings.sleep_time } : null;
+      budgets = mealBudget.distributeRemainingBudget(remainingCalories, unlogged, currentPeriodForUser(now, sleepSchedule));
     }
 
     // الماي متوفر فقط لـ"اليوم الحالي" (todayWaterMl يعتمد على "الآن" الفعلي، نفس قيد

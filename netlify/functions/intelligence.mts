@@ -1,7 +1,8 @@
 /**
  * /api/intelligence — نقطة نهاية Captain CJ Intelligence، ?action= يحدد السلوك (نفس نمط
  * `/api/settings`/`/api/progress/*`). المرحلة 1: daily-summary (Personal Score). المرحلة 2:
- * missions/challenges. المرحلة 3: streak-freeze (POST use)، leaderboard (GET Top 10).
+ * missions/challenges. المرحلة 3: streak-freeze (POST use)، leaderboard (GET Top 10). المرحلة 4:
+ * recovery-day (GET حالة اليوم + POST تفعيل/إلغاء).
  */
 import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
@@ -12,6 +13,8 @@ import { computePersonalScore } from "../../shared/nutrition-engine/personalScor
 import { listMissionsForToday, claimMission } from "../../shared/nutrition-engine/missions.js";
 import { listChallenges, startChallenge } from "../../shared/nutrition-engine/challenges.js";
 import { useStreakFreeze } from "../../shared/nutrition-engine/streakFreeze.js";
+import { todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
+import type { RecoveryDayRecord } from "../../shared/nutrition-engine/db/repository.js";
 
 function insightText(score: number, hasData: boolean): string {
   if (!hasData) return "لسا ماكو نشاط كافي نحسب عليه نقاطك — سجّل وجباتك وراح نبني لك صورة واضحة كابتن.";
@@ -87,6 +90,26 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         getStreakLeaderboard(db), getUserStreakRank(db, claims.sub),
       ]);
       return jsonOk({ leaderboard, my_rank: myRank, my_streak_days: user.streak_days });
+    }
+
+    if (req.method === "GET" && action === "recovery-day") {
+      const today = todayBaghdadIso();
+      const row = await repo.findRecoveryDay(claims.sub, today);
+      return jsonOk({ active: row !== null, mode: row?.mode ?? null });
+    }
+
+    if (req.method === "POST" && action === "recovery-day") {
+      const body = await req.json().catch(() => ({}));
+      const today = todayBaghdadIso();
+      if (body.enable === false) {
+        await repo.clearRecoveryDay(claims.sub, today);
+        return jsonOk({ active: false });
+      }
+      const row: RecoveryDayRecord = {
+        user_id: claims.sub, date: today, mode: "FLEXIBLE_DAY", activated_at: new Date().toISOString(),
+      };
+      await repo.setRecoveryDay(row);
+      return jsonOk({ active: true, mode: row.mode });
     }
 
     return jsonError(400, "VALIDATION_ERROR", "action غير معروف.");

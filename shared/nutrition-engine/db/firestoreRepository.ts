@@ -24,7 +24,7 @@ import type {
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
   MealStatusRecord, NutritionTipRecord, RecipeRecord, BehaviorDailyRecord, ChallengeProgressRecord,
-  StreakFreezeUsageRecord,
+  StreakFreezeUsageRecord, RecoveryDayRecord,
 } from "./repository.js";
 
 export function genId(): string {
@@ -218,6 +218,24 @@ export class FirestoreRepository implements Repository {
   // ---- Streak Freeze ----
   async insertStreakFreezeUsage(row: StreakFreezeUsageRecord): Promise<void> {
     await this.db.collection("streak_freeze_usage").doc(genId()).set(row);
+  }
+
+  // ---- Recovery Day ----
+  private recoveryDayDocId(userId: string, date: string): string {
+    return `${userId}_${date}`;
+  }
+
+  async findRecoveryDay(userId: string, date: string): Promise<RecoveryDayRecord | null> {
+    const doc = await this.db.collection("recovery_days").doc(this.recoveryDayDocId(userId, date)).get();
+    return doc.exists ? (doc.data() as RecoveryDayRecord) : null;
+  }
+
+  async setRecoveryDay(row: RecoveryDayRecord): Promise<void> {
+    await this.db.collection("recovery_days").doc(this.recoveryDayDocId(row.user_id, row.date)).set(row);
+  }
+
+  async clearRecoveryDay(userId: string, date: string): Promise<void> {
+    await this.db.collection("recovery_days").doc(this.recoveryDayDocId(userId, date)).delete();
   }
 
   // ---- Nutrition Profile / Weight ----

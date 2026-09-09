@@ -121,6 +121,13 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       if (body.quiet_hours_end === null || (Number.isInteger(body.quiet_hours_end) && body.quiet_hours_end >= 0 && body.quiet_hours_end <= 23)) {
         patch.quiet_hours_end = body.quiet_hours_end;
       }
+      const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      if (body.wake_time === null || (typeof body.wake_time === "string" && timePattern.test(body.wake_time))) {
+        patch.wake_time = body.wake_time;
+      }
+      if (body.sleep_time === null || (typeof body.sleep_time === "string" && timePattern.test(body.sleep_time))) {
+        patch.sleep_time = body.sleep_time;
+      }
       await updateNotificationSettings(db, claims.sub, patch);
       return jsonOk({ ok: true });
     }

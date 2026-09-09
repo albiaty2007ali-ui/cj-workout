@@ -164,6 +164,11 @@ export interface Repository {
   // ---- Streak Freeze ----
   insertStreakFreezeUsage(row: StreakFreezeUsageRecord): Promise<void>;
 
+  // ---- Recovery Day ----
+  findRecoveryDay(userId: string, date: string): Promise<RecoveryDayRecord | null>;
+  setRecoveryDay(row: RecoveryDayRecord): Promise<void>; // Upsert — تفعيل أو تغيير النمط لنفس اليوم
+  clearRecoveryDay(userId: string, date: string): Promise<void>; // إلغاء التفعيل
+
   /**
    * تحديث ذري لعداد الوجبات المجانية — يطابق `UPDATE users SET free_meals_used =
    * free_meals_used + 1 WHERE id=:uid AND free_meals_used < :cap` بايثون (منع تجاوز الحد تحت
@@ -274,4 +279,17 @@ export interface StreakFreezeUsageRecord {
   user_id: string;
   date_covered: string; // اليوم اللي انحمى (عادة "أمس")
   used_at: string; // اليوم اللي استُخدم فيه الـFreeze فعليًا
+}
+
+/**
+ * يوم مرن/استثنائي (Recovery/Flexible Day، المرحلة 4) — فعل مستخدم صريح ليوم واحد محدد، لا يمس
+ * أبدًا XP/Streak/السجل التاريخي/حدود Trial (صفر استدعاء لأي من تلك الأنظمة من مسار هذا الملف
+ * أصلاً — هذا وحده الضمان، بدون حارس إضافي). التأثير الفعلي الحالي: يوقف تذكيرات وقت الوجبات
+ * المجدولة لنفس اليوم (scheduled-reminders.mts) بدل الضغط بجدول ثابت على يوم استثنائي.
+ */
+export interface RecoveryDayRecord {
+  user_id: string;
+  date: string; // "YYYY-MM-DD" بتوقيت بغداد
+  mode: "FLEXIBLE_DAY" | "BUSY_DAY" | "TRAVEL_DAY";
+  activated_at: string; // ISO timestamp
 }

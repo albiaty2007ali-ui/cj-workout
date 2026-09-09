@@ -29,11 +29,16 @@ export interface NotificationSettings {
   tips: boolean;
   quiet_hours_start: number | null; // 0-23، أو null = بدون ساعات هدوء
   quiet_hours_end: number | null;
+  /** جدول نوم حقيقي اختياري "HH:MM" بتوقيت بغداد (المرحلة 4 من ذكاء Captain CJ) — null = غير
+   *  مضبوط، يستخدم mealTimingEngine.ts فترات بغداد الثابتة الافتراضية (Fallback، صفر كسر). */
+  wake_time: string | null;
+  sleep_time: string | null;
 }
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   enabled: false, meals: true, water: true, streak: true, tips: true,
   quiet_hours_start: 22, quiet_hours_end: 8,
+  wake_time: null, sleep_time: null,
 };
 
 export async function getSettings(db: Firestore, userId: string): Promise<NotificationSettings> {

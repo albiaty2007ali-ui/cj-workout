@@ -1,12 +1,13 @@
 /**
- * Netlify Scheduled Function — تذكيرات وجبات/ماي حقيقية بوقت ثابت (الفجوة الوحيدة الموثّقة
- * بالمشروع من نظام الإشعارات: "التذكيرات المجدولة... لسا غير مبنية"، محطات الستريك بس كانت
- * Event-driven فعليًا قبل هذا الملف). تشتغل كل 30 دقيقة (config.schedule).
+ * Netlify Scheduled Function — تذكيرات وجبات/ماي حقيقية. تشتغل كل 30 دقيقة (config.schedule).
  *
- * تبسيط مقصود عن أصل Python (nutrition_ai/notifications/scheduler.py): هناك breakfast_time/
- * lunch_time/dinner_time مخصصة لكل مستخدم — هنا نوافذ ساعات ثابتة (فطور 8-10ص، غداء 1-3م،
- * عشاء 7-9م بتوقيت بغداد). إضافة أوقات وجبات مخصصة لكل مستخدم تحتاج حقول بروفايل + واجهة
- * إعدادات جديدة بالكامل — خارج نطاق هذا الملف، بس أسهل توسعة لاحقة لو صارت مطلوبة فعليًا.
+ * نوافذ ثابتة افتراضية (فطور 8-10ص، غداء 1-3م، عشاء 7-9م بتوقيت بغداد) — **لو المستخدم ضبط
+ * جدول نوم حقيقي** (wake_time/sleep_time بالإعدادات، المرحلة 4 من ذكاء Captain CJ)، تُستبدل
+ * بنوافذ محسوبة فعليًا من جدول نومه عبر mealTimingEngine.ts (fallback حرفي للثابتة بدون ذلك،
+ * صفر كسر لمن ما ضبط جدول نوم).
+ *
+ * Recovery/Flexible Day: يوم استثنائي مفعّل صراحة (recovery_days) يوقف تذكيرات الوجبات لنفس
+ * اليوم فقط — صفر تأثير على XP/Streak/السجل (هذا الملف أصلاً ما يستدعي أي من تلك الأنظمة).
  *
  * كل تذكير يمر عبر نفس canSendNow/sendNotification الحقيقيين (engine.ts) — يحترم enabled +
  * تصنيف meals/water + ساعات الهدوء + Idempotency (dedup_key فريد لكل يوم/فئة)، بالضبط نفس
@@ -18,24 +19,36 @@ import { getFirebaseApp, FirestoreRepository } from "../../shared/nutrition-engi
 import { getSettings, canSendNow, sendNotification } from "../../shared/nutrition-engine/notifications/engine.js";
 import { nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
 import * as calculator from "../../shared/nutrition-engine/calculator.js";
+import { mealWindowsForSchedule, waterWindowForSchedule, isWithinMinuteRange, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
 
 export const config: Config = { schedule: "*/30 * * * *" };
 
-const MEAL_WINDOWS = [
-  { key: "breakfast", startHour: 8, endHour: 10, title: "🍳 وكت الفطور!", body: "خبرني شنو فطرت اليوم 🌱" },
-  { key: "lunch", startHour: 13, endHour: 15, title: "🍽️ وكت الغداء!", body: "لا تنسى تسجل غداءك، شنو تغديت؟" },
-  { key: "dinner", startHour: 19, endHour: 21, title: "🌙 وكت العشاء!", body: "شنو راح تتعشى اليوم؟ خبرني حتى أحسبلك." },
-] as const;
+const MEAL_COPY: Record<"breakfast" | "lunch" | "dinner", { title: string; body: string }> = {
+  breakfast: { title: "🍳 وكت الفطور!", body: "خبرني شنو فطرت اليوم 🌱" },
+  lunch: { title: "🍽️ وكت الغداء!", body: "لا تنسى تسجل غداءك، شنو تغديت؟" },
+  dinner: { title: "🌙 وكت العشاء!", body: "شنو راح تتعشى اليوم؟ خبرني حتى أحسبلك." },
+};
 
-// نافذة تذكير الماي (استيقاظ نموذجي) — توزيع خطي بسيط لهدف اليوم عبر هذي الساعات، صفر تعقيد إضافي.
-const WATER_WAKE_START = 9;
-const WATER_WAKE_END = 21;
+// نوافذ افتراضية ثابتة (بتوقيت بغداد) — تُستخدم فقط لمن لسا ما ضبط جدول نوم حقيقي بالإعدادات.
+const DEFAULT_MEAL_WINDOWS = [
+  { key: "breakfast" as const, startMinuteOfDay: 8 * 60, endMinuteOfDay: 10 * 60 },
+  { key: "lunch" as const, startMinuteOfDay: 13 * 60, endMinuteOfDay: 15 * 60 },
+  { key: "dinner" as const, startMinuteOfDay: 19 * 60, endMinuteOfDay: 21 * 60 },
+];
+const DEFAULT_WATER_WINDOW = { startMinuteOfDay: 9 * 60, endMinuteOfDay: 21 * 60 };
+
+function windowLengthMinutes(range: { startMinuteOfDay: number; endMinuteOfDay: number }): number {
+  return range.endMinuteOfDay > range.startMinuteOfDay
+    ? range.endMinuteOfDay - range.startMinuteOfDay
+    : (24 * 60 - range.startMinuteOfDay) + range.endMinuteOfDay;
+}
 
 export default async (_req: Request, _context: Context): Promise<Response> => {
   const db = getFirestore(getFirebaseApp());
   const repo = new FirestoreRepository();
   const now = new Date();
-  const { hour } = nowBaghdad(now);
+  const { hour, minute } = nowBaghdad(now);
+  const nowMinuteOfDay = hour * 60 + minute;
   const today = todayBaghdadIso(now);
 
   // صفر فايدة نفحص مستخدم بلا اشتراك Push حقيقي أصلاً — نبني لائحة المستخدمين المشتركين فقط.
@@ -49,21 +62,33 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
     const settings = await getSettings(db, userId);
     if (!settings.enabled) continue;
 
-    const mealWindow = MEAL_WINDOWS.find((w) => hour >= w.startHour && hour < w.endHour);
+    const sleepSchedule: SleepSchedule | null = settings.wake_time && settings.sleep_time
+      ? { wake_time: settings.wake_time, sleep_time: settings.sleep_time } : null;
+    const mealWindows = sleepSchedule ? mealWindowsForSchedule(sleepSchedule) : DEFAULT_MEAL_WINDOWS;
+    const waterWindow = sleepSchedule ? waterWindowForSchedule(sleepSchedule) : DEFAULT_WATER_WINDOW;
+
+    // يوم مرن/استثنائي مفعّل صراحة (المرحلة 4) -> يوقف تذكيرات وقت الوجبات لنفس اليوم فقط،
+    // صفر تأثير على XP/Streak (هذا الملف أصلاً ما يستدعي أي من تلك الأنظمة).
+    const recoveryActive = (await repo.findRecoveryDay(userId, today)) !== null;
+
+    const mealWindow = !recoveryActive ? mealWindows.find((w) => isWithinMinuteRange(nowMinuteOfDay, w)) : undefined;
     if (mealWindow && canSendNow(settings, "MEAL_REMINDER", now)) {
       const statusRow = await repo.findMealStatus(userId, today, mealWindow.key);
       const status = statusRow?.status ?? "not_started";
       if (status !== "logged") {
-        await sendNotification(db, userId, "MEAL_REMINDER", `${mealWindow.key}_${today}`, "/chat", mealWindow.title, mealWindow.body);
+        const copy = MEAL_COPY[mealWindow.key];
+        await sendNotification(db, userId, "MEAL_REMINDER", `${mealWindow.key}_${today}`, "/chat", copy.title, copy.body);
         mealSent++;
       }
     }
 
-    if (hour >= WATER_WAKE_START && hour < WATER_WAKE_END && canSendNow(settings, "WATER", now)) {
+    if (isWithinMinuteRange(nowMinuteOfDay, waterWindow) && canSendNow(settings, "WATER", now)) {
       const profile = await repo.findNutritionProfile(userId);
       if (profile && profile.water_target_ml > 0) {
         const waterMl = await calculator.todayWaterMl(repo, userId, now);
-        const elapsedFraction = (hour - WATER_WAKE_START) / (WATER_WAKE_END - WATER_WAKE_START);
+        let elapsedMinutes = nowMinuteOfDay - waterWindow.startMinuteOfDay;
+        if (elapsedMinutes < 0) elapsedMinutes += 24 * 60;
+        const elapsedFraction = elapsedMinutes / windowLengthMinutes(waterWindow);
         const expectedByNow = profile.water_target_ml * elapsedFraction;
         // دِدوب باليوم+الساعة (مو باليوم بس) — يسمح بتذكير كل شوي لو المستخدم فعليًا متأخر
         // كثير، بس أبدًا مو أكثر من مرة بنفس الساعة (نفس ضمان Idempotency الموجود أصلاً).

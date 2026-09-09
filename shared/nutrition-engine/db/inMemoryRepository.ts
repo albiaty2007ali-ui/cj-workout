@@ -8,7 +8,7 @@ import type {
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
   MealStatusRecord, NutritionTipRecord, UserRecord, RecipeRecord, BehaviorDailyRecord,
-  ChallengeProgressRecord, StreakFreezeUsageRecord,
+  ChallengeProgressRecord, StreakFreezeUsageRecord, RecoveryDayRecord,
 } from "./repository.js";
 
 function genId(): string {
@@ -273,6 +273,22 @@ export class InMemoryRepository implements Repository {
 
   async insertStreakFreezeUsage(row: StreakFreezeUsageRecord): Promise<void> {
     this.streakFreezeUsage.push({ ...row });
+  }
+
+  private recoveryDays: RecoveryDayRecord[] = [];
+
+  async findRecoveryDay(userId: string, date: string): Promise<RecoveryDayRecord | null> {
+    return this.recoveryDays.find((r) => r.user_id === userId && r.date === date) ?? null;
+  }
+
+  async setRecoveryDay(row: RecoveryDayRecord): Promise<void> {
+    const idx = this.recoveryDays.findIndex((r) => r.user_id === row.user_id && r.date === row.date);
+    if (idx >= 0) this.recoveryDays[idx] = { ...row };
+    else this.recoveryDays.push({ ...row });
+  }
+
+  async clearRecoveryDay(userId: string, date: string): Promise<void> {
+    this.recoveryDays = this.recoveryDays.filter((r) => !(r.user_id === userId && r.date === date));
   }
 
   async incrementFreeMealsUsedIfBelowCap(userId: string, cap: number): Promise<boolean> {

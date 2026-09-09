@@ -21,6 +21,8 @@ interface NotificationSettingsData {
   tips: boolean;
   quiet_hours_start: number | null;
   quiet_hours_end: number | null;
+  wake_time: string | null;
+  sleep_time: string | null;
   vapid_public_key: string | null;
 }
 
@@ -47,12 +49,16 @@ export default function Settings() {
   const [notifBusy, setNotifBusy] = useState(false);
   const [deviceSubscribed, setDeviceSubscribed] = useState(false);
 
+  const [recoveryDayActive, setRecoveryDayActive] = useState<boolean | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+
   useEffect(() => {
     (async () => {
-      const [meRes, settingsRes, notifRes] = await Promise.all([
+      const [meRes, settingsRes, notifRes, recoveryRes] = await Promise.all([
         api.get<MeResponse>("/me"),
         api.get<SettingsData>("/settings"),
         api.get<NotificationSettingsData>("/settings?action=notifications"),
+        api.get<{ active: boolean }>("/intelligence?action=recovery-day"),
       ]);
       if (!meRes.success || !meRes.data) {
         navigate("/login");
@@ -61,9 +67,22 @@ export default function Settings() {
       setMe(meRes.data);
       if (settingsRes.success && settingsRes.data) setSettings(settingsRes.data);
       if (notifRes.success && notifRes.data) setNotif(notifRes.data);
+      if (recoveryRes.success && recoveryRes.data) setRecoveryDayActive(recoveryRes.data.active);
       if (pushSupported()) setDeviceSubscribed(!!(await currentSubscription()));
     })();
   }, [navigate]);
+
+  async function toggleRecoveryDay() {
+    if (recoveryDayActive === null) return;
+    setRecoveryBusy(true);
+    const nextValue = !recoveryDayActive;
+    const res = await api.post<{ active: boolean }>("/intelligence?action=recovery-day", { enable: nextValue });
+    setRecoveryBusy(false);
+    if (res.success && res.data) {
+      setRecoveryDayActive(res.data.active);
+      flashSaved();
+    }
+  }
 
   async function saveNotif(patch: Partial<NotificationSettingsData>) {
     const res = await api.post("/settings?action=notifications", patch);
@@ -264,11 +283,39 @@ export default function Settings() {
                     </select>
                   </div>
                 </div>
+
+                <div style={{ marginTop: 16 }}>
+                  <p className="notif-row-label" style={{ marginBottom: 6 }}>😴 جدول نومك (اختياري — يخلي مواعيد تذكير الوجبات والماي تتكيّف مع وقتك الحقيقي بدل ساعات ثابتة)</p>
+                  <div className="admin-form-row">
+                    <input
+                      type="time" value={notif.wake_time ?? ""}
+                      onChange={(e) => saveNotif({ wake_time: e.target.value || null })}
+                    />
+                    <span style={{ alignSelf: "center", color: "var(--text-muted)" }}>إلى</span>
+                    <input
+                      type="time" value={notif.sleep_time ?? ""}
+                      onChange={(e) => saveNotif({ sleep_time: e.target.value || null })}
+                    />
+                  </div>
+                </div>
               </>
             )}
-            <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", marginTop: 12, marginBottom: 0 }}>
-              التذكيرات بوقت ثابت (فطور/غداء/عشاء) قيد التطوير — الإشعار الفعلي الحالي هو محطات الستريك فور تحقيقها.
+          </div>
+        )}
+
+        {recoveryDayActive !== null && (
+          <div className="notice-box">
+            <h3 style={{ marginTop: 0 }}>🔄 يوم مرن</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+              يومك اليوم مختلف عن المعتاد؟ فعّل هذا وراح نعيد توزيع باقي وجباتك ونوقف تذكيرات وقت الوجبات لهذا اليوم بس — صفر تأثير على الستريك أو XP أو سجلّك السابق.
             </p>
+            <div className="notif-row">
+              <span className="notif-row-label">تفعيل اليوم المرن</span>
+              <label className="switch">
+                <input type="checkbox" checked={recoveryDayActive} disabled={recoveryBusy} onChange={toggleRecoveryDay} />
+                <span className="switch-track" />
+              </label>
+            </div>
           </div>
         )}
 
