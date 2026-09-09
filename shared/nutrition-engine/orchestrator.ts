@@ -57,8 +57,12 @@ async function matchRecipeCategoryId(repo: Repository, textNorm: string): Promis
 
 const MEAL_KEYWORDS: Record<string, string[]> = {
   breakfast: ["فطرت", "فطور", "فطرة", "فطرنا"],
+  // ملاحظة: عمدًا ما ضفنا "غدا" (بدون همزة) هنا رغم كونها إملاء عامي شائع لـ"غداء" — نفس الكلمة
+  // حرفيًا تعني "غدًا/بكرة" بالفصحى، وإضافتها substring-match بلا سياق كانت تخلق التباس حقيقي
+  // (مثلاً أي رسالة فيها "غدا" بمعنى tomorrow تنحسب صدفة لمسة "غداء"). "عشا" ماله هالتصادم.
   lunch: ["تغديت", "تغدينا", "غداء", "غدانا", "غدينا"],
-  dinner: ["عشيت", "عشينا", "عشاء", "تعشيت"],
+  // "عشا" (بدون همزة، نفس السبب) — اكتُشفت ناقصة أثناء تصليح شكوى مستخدم حقيقية ("عشا؟" ما كانت تنطابق).
+  dinner: ["عشيت", "عشينا", "عشاء", "عشا", "تعشيت"],
   snack: ["سناك", "سنك", "وجبة خفيفة"],
 };
 
@@ -267,6 +271,14 @@ async function handleMealMessage(
   // ---------------- رسالة جديدة كليًا ----------------
   const result = await extractFoodEntities(textNorm);
   if (result.resolved.length === 0 && result.clarifications.length === 0) {
+    // رسالة تذكر كلمة وجبة صريحة بس بدون اسم أكلة فعلي ("فطور !!"، "غداء") — هذا مو "ما فهمت
+    // شي إطلاقًا"، هذا واضح جدًا شنو الوجبة، بس ناقص اسم الأكلة. رد مخصّص أفضل بكثير من الرسالة
+    // العامة (اكتُشف هذا الفرق من شكوى مستخدم حقيقية: "فطور !!" أعطت ردًا عامًا يوحي بالفشل).
+    const bareMealType = explicitMealTypeKeyword(textNorm);
+    if (bareMealType) {
+      const label = responses.MEAL_TYPE_LABELS[bareMealType] ?? "الوجبة";
+      return { reply: `تمام كابتن، شنو أكلت بالضبط بـ${label}؟ گلي اسم الأكلة (مثلاً: بيضتين وخبز) وأحسبلك السعرات.`, meal_logged: false };
+    }
     return {
       reply: 'ما قدرت أتعرف على أكلة واضحة برسالتك. جرب تكتب اسم الأكلة بالضبط (مثلاً: "تغديت دولمة" أو "فطرت بيضتين وخبز").',
       meal_logged: false,
@@ -576,6 +588,13 @@ async function handleUnitQuestion(textNorm: string): Promise<DispatchResult> {
 async function handleGeneralFoodInfo(textNorm: string): Promise<DispatchResult> {
   const [foodId, foodName] = await extractFirstFood(textNorm);
   if (foodId === null) {
+    // نفس تحسين "فطور !!" بـhandleMealMessage — بس هذا الفرع يُستدعى لرسائل فيها "؟" (مثلاً
+    // "عشا؟")، فما توصل الفحص هناك أصلاً. نفس المنطق هنا لتغطية الحالتين.
+    const bareMealType = explicitMealTypeKeyword(textNorm);
+    if (bareMealType) {
+      const label = responses.MEAL_TYPE_LABELS[bareMealType] ?? "الوجبة";
+      return { reply: `تمام كابتن، شنو أكلت بالضبط بـ${label}؟ گلي اسم الأكلة (مثلاً: بيضتين وخبز) وأحسبلك السعرات.`, meal_logged: false };
+    }
     return {
       reply: "ما فهمت سؤالك بوضوح 🙏 جرب تسأل بشكل أوضح (مثلاً: \"شكد سعرات الدولمة؟\" أو \"شكد آكل من التمن؟\")، أو گلي شنو أكلت فعليًا لو تريد تسجلها.",
       meal_logged: false,

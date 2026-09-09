@@ -125,3 +125,54 @@ describe("ASK_* أسئلة معلوماتية عن طعام — صفر تسجي�
     expect(r.meal_logged).toBe(false);
   });
 });
+
+/**
+ * "فطور !!" -> رد عام مربك ("ما قدرت أتعرف على أكلة") بدل سؤال واضح عن الأكلة — شكوى مستخدم
+ * حقيقية بالإنتاج. الرسالة تذكر وجبة صريحة (فطور/غداء/عشاء/سناك) بس بدون اسم أكلة فعلي؛ الرد
+ * الصحيح يسأل عن الأكلة بالتحديد لنفس الوجبة المذكورة، مو رد عام يوحي بالفشل الكامل.
+ */
+describe("رسالة تذكر وجبة صريحة بدون اسم أكلة ('فطور !!') -> سؤال توضيح مخصّص، صفر تسجيل", () => {
+  let repo: InMemoryRepository;
+
+  beforeEach(() => {
+    repo = setupRepo();
+  });
+
+  it("'فطور !!' -> يسأل عن الفطور تحديدًا (مو رد عام)، meal_logged=false", async () => {
+    const user = await freshUser(repo, "m1");
+    const r = await handleMessage(repo, user, "فطور !!");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("الفطور");
+    expect(r.reply).not.toContain("ما قدرت أتعرف");
+  });
+
+  it("'غداء' (بدون أي علامة) -> يسأل عن الغداء تحديدًا، meal_logged=false", async () => {
+    const user = await freshUser(repo, "m2");
+    const r = await handleMessage(repo, user, "غداء");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("الغداء");
+  });
+
+  it("'عشا؟' (بعلامة استفهام -> يمر عبر مسار مختلف داخليًا) -> نفس التحسين يبقى يعمل", async () => {
+    const user = await freshUser(repo, "m3");
+    const r = await handleMessage(repo, user, "عشا؟");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("العشاء");
+  });
+
+  it("'سناك.' -> يسأل عن السناك تحديدًا، meal_logged=false", async () => {
+    const user = await freshUser(repo, "m4");
+    const r = await handleMessage(repo, user, "سناك.");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("السناك");
+  });
+
+  it("'اكلت بيضتين' يبقى يعمل بالضبط كالسابق (صفر تأثير من التحسين الجديد على التسجيل الحقيقي)", async () => {
+    const user = await freshUser(repo, "m5");
+    const now = new Date("2026-09-08T10:00:00Z");
+    repo.now = now;
+    const r = await handleMessage(repo, user, "اكلت بيضتين", now);
+    expect(r.meal_logged).toBe(true);
+    expect(r.today_calories).toBe(155);
+  });
+});
