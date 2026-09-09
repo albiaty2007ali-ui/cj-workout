@@ -17,7 +17,7 @@ export type NotificationGroup = "meals" | "water" | "streak" | "tips";
 const CATEGORY_GROUP: Record<string, NotificationGroup> = {
   BREAKFAST: "meals", LUNCH: "meals", DINNER: "meals", SNACK: "meals", MEAL_REMINDER: "meals",
   WATER: "water", HYDRATION: "water",
-  STREAK: "streak", XP: "streak", MOTIVATION: "streak", CONSISTENCY: "streak",
+  STREAK: "streak", XP: "streak", MOTIVATION: "streak", CONSISTENCY: "streak", STREAK_RISK: "streak",
   RECIPE: "tips", PROGRESS: "tips", RETURN: "tips", DAILY_SUMMARY: "tips",
 };
 

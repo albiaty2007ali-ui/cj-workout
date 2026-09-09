@@ -24,7 +24,7 @@ import type {
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
   MealStatusRecord, NutritionTipRecord, RecipeRecord, BehaviorDailyRecord, ChallengeProgressRecord,
-  StreakFreezeUsageRecord, RecoveryDayRecord,
+  StreakFreezeUsageRecord, RecoveryDayRecord, InsightShownRecord,
 } from "./repository.js";
 
 export function genId(): string {
@@ -236,6 +236,26 @@ export class FirestoreRepository implements Repository {
 
   async clearRecoveryDay(userId: string, date: string): Promise<void> {
     await this.db.collection("recovery_days").doc(this.recoveryDayDocId(userId, date)).delete();
+  }
+
+  // ---- Insights ----
+  private insightShownDocId(userId: string, type: string, date: string): string {
+    return `${userId}_${type}_${date}`;
+  }
+
+  async findInsightShown(userId: string, type: string, date: string): Promise<boolean> {
+    const doc = await this.db.collection("insight_shown").doc(this.insightShownDocId(userId, type, date)).get();
+    return doc.exists;
+  }
+
+  async recordInsightShown(row: InsightShownRecord): Promise<void> {
+    try {
+      // create() يفشل لو موجودة مسبقًا (Race نادر) — نبتلعه هنا عمدًا، هذا سجل معلوماتي فقط
+      // وأبدًا ما يجوز يكسر رد شات حقيقي (نفس فلسفة sendNotification's best-effort).
+      await this.db.collection("insight_shown").doc(this.insightShownDocId(row.user_id, row.type, row.date)).create(row);
+    } catch (err) {
+      console.warn("recordInsightShown failed (best-effort, ignored):", err);
+    }
   }
 
   // ---- Nutrition Profile / Weight ----

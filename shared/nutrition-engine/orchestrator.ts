@@ -19,6 +19,7 @@ import * as directLog from "./directLog.js";
 import { extractFoodEntities } from "./entities.js";
 import * as intents from "./intents.js";
 import * as mealState from "./mealState.js";
+import * as patternDetection from "./patternDetection.js";
 import { findLeadingNumber, parseWaterMl } from "./quantity.js";
 import * as recipeSearch from "./recipeSearch.js";
 import * as recommendations from "./recommendations.js";
@@ -363,6 +364,11 @@ async function finalizeMeal(
   }
   for (const milestone of streakSnapshot.new_milestones) {
     reply += `\n\n🔥 ${milestone.label}! +${milestone.xp_reward} XP`;
+  }
+
+  if ((user.ai_response_style ?? "balanced") !== "concise") {
+    const insightMessage = await patternDetection.pickUnseenBaselineInsight(repo, user.id, now);
+    if (insightMessage) reply += `\n\n👀 ${insightMessage}`;
   }
 
   if (source === "direct" || source === "recipe") {

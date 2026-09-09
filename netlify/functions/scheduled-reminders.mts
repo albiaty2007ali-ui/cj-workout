@@ -20,6 +20,7 @@ import { getSettings, canSendNow, sendNotification } from "../../shared/nutritio
 import { nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
 import * as calculator from "../../shared/nutrition-engine/calculator.js";
 import { mealWindowsForSchedule, waterWindowForSchedule, isWithinMinuteRange, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
+import { checkStreakRisk } from "../../shared/nutrition-engine/patternDetection.js";
 
 export const config: Config = { schedule: "*/30 * * * *" };
 
@@ -57,6 +58,7 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
 
   let mealSent = 0;
   let waterSent = 0;
+  let streakRiskSent = 0;
 
   for (const userId of userIds) {
     const settings = await getSettings(db, userId);
@@ -101,9 +103,20 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
         }
       }
     }
+    // خطر انقطاع Streak حقيقي (المرحلة 5) — فحص مستقل عن الوجبات/الماي، مرة وحدة باليوم عبر dedup_key.
+    if (canSendNow(settings, "STREAK_RISK", now)) {
+      const [user, todayBehavior] = await Promise.all([
+        repo.findUser(userId), repo.findBehaviorDaily(userId, today),
+      ]);
+      const risk = user ? checkStreakRisk(user, todayBehavior, now) : null;
+      if (risk) {
+        await sendNotification(db, userId, "STREAK_RISK", `streak_risk_${today}`, "/chat", "🔥 خطر ينكسر الستريك!", risk.message);
+        streakRiskSent++;
+      }
+    }
   }
 
-  return new Response(JSON.stringify({ ok: true, checked: userIds.length, mealSent, waterSent }), {
+  return new Response(JSON.stringify({ ok: true, checked: userIds.length, mealSent, waterSent, streakRiskSent }), {
     headers: { "Content-Type": "application/json" },
   });
 };

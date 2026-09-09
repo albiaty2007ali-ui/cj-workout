@@ -169,6 +169,10 @@ export interface Repository {
   setRecoveryDay(row: RecoveryDayRecord): Promise<void>; // Upsert — تفعيل أو تغيير النمط لنفس اليوم
   clearRecoveryDay(userId: string, date: string): Promise<void>; // إلغاء التفعيل
 
+  // ---- Insights (Smart Anomaly Detection) ----
+  findInsightShown(userId: string, type: string, date: string): Promise<boolean>;
+  recordInsightShown(row: InsightShownRecord): Promise<void>; // Best-effort — لا يرمي أبدًا حتى لو صار Race نادر
+
   /**
    * تحديث ذري لعداد الوجبات المجانية — يطابق `UPDATE users SET free_meals_used =
    * free_meals_used + 1 WHERE id=:uid AND free_meals_used < :cap` بايثون (منع تجاوز الحد تحت
@@ -292,4 +296,11 @@ export interface RecoveryDayRecord {
   date: string; // "YYYY-MM-DD" بتوقيت بغداد
   mode: "FLEXIBLE_DAY" | "BUSY_DAY" | "TRAVEL_DAY";
   activated_at: string; // ISO timestamp
+}
+
+/** علامة "هذا النوع من Insight انعرض لهذا المستخدم هذا اليوم" — Cooldown بسيط يمنع تكرار نفس الملاحظة بنفس اليوم (المرحلة 5). */
+export interface InsightShownRecord {
+  user_id: string;
+  type: string;
+  date: string; // "YYYY-MM-DD" بتوقيت بغداد
 }
