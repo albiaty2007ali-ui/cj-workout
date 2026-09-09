@@ -98,7 +98,7 @@ export function authenticateRequest(req: Request): SessionClaims | null {
 
 export interface UserCredentials {
   id: string;
-  password_hash: string;
+  password_hash: string | null; // null = حساب أُنشئ عبر Google فقط، بدون كلمة مرور محلية
   disabled: boolean;
   role: string;
 }
@@ -108,7 +108,7 @@ export async function findUserCredentialsByEmail(db: Firestore, email: string): 
   if (snap.empty) return null;
   const doc = snap.docs[0]!;
   const d = doc.data();
-  return { id: doc.id, password_hash: d.password_hash, disabled: d.disabled ?? false, role: d.role ?? "user" };
+  return { id: doc.id, password_hash: d.password_hash ?? null, disabled: d.disabled ?? false, role: d.role ?? "user" };
 }
 
 export async function emailExists(db: Firestore, email: string): Promise<boolean> {
@@ -128,6 +128,27 @@ export async function createUser(db: Firestore, input: NewUserInput): Promise<{ 
   const passwordHash = hashPassword(input.password);
   await db.collection("users").doc(id).set({
     name: input.name, email: input.email, password_hash: passwordHash, role: "user", disabled: false,
+    xp: 0, streak_days: 0, longest_streak: 0, streak_started_at: null, last_active_date: null,
+    free_meals_used: 0, current_recipe_id: null, current_recipe_step: 0,
+    pending_recipe_confirmation_id: null, pending_food_topic_json: null, pending_meal_json: null,
+    last_direct_log_json: null, ai_response_style: "balanced",
+    created_at: FieldValue.serverTimestamp(),
+  });
+  return { id, role: "user" };
+}
+
+export interface NewGoogleUserInput {
+  name: string;
+  email: string;
+  google_id: string;
+}
+
+/** ينشئ مستخدم جديد عبر تسجيل دخول Google — بدون كلمة مرور محلية (password_hash: null)، نفس باقي
+ *  حقول createUser الافتراضية تمامًا حتى لا يختلف سلوك حساب Google عن حساب بريد/كلمة مرور عاديّ. */
+export async function createUserFromGoogle(db: Firestore, input: NewGoogleUserInput): Promise<{ id: string; role: string }> {
+  const id = randomUUID().replace(/-/g, "");
+  await db.collection("users").doc(id).set({
+    name: input.name, email: input.email, password_hash: null, google_id: input.google_id, role: "user", disabled: false,
     xp: 0, streak_days: 0, longest_streak: 0, streak_started_at: null, last_active_date: null,
     free_meals_used: 0, current_recipe_id: null, current_recipe_step: 0,
     pending_recipe_confirmation_id: null, pending_food_topic_json: null, pending_meal_json: null,

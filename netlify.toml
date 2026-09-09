@@ -36,6 +36,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/auth/google"
+  to = "/.netlify/functions/auth-google"
+  status = 200
+
+[[redirects]]
   from = "/api/me"
   to = "/.netlify/functions/me"
   status = 200
@@ -133,6 +138,11 @@
 [[redirects]]
   from = "/api/push/subscribe"
   to = "/.netlify/functions/push-subscribe"
+  status = 200
+
+[[redirects]]
+  from = "/api/intelligence"
+  to = "/.netlify/functions/intelligence"
   status = 200
 
 # SPA Fallback — لازم آخر قاعدة (الأعم)، حتى refresh مباشر على /chat أو /login يشتغل بدون 404

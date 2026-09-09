@@ -100,6 +100,10 @@ body {
 .auth-card .btn { width: 100%; padding: 12px; height: auto; font-size: 1rem; }
 .auth-switch { text-align: center; margin-top: 16px; font-size: 0.9rem; color: var(--text); }
 .auth-switch a { color: var(--moss); text-decoration: none; font-weight: 600; }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 4px; color: var(--text-muted); font-size: 0.85rem; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.google-btn-skeleton { height: 40px; border-radius: 999px; background: var(--border); opacity: 0.35; animation: google-btn-pulse 1.2s ease-in-out infinite; }
+@keyframes google-btn-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.5; } }
 
 .app-shell {
   display: flex;

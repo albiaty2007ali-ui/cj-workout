@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_AD_DAILY_BOTTOM?: string;
   readonly VITE_AD_WEIGHT_BOTTOM?: string;
   readonly VITE_AD_SUBSCRIBE_INTERSTITIAL?: string;
+  readonly VITE_GOOGLE_CLIENT_ID?: string;
 }
 
 interface ImportMeta {

@@ -65,6 +65,7 @@ export const translations = {
       createAccount: "إنشاء الحساب",
       haveAccount: "عندك حساب؟",
       loginLink: "سجّل دخولك",
+      or: "أو",
       forgotTitle: "استرجاع كلمة المرور",
       forgotSent: "لو الإيميل مسجّل عندنا، وصلتك رسالة فيها رابط لإعادة تعيين كلمة المرور (صالح 30 دقيقة).",
       sendResetLink: "أرسل رابط الاستعادة",
@@ -78,6 +79,9 @@ export const translations = {
       privacyBody: "بياناتك الغذائية والصحية خاصة بيك. تگدر تحمّل بياناتك أو تحذف حسابك بأي وقت من تحت بهذي الصفحة.",
       replayIntro: "🔁 إعادة مشاهدة المقدمة",
       languageTitle: "🌐 اللغة",
+    },
+    intelligence: {
+      scoreLabel: "نقاطك الشخصية",
     },
   },
   en: {
@@ -137,6 +141,7 @@ export const translations = {
       createAccount: "Create account",
       haveAccount: "Already have an account?",
       loginLink: "Sign in",
+      or: "or",
       forgotTitle: "Password recovery",
       forgotSent: "If this email is registered, you'll get a message with a password reset link (valid for 30 minutes).",
       sendResetLink: "Send reset link",
@@ -150,6 +155,9 @@ export const translations = {
       privacyBody: "Your nutrition and health data is private to you. You can download your data or delete your account anytime from below on this page.",
       replayIntro: "🔁 Watch the intro again",
       languageTitle: "🌐 Language",
+    },
+    intelligence: {
+      scoreLabel: "Your Personal Score",
     },
   },
 } as const;

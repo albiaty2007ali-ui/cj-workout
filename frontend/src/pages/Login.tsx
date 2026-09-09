@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useI18n } from "../i18n/I18nContext";
 import LanguageToggle from "../components/LanguageToggle";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -43,6 +44,7 @@ export default function Login() {
         </div>
         {error && <p className="field-error">{error}</p>}
         <button className="btn" type="submit" disabled={loading}>{loading ? t("common.loading") : t("auth.login")}</button>
+        <GoogleSignInButton />
         <p className="auth-switch">
           {t("auth.noAccount")} <Link to="/register">{t("auth.registerLink")}</Link>
         </p>

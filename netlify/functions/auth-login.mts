@@ -23,7 +23,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const db = getFirestore(getFirebaseApp());
     const user = await findUserCredentialsByEmail(db, email);
 
-    if (!user || !checkPassword(password, user.password_hash)) {
+    if (!user || !user.password_hash || !checkPassword(password, user.password_hash)) {
       return jsonError(401, "INVALID_CREDENTIALS", "البريد الإلكتروني أو كلمة المرور غير صحيحة");
     }
     if (user.disabled) {
