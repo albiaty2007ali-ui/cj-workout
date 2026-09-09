@@ -10,8 +10,9 @@ function envOrNull(value: string | undefined): string | null {
 }
 
 export const AD_SLOTS = {
-  /** بانر صغير — صفحة الشات (تحت الاقتراحات السريعة) */
-  chatBanner: envOrNull(import.meta.env.VITE_AD_CHAT_BANNER),
+  // ملاحظة: ماكو إعلان بصفحة الشات نهائيًا (عمدًا) — طلب صريح من المستخدم "لا تضع إعلانات
+  // مزعجة داخل Chat"، وتأكّد فعليًا: إعلان جُرِّب هناك طلع محتوى غير لائق (تعارف/كليكبيت)
+  // بمكان بارز بمنتصف المحادثة. الشات يبقى الوحيد بدون أي إعلان بكل التطبيق.
   /** بانر صغير — أعلى قائمة الوصفات */
   recipesListTop: envOrNull(import.meta.env.VITE_AD_RECIPES_TOP),
   /** بانر صغير — أسفل صفحة "يومي الغذائي" */
