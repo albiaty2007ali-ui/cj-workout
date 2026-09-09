@@ -14,8 +14,12 @@ import { computePersonalScore } from "../../shared/nutrition-engine/personalScor
 import { listMissionsForToday, claimMission } from "../../shared/nutrition-engine/missions.js";
 import { listChallenges, startChallenge } from "../../shared/nutrition-engine/challenges.js";
 import { useStreakFreeze } from "../../shared/nutrition-engine/streakFreeze.js";
-import { todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
+import { todayBaghdadIso, addDaysIso, diffDaysIso } from "../../shared/nutrition-engine/iraqTime.js";
 import type { RecoveryDayRecord } from "../../shared/nutrition-engine/db/repository.js";
+
+const RECOVERY_MODES = new Set<RecoveryDayRecord["mode"]>(["FLEXIBLE_DAY", "BUSY_DAY", "TRAVEL_DAY"]);
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TRAVEL_MODE_MAX_DAYS = 30;
 import { computeWeightStats, computeGoalForecast, type WeightEntry } from "../../shared/nutrition-engine/weightStats.js";
 import { computeConsistencyScore } from "../../shared/nutrition-engine/consistencyScore.js";
 import { analyzeBestWorstDay } from "../../shared/nutrition-engine/bestWorstDay.js";
@@ -136,11 +140,31 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         await repo.clearRecoveryDay(claims.sub, today);
         return jsonOk({ active: false });
       }
-      const row: RecoveryDayRecord = {
-        user_id: claims.sub, date: today, mode: "FLEXIBLE_DAY", activated_at: new Date().toISOString(),
-      };
+      const mode: RecoveryDayRecord["mode"] = RECOVERY_MODES.has(body.mode) ? body.mode : "FLEXIBLE_DAY";
+      const row: RecoveryDayRecord = { user_id: claims.sub, date: today, mode, activated_at: new Date().toISOString() };
       await repo.setRecoveryDay(row);
       return jsonOk({ active: true, mode: row.mode });
+    }
+
+    // Travel Mode (المرحلة 7) — نفس بنية RecoveryDayRecord الموجودة أصلاً، بس بحلقة على مدى تاريخ
+    // بدل يوم واحد. صفر Collection جديد. حد أقصى TRAVEL_MODE_MAX_DAYS يوم لمنع كتابة غير محدودة.
+    if (req.method === "POST" && action === "travel-mode") {
+      const body = await req.json().catch(() => ({}));
+      const startDate = typeof body.start_date === "string" ? body.start_date : "";
+      const endDate = typeof body.end_date === "string" ? body.end_date : "";
+      if (!ISO_DATE_RE.test(startDate) || !ISO_DATE_RE.test(endDate)) {
+        return jsonError(400, "VALIDATION_ERROR", "start_date وend_date لازم يكونون بصيغة YYYY-MM-DD.");
+      }
+      const dayCount = diffDaysIso(endDate, startDate) + 1;
+      if (dayCount < 1 || dayCount > TRAVEL_MODE_MAX_DAYS) {
+        return jsonError(400, "VALIDATION_ERROR", `المدى لازم يكون بين يوم و${TRAVEL_MODE_MAX_DAYS} يوم.`);
+      }
+      const activatedAt = new Date().toISOString();
+      for (let i = 0; i < dayCount; i++) {
+        const date = addDaysIso(startDate, i);
+        await repo.setRecoveryDay({ user_id: claims.sub, date, mode: "TRAVEL_DAY", activated_at: activatedAt });
+      }
+      return jsonOk({ active: true, mode: "TRAVEL_DAY", days_activated: dayCount });
     }
 
     return jsonError(400, "VALIDATION_ERROR", "action غير معروف.");

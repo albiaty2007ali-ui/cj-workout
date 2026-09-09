@@ -12,6 +12,26 @@ const MEAL_META: Array<{ key: "breakfast" | "lunch" | "dinner"; label: string; i
   { key: "dinner", label: "العشاء", icon: "🌙" },
 ];
 
+/** يعتمد كليًا على data.budgets الحقيقية المحسوبة أصلًا (progress-daily.mts -> mealBudget.ts) —
+ * "رتبلي باقي اليوم" هو تجميع/عرض لما هو موجود فعلاً، صفر توزيع جديد. */
+function FixMyDayPlan({ data }: { data: DailyResponse }) {
+  const items = MEAL_META
+    .filter(({ key }) => data.meals![key].status !== "LOGGED" && data.budgets?.[key])
+    .map(({ key, label, icon }) => ({ label, icon, kcal: data.budgets![key] }));
+  if (items.length === 0) return null;
+  return (
+    <div className="notice-box" style={{ marginTop: 16 }}>
+      <h3 style={{ marginTop: 0 }}>🔧 خطتك لباقي اليوم</h3>
+      {items.map((it) => (
+        <p key={it.label} style={{ margin: "6px 0" }}>{it.icon} {it.label}: <strong>~{it.kcal} kcal</strong></p>
+      ))}
+      <p style={{ marginTop: 10, color: "var(--text-muted)", fontSize: "0.85rem" }}>
+        موزّعة حسب باقي سعراتك اليوم ({data.remaining_calories} kcal) ووقتك الحالي — تعديلها بيدك، هذي بس نقطة انطلاق.
+      </p>
+    </div>
+  );
+}
+
 function shiftDate(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
@@ -23,6 +43,7 @@ export default function Daily() {
   const [params, setParams] = useSearchParams();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [data, setData] = useState<DailyResponse | null>(null);
+  const [showFixPlan, setShowFixPlan] = useState(false);
   const dateParam = params.get("date") ?? "";
 
   useEffect(() => {
@@ -81,6 +102,15 @@ export default function Daily() {
                 </p>
               </div>
             </div>
+
+            {data.is_today && !data.over_target && MEAL_META.some(({ key }) => data.meals![key].status !== "LOGGED" && data.budgets?.[key]) && (
+              <div style={{ marginTop: 16 }}>
+                <button className="btn btn-moss" onClick={() => setShowFixPlan((v) => !v)}>
+                  🔧 رتبلي باقي اليوم
+                </button>
+                {showFixPlan && <FixMyDayPlan data={data} />}
+              </div>
+            )}
 
             <div style={{ marginTop: 24 }}>
               {MEAL_META.map(({ key, label, icon }) => {

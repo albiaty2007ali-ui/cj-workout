@@ -49,8 +49,14 @@ export default function Settings() {
   const [notifBusy, setNotifBusy] = useState(false);
   const [deviceSubscribed, setDeviceSubscribed] = useState(false);
 
+  type RecoveryMode = "FLEXIBLE_DAY" | "BUSY_DAY" | "TRAVEL_DAY";
   const [recoveryDayActive, setRecoveryDayActive] = useState<boolean | null>(null);
+  const [recoveryMode, setRecoveryMode] = useState<RecoveryMode>("FLEXIBLE_DAY");
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [travelStart, setTravelStart] = useState("");
+  const [travelEnd, setTravelEnd] = useState("");
+  const [travelBusy, setTravelBusy] = useState(false);
+  const [travelMsg, setTravelMsg] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -58,7 +64,7 @@ export default function Settings() {
         api.get<MeResponse>("/me"),
         api.get<SettingsData>("/settings"),
         api.get<NotificationSettingsData>("/settings?action=notifications"),
-        api.get<{ active: boolean }>("/intelligence?action=recovery-day"),
+        api.get<{ active: boolean; mode: RecoveryMode | null }>("/intelligence?action=recovery-day"),
       ]);
       if (!meRes.success || !meRes.data) {
         navigate("/login");
@@ -67,7 +73,10 @@ export default function Settings() {
       setMe(meRes.data);
       if (settingsRes.success && settingsRes.data) setSettings(settingsRes.data);
       if (notifRes.success && notifRes.data) setNotif(notifRes.data);
-      if (recoveryRes.success && recoveryRes.data) setRecoveryDayActive(recoveryRes.data.active);
+      if (recoveryRes.success && recoveryRes.data) {
+        setRecoveryDayActive(recoveryRes.data.active);
+        if (recoveryRes.data.mode) setRecoveryMode(recoveryRes.data.mode);
+      }
       if (pushSupported()) setDeviceSubscribed(!!(await currentSubscription()));
     })();
   }, [navigate]);
@@ -76,12 +85,33 @@ export default function Settings() {
     if (recoveryDayActive === null) return;
     setRecoveryBusy(true);
     const nextValue = !recoveryDayActive;
-    const res = await api.post<{ active: boolean }>("/intelligence?action=recovery-day", { enable: nextValue });
+    const res = await api.post<{ active: boolean; mode?: RecoveryMode }>(
+      "/intelligence?action=recovery-day",
+      nextValue ? { enable: true, mode: recoveryMode } : { enable: false },
+    );
     setRecoveryBusy(false);
     if (res.success && res.data) {
       setRecoveryDayActive(res.data.active);
       flashSaved();
     }
+  }
+
+  async function activateTravelMode() {
+    if (!travelStart || !travelEnd) return;
+    setTravelBusy(true);
+    setTravelMsg("");
+    const res = await api.post<{ days_activated: number }>("/intelligence?action=travel-mode", { start_date: travelStart, end_date: travelEnd });
+    setTravelBusy(false);
+    if (res.success && res.data) {
+      setTravelMsg(`✓ فعّلنا وضع السفر لـ${res.data.days_activated} يوم`);
+      if (travelStart === todayIso()) { setRecoveryDayActive(true); setRecoveryMode("TRAVEL_DAY"); }
+    } else {
+      setTravelMsg(res.error?.message ?? "صار خطأ");
+    }
+  }
+
+  function todayIso(): string {
+    return new Date().toISOString().slice(0, 10);
   }
 
   async function saveNotif(patch: Partial<NotificationSettingsData>) {
@@ -309,12 +339,35 @@ export default function Settings() {
             <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
               {t("settings.recoveryDayBody")}
             </p>
+            {!recoveryDayActive && (
+              <select value={recoveryMode} onChange={(e) => setRecoveryMode(e.target.value as RecoveryMode)} style={{ marginBottom: 10 }}>
+                <option value="FLEXIBLE_DAY">{t("settings.recoveryModeFlexible")}</option>
+                <option value="BUSY_DAY">{t("settings.recoveryModeBusy")}</option>
+              </select>
+            )}
             <div className="notif-row">
-              <span className="notif-row-label">{t("settings.recoveryDayToggle")}</span>
+              <span className="notif-row-label">
+                {t("settings.recoveryDayToggle")}
+                {recoveryDayActive && recoveryMode === "TRAVEL_DAY" && " ✈️"}
+              </span>
               <label className="switch">
                 <input type="checkbox" checked={recoveryDayActive} disabled={recoveryBusy} onChange={toggleRecoveryDay} />
                 <span className="switch-track" />
               </label>
+            </div>
+
+            <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+              <p style={{ fontWeight: 600, marginBottom: 4 }}>{t("settings.travelModeTitle")}</p>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: 8 }}>{t("settings.travelModeBody")}</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <input type="date" value={travelStart} onChange={(e) => setTravelStart(e.target.value)} />
+                <span>—</span>
+                <input type="date" value={travelEnd} onChange={(e) => setTravelEnd(e.target.value)} />
+                <button className="btn btn-outline-dark" disabled={travelBusy || !travelStart || !travelEnd} onClick={activateTravelMode}>
+                  {t("settings.travelModeActivate")}
+                </button>
+              </div>
+              {travelMsg && <p style={{ marginTop: 8, fontSize: "0.85rem" }}>{travelMsg}</p>}
             </div>
           </div>
         )}

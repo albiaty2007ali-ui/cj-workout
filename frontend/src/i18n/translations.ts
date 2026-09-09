@@ -84,6 +84,11 @@ export const translations = {
       recoveryDayTitle: "🔄 يوم مرن",
       recoveryDayBody: "يومك اليوم مختلف عن المعتاد؟ فعّل هذا وراح نعيد توزيع باقي وجباتك ونوقف تذكيرات وقت الوجبات لهذا اليوم بس — صفر تأثير على الستريك أو XP أو سجلّك السابق.",
       recoveryDayToggle: "تفعيل اليوم المرن",
+      recoveryModeFlexible: "🔄 يوم مرن (عام)",
+      recoveryModeBusy: "😓 يوم مشغول",
+      travelModeTitle: "✈️ وضع السفر",
+      travelModeBody: "مسافر لمدة أيام؟ حدد مدى تاريخ وراح نوقف تذكيرات الوجبات ونفعّل اليوم المرن لكل هذي الأيام دفعة وحدة — نفس ضمان اليوم المرن (صفر تأثير على الستريك/XP/سجلّك).",
+      travelModeActivate: "فعّل وضع السفر",
     },
     intelligence: {
       scoreLabel: "نقاطك الشخصية",
@@ -192,6 +197,11 @@ export const translations = {
       recoveryDayTitle: "🔄 Flexible Day",
       recoveryDayBody: "Is today different from your usual routine? Turn this on and we'll re-plan the rest of today's meals and pause meal-time reminders for today only — zero effect on your streak, XP, or past history.",
       recoveryDayToggle: "Enable flexible day",
+      recoveryModeFlexible: "🔄 Flexible day (general)",
+      recoveryModeBusy: "😓 Busy day",
+      travelModeTitle: "✈️ Travel Mode",
+      travelModeBody: "Traveling for a few days? Pick a date range and we'll pause meal reminders and enable flexible day for all of them at once — same guarantee as flexible day (zero effect on streak/XP/history).",
+      travelModeActivate: "Activate travel mode",
     },
     intelligence: {
       scoreLabel: "Your Personal Score",
