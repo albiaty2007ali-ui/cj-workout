@@ -10,7 +10,7 @@
  */
 import type { Firestore } from "firebase-admin/firestore";
 import { nowBaghdad } from "../iraqTime.js";
-import { sendPush, type PushSubscriptionJson } from "./push.js";
+import { sendPush, sendFcmPush, type PushSubscriptionJson } from "./push.js";
 
 export type NotificationGroup = "meals" | "water" | "streak" | "tips";
 
@@ -87,6 +87,10 @@ export async function sendNotification(
     const subsSnap = await db.collection("push_subscriptions").where("user_id", "==", userId).get();
     for (const doc of subsSnap.docs) {
       const data = doc.data();
+      if (data.platform === "android") {
+        await sendFcmPush(data.fcm_token, { title, body, url });
+        continue;
+      }
       const subscription: PushSubscriptionJson = { endpoint: data.endpoint, keys: data.keys };
       const ok = await sendPush(subscription, { title, body, url });
       if (!ok) {
