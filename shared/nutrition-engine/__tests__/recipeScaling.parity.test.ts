@@ -11,7 +11,7 @@ function makeRecipe(overrides: Partial<RecipeRecord> = {}): RecipeRecord {
     id: "r1", name: "وصفة", slug: "recipe", description: null, category_id: "c1",
     active: true, calories: 400, protein: 20, carbs: 40, fat: 10, fiber: 5,
     prep_time_min: null, cook_time_min: null, servings: 4, difficulty: "easy",
-    match_keywords: null,
+    match_keywords: null, source: null, tags: [],
     ingredients: [
       { name: "دجاج", quantity: "200", unit: "غم" },
       { name: "رز", quantity: "1", unit: "كوب" },

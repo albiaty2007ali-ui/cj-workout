@@ -141,7 +141,7 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
         description: "وجبة غداء عالية البروتين ومنخفضة الدهون.", category_id: "c1", active: true,
         calories: 380, protein: 40, carbs: 10, fat: 18, fiber: null,
         prep_time_min: 10, cook_time_min: 15, servings: 1, difficulty: "medium",
-        match_keywords: "دجاج مشوي|دجاج بالخضار|سلطة دجاج",
+        match_keywords: "دجاج مشوي|دجاج بالخضار|سلطة دجاج", source: null, tags: [],
         ingredients: [
           { name: "صدر دجاج", quantity: "1", unit: "قطعة" },
           { name: "خس وخيار وطماطة", quantity: null, unit: "للسلطة" },
@@ -170,7 +170,7 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
         description: "وجبة غداء عالية البروتين ومنخفضة الدهون.", category_id: "c1", active: true,
         calories: 380, protein: 40, carbs: 10, fat: 18, fiber: null,
         prep_time_min: 10, cook_time_min: 15, servings: 1, difficulty: "medium",
-        match_keywords: "دجاج مشوي|دجاج بالخضار|سلطة دجاج",
+        match_keywords: "دجاج مشوي|دجاج بالخضار|سلطة دجاج", source: null, tags: [],
         ingredients: [], steps: [], substitutions: [],
       },
     ];

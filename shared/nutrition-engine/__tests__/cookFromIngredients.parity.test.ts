@@ -18,7 +18,7 @@ function makeRecipe(overrides: Partial<RecipeRecord>): RecipeRecord {
     id: overrides.name!, name: "", slug: "", description: null, category_id: "c1",
     active: true, calories: 0, protein: 0, carbs: 0, fat: 0, fiber: null,
     prep_time_min: null, cook_time_min: null, servings: 1, difficulty: "easy",
-    match_keywords: null, ingredients: [], steps: [], substitutions: [],
+    match_keywords: null, source: null, tags: [], ingredients: [], steps: [], substitutions: [],
     ...overrides,
   };
 }

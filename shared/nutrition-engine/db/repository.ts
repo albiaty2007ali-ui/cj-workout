@@ -189,6 +189,14 @@ export interface RecipeIngredientRecord {
   name: string;
   quantity: string | null;
   unit: string | null;
+  /** food_id حقيقي من foods.sqlite (ingredientResolver.ts) — null/undefined لو المكوّن لم
+   *  يتحلّل بثقة كافية (القاعدة صغيرة، 44 food فقط — هذا متوقع لكثير من المكونات). صفر تخمين.
+   *  اختياري (مو إجباري) حتى ما تنكسر الوثائق/الاختبارات الحالية اللي انكتبت قبل هذا الحقل —
+   *  أي قارئ يعامل undefined كـnull. */
+  food_id?: number | null;
+  /** true افتراضيًا لكل مكوّن (صفر تخمين) — false فقط لو النص الأصلي يحتوي كلمة "اختياري"
+   *  فعليًا. اختياري لنفس سبب food_id أعلاه — أي قارئ يعامل undefined كـtrue. */
+  required?: boolean;
 }
 
 export interface RecipeStepRecord {
@@ -222,6 +230,10 @@ export interface RecipeRecord {
   servings: number;
   difficulty: string;
   match_keywords: string | null;
+  /** مصدر خارجي حقيقي (مثلاً رابط USDA MyPlate Kitchen) — null لو غير موثَّق. */
+  source: string | null;
+  /** كلمات تصنيف خفيفة للبحث/الترشيح (مثلاً "عالي البروتين"، "سريع") — مصفوفة فاضية افتراضيًا. */
+  tags: string[];
   ingredients: RecipeIngredientRecord[];
   steps: RecipeStepRecord[];
   substitutions: RecipeSubstitutionRecord[];

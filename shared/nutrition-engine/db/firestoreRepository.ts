@@ -23,7 +23,7 @@ import type {
   Repository, UserRecord, XpTransactionInput, ActiveDayRecord, StreakMilestoneRecord,
   NutritionProfileRecord, WeightHistoryInput, WeightHistoryRecord,
   MealLogInput, MealLogRecord, WaterLogInput, WaterLogRecord,
-  MealStatusRecord, NutritionTipRecord, RecipeRecord, BehaviorDailyRecord, ChallengeProgressRecord,
+  MealStatusRecord, NutritionTipRecord, RecipeRecord, RecipeIngredientRecord, BehaviorDailyRecord, ChallengeProgressRecord,
   StreakFreezeUsageRecord, RecoveryDayRecord, InsightShownRecord,
 } from "./repository.js";
 
@@ -43,6 +43,22 @@ export function getFirebaseApp(): App {
   const serviceAccount = JSON.parse(raw);
   app = initializeApp({ credential: cert(serviceAccount) });
   return app;
+}
+
+/**
+ * يملأ الحقول الإضافية المُضافة لاحقًا (food_id/required/source/tags) بقيم افتراضية آمنة —
+ * ضروري لأن وثائق الوصفات الحالية بـFirestore انكتبت قبل هذي الحقول (صفر Migration إجباري
+ * فوري، القراءة تتعامل صح مع الوثائق القديمة والجديدة معًا).
+ */
+function normalizeRecipeDoc(id: string, data: FirebaseFirestore.DocumentData): RecipeRecord {
+  const raw = data as Omit<RecipeRecord, "id" | "ingredients" | "source" | "tags"> & {
+    ingredients?: Partial<RecipeIngredientRecord>[]; source?: string | null; tags?: string[];
+  };
+  const ingredients: RecipeIngredientRecord[] = (raw.ingredients ?? []).map((ing) => ({
+    name: ing.name ?? "", quantity: ing.quantity ?? null, unit: ing.unit ?? null,
+    food_id: ing.food_id ?? null, required: ing.required ?? true,
+  }));
+  return { id, ...raw, ingredients, source: raw.source ?? null, tags: raw.tags ?? [] };
 }
 
 function toDate(value: unknown): Date {
@@ -427,20 +443,20 @@ export class FirestoreRepository implements Repository {
     let q = this.db.collection("recipes").where("active", "==", true) as FirebaseFirestore.Query;
     if (categoryId) q = q.where("category_id", "==", categoryId);
     const snap = await q.orderBy("name").get();
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RecipeRecord, "id">) }));
+    return snap.docs.map((d) => normalizeRecipeDoc(d.id, d.data()));
   }
 
   async findRecipeById(id: string): Promise<RecipeRecord | null> {
     const doc = await this.db.collection("recipes").doc(id).get();
     if (!doc.exists) return null;
-    return { id, ...(doc.data() as Omit<RecipeRecord, "id">) };
+    return normalizeRecipeDoc(id, doc.data()!);
   }
 
   async findRecipeBySlug(slug: string): Promise<RecipeRecord | null> {
     const snap = await this.db.collection("recipes").where("slug", "==", slug).where("active", "==", true).limit(1).get();
     if (snap.empty) return null;
     const doc = snap.docs[0]!;
-    return { id: doc.id, ...(doc.data() as Omit<RecipeRecord, "id">) };
+    return normalizeRecipeDoc(doc.id, doc.data());
   }
 
   async findRecipeCategoryByName(name: string): Promise<{ id: string; name: string } | null> {
