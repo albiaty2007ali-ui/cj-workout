@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../../lib/api";
 import AppShell from "../../components/AppShell";
+import { useI18n, backArrow } from "../../i18n/I18nContext";
 
 interface LevelReward { badge_icon: string; badge_title: string; }
 interface LevelRow { level: number; required_xp: number; title: string; reward: LevelReward | null; }
@@ -9,6 +10,7 @@ interface LevelEdit { title: string; required_xp: string; badge_icon: string; ba
 
 export default function AdminLevels() {
   const navigate = useNavigate();
+  const { t, dir } = useI18n();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [levels, setLevels] = useState<LevelRow[]>([]);
   const [level, setLevel] = useState("");
@@ -67,8 +69,8 @@ export default function AdminLevels() {
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin>
       <main className="container" style={{ maxWidth: 900 }}>
-        <div className="topbar"><Link to="/admin">→ رجوع للوحة الإدارة</Link></div>
-        <h1 className="font-display">إدارة المستويات (Levels)</h1>
+        <div className="topbar"><Link to="/admin">{backArrow(dir)} {t("admin.backToAdminPanel")}</Link></div>
+        <h1 className="font-display">{t("admin.levelsPageTitle")}</h1>
         <p className="subtitle">{levels.length} مستوى — يتحدد شكل تقدّم XP بالبروفايل من هذا الجدول. المكافأة شارة تجميلية بحتة (أيقونة + لقب)، تُعرَض بالبروفايل بس ولا تغيّر أي حساب.</p>
 
         <div className="notice-box">

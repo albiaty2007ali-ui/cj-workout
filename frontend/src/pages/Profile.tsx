@@ -3,11 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import type { ProfileResponse, CalendarDay } from "../lib/profileApi";
 import AppShell from "../components/AppShell";
-
-const WEEKDAY_LABELS = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
-const STATUS_LABEL: Record<CalendarDay["status"], string> = {
-  green: "يوم ممتاز 🟢", yellow: "يوم جزئي 🟡", orange: "سجّلت بس ناقص هدف 🟠", none: "ماكو بيانات ⚪",
-};
+import { useI18n, backArrow, forwardArrow } from "../i18n/I18nContext";
+import { WEEKDAY_LABELS, MONTH_LABELS } from "../i18n/translations";
 
 function monthKey(iso: string): string {
   return iso.slice(0, 7);
@@ -23,10 +20,10 @@ function shiftMonth(key: string, delta: number): string {
   const dt = new Date(Date.UTC(y, m - 1 + delta, 1));
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
 }
-const MONTH_LABELS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 
 export default function Profile() {
   const navigate = useNavigate();
+  const { t, dir, language } = useI18n();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [editing, setEditing] = useState(false);
@@ -37,6 +34,11 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [viewMonth, setViewMonth] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const STATUS_LABEL: Record<CalendarDay["status"], string> = {
+    green: t("profile.statusGreen"), yellow: t("profile.statusYellow"),
+    orange: t("profile.statusOrange"), none: t("profile.statusNone"),
+  };
 
   async function load() {
     const [meRes, profileRes] = await Promise.all([
@@ -106,7 +108,7 @@ export default function Profile() {
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
       <main className="page-container">
-        <h1 className="font-display">👤 البروفايل</h1>
+        <h1 className="font-display">{t("profile.pageTitle")}</h1>
 
         <div className="notice-box">
           {!editing ? (
@@ -114,29 +116,29 @@ export default function Profile() {
               <p style={{ fontWeight: 700, fontSize: "1.1rem" }}>{profile.name}</p>
               {profile.username && <p style={{ color: "var(--text-muted, var(--text-muted))" }}>@{profile.username}</p>}
               {profile.bio && <p>{profile.bio}</p>}
-              <button className="btn btn-outline-dark" onClick={() => setEditing(true)}>تعديل البيانات</button>
+              <button className="btn btn-outline-dark" onClick={() => setEditing(true)}>{t("profile.editButton")}</button>
             </>
           ) : (
             <form onSubmit={saveEdits}>
               <div className="field">
-                <label>الاسم</label>
+                <label>{t("profile.nameLabel")}</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} />
                 {errors.name && <p className="field-error">{errors.name}</p>}
               </div>
               <div className="field">
-                <label>يوزرنيم (اختياري)</label>
-                <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="حروف إنكليزية وأرقام و_" />
+                <label>{t("profile.usernameLabel")}</label>
+                <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("profile.usernamePlaceholder")} />
                 {errors.username && <p className="field-error">{errors.username}</p>}
               </div>
               <div className="field">
-                <label>نبذة (اختياري)</label>
+                <label>{t("profile.bioLabel")}</label>
                 <textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={300} rows={3} style={{ width: "100%" }} />
                 {errors.bio && <p className="field-error">{errors.bio}</p>}
               </div>
               {errors._ && <p className="field-error">{errors._}</p>}
               <div style={{ display: "flex", gap: 10 }}>
-                <button className="btn btn-moss" type="submit" disabled={saving}>{saving ? "..." : "حفظ"}</button>
-                <button className="btn btn-outline-dark" type="button" onClick={() => setEditing(false)}>إلغاء</button>
+                <button className="btn btn-moss" type="submit" disabled={saving}>{saving ? t("common.loading") : t("profile.saveButton")}</button>
+                <button className="btn btn-outline-dark" type="button" onClick={() => setEditing(false)}>{t("profile.cancelButton")}</button>
               </div>
             </form>
           )}
@@ -144,19 +146,19 @@ export default function Profile() {
 
         <div className="calorie-cards" style={{ marginTop: 16 }}>
           <div className="calorie-card">
-            <p className="cc-label">⭐ المستوى</p>
+            <p className="cc-label">{t("profile.levelLabel")}</p>
             <p className="cc-value">{profile.progress.level} — {profile.progress.title}</p>
           </div>
           <div className="calorie-card">
-            <p className="cc-label">🔥 الستريك</p>
-            <p className="cc-value">{profile.streak_days} يوم</p>
+            <p className="cc-label">{t("profile.streakLabel")}</p>
+            <p className="cc-value">{profile.streak_days} {t("profile.daysUnit")}</p>
           </div>
           <div className="calorie-card">
-            <p className="cc-label">🍽️ وجبات مسجّلة</p>
+            <p className="cc-label">{t("profile.mealsLoggedLabel")}</p>
             <p className="cc-value">{profile.stats.meals_logged}</p>
           </div>
           <div className="calorie-card">
-            <p className="cc-label">💧 سجلات الماي</p>
+            <p className="cc-label">{t("profile.waterLogsLabel")}</p>
             <p className="cc-value">{profile.stats.water_logs}</p>
           </div>
         </div>
@@ -166,59 +168,63 @@ export default function Profile() {
             <span className="badge-icon">{profile.progress.badge_icon}</span>
             <div>
               <p className="badge-title">{profile.progress.badge_title}</p>
-              <p className="badge-sub">شارة تجميلية وصلتلها بمستوى {profile.progress.level}</p>
+              <p className="badge-sub">{t("profile.badgeSubPrefix")} {profile.progress.level}</p>
             </div>
           </div>
         )}
 
         {!profile.progress.is_max_level && (
           <div className="notice-box" style={{ marginTop: 16 }}>
-            باقيلك <strong>{profile.progress.needed_for_next}</strong> XP للمستوى الجاي
+            {t("profile.xpToNextPrefix")} <strong>{profile.progress.needed_for_next}</strong> {t("profile.xpToNextSuffix")}
           </div>
         )}
 
         <div className="notice-box" style={{ marginTop: 16 }}>
-          <h3 style={{ marginTop: 0 }}>🏅 الإنجازات</h3>
+          <h3 style={{ marginTop: 0 }}>{t("profile.achievementsTitle")}</h3>
           <div className="achievement-grid">
             <div className="achievement-badge">
               <span className="ab-icon">⭐</span>
               <span className="ab-value">{profile.achievements.level}</span>
-              <span className="ab-label">المستوى الحالي</span>
+              <span className="ab-label">{t("profile.achLevelLabel")}</span>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🔥</span>
               <span className="ab-value">{profile.achievements.streak_days}</span>
-              <span className="ab-label">ستريك حالي</span>
+              <span className="ab-label">{t("profile.achStreakLabel")}</span>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🏔️</span>
               <span className="ab-value">{profile.achievements.longest_streak}</span>
-              <span className="ab-label">أطول ستريك</span>
+              <span className="ab-label">{t("profile.achLongestStreakLabel")}</span>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🍽️</span>
               <span className="ab-value">{profile.achievements.meals_logged}</span>
-              <span className="ab-label">وجبات مسجّلة</span>
+              <span className="ab-label">{t("profile.achMealsLabel")}</span>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🏆</span>
               <span className="ab-value">{profile.achievements.challenges_completed}</span>
-              <span className="ab-label">تحديات مكتملة</span>
+              <span className="ab-label">{t("profile.achChallengesLabel")}</span>
             </div>
           </div>
         </div>
 
         <div className="notice-box" style={{ marginTop: 16 }}>
-          <h3 style={{ marginTop: 0 }}>📅 تقويم التغذية</h3>
+          <h3 style={{ marginTop: 0 }}>{t("profile.calendarTitle")}</h3>
           {viewMonth && monthGrid && (
             <>
               <div className="calendar-nav">
-                <button type="button" disabled={!earliestMonth || viewMonth <= earliestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, -1) : v); setSelectedDate(null); }}>→ الشهر السابق</button>
-                <strong>{MONTH_LABELS[Number(viewMonth.split("-")[1]) - 1]} {viewMonth.split("-")[0]}</strong>
-                <button type="button" disabled={!latestMonth || viewMonth >= latestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, 1) : v); setSelectedDate(null); }}>الشهر الجاي ←</button>
+                <button type="button" disabled={!earliestMonth || viewMonth <= earliestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, -1) : v); setSelectedDate(null); }}>
+                  {backArrow(dir)} {t("profile.prevMonth")}
+                </button>
+                <strong>{MONTH_LABELS[language][Number(viewMonth.split("-")[1]) - 1]} {viewMonth.split("-")[0]}</strong>
+                <button type="button" disabled={!latestMonth || viewMonth >= latestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, 1) : v); setSelectedDate(null); }}>
+                  {t("profile.nextMonth")} {forwardArrow(dir)}
+                </button>
               </div>
               <div className="calendar-weekdays">
-                {WEEKDAY_LABELS.map((d) => <span key={d}>{d}</span>)}
+                {WEEKDAY_LABELS[language].map((d) => <span key={d}>{d}</span>)}
               </div>
               <div className="calendar-grid">
                 {monthGrid.map((date, i) => {
@@ -238,19 +244,19 @@ export default function Profile() {
                 })}
               </div>
               <div className="calendar-legend">
-                <span><span className="dot" style={{ background: "var(--moss)" }} />ممتاز</span>
-                <span><span className="dot" style={{ background: "var(--gold)" }} />جزئي</span>
-                <span><span className="dot" style={{ background: "#c97a3d" }} />ناقص هدف</span>
-                <span><span className="dot" style={{ background: "var(--border)" }} />ماكو بيانات</span>
+                <span><span className="dot" style={{ background: "var(--moss)" }} />{t("profile.legendGreen")}</span>
+                <span><span className="dot" style={{ background: "var(--gold)" }} />{t("profile.legendYellow")}</span>
+                <span><span className="dot" style={{ background: "#c97a3d" }} />{t("profile.legendOrange")}</span>
+                <span><span className="dot" style={{ background: "var(--border)" }} />{t("profile.legendNone")}</span>
               </div>
               {selectedDate && (
                 <div className="calendar-day-detail">
                   <strong>{selectedDate}</strong> — {STATUS_LABEL[selectedDay?.status ?? "none"]}
                   {selectedDay && selectedDay.status !== "none" && (
                     <p style={{ margin: "6px 0 0" }}>
-                      🍽️ {selectedDay.meals_logged} وجبة مسجّلة
-                      {selectedDay.protein_hit_target && " · ✅ هدف البروتين تحقق"}
-                      {selectedDay.water_hit_target && " · ✅ هدف الماي تحقق"}
+                      🍽️ {selectedDay.meals_logged} {t("profile.dayDetailMeals")}
+                      {selectedDay.protein_hit_target && ` · ${t("profile.dayDetailProteinHit")}`}
+                      {selectedDay.water_hit_target && ` · ${t("profile.dayDetailWaterHit")}`}
                     </p>
                   )}
                 </div>

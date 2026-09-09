@@ -3,12 +3,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type MeResponse, type ChatReply } from "../lib/api";
 import type { RecipeDetailResponse } from "../lib/recipesApi";
 import AppShell from "../components/AppShell";
-
-const DIFFICULTY_LABELS: Record<string, string> = { easy: "سهل", medium: "متوسط", hard: "صعب" };
+import { useI18n, backArrow, forwardArrow } from "../i18n/I18nContext";
+import { DIFFICULTY_LABELS } from "../i18n/translations";
 
 export default function RecipeDetail() {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
+  const { t, dir, language } = useI18n();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [data, setData] = useState<RecipeDetailResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -93,6 +94,9 @@ export default function RecipeDetail() {
     setMode("tutorial");
   }
 
+  // ملاحظة مهمة: النص المُرسَل هنا لازم يبقى بالعبارة العربية اللي يتعرّف عليها الـBackend
+  // (intents.RECIPE_EATEN_PHRASES) بغض النظر عن لغة الواجهة — محرك NLU/الشات عربي فقط بالكامل
+  // (قيد معماري موثَّق بـtranslations.ts). نص الزر المعروض يُترجَم، الرسالة الفعلية المُرسَلة لا.
   async function answerEaten(answer: string) {
     setEatenAnswered(true);
     const res = await api.post<ChatReply>("/chat", { message: answer });
@@ -102,7 +106,7 @@ export default function RecipeDetail() {
   if (!me) return null;
   if (notFound) return (
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
-      <main className="container"><p className="calorie-warning">الوصفة غير موجودة.</p></main>
+      <main className="container"><p className="calorie-warning">{t("recipe.notFound")}</p></main>
     </AppShell>
   );
   if (!data) return null;
@@ -112,7 +116,7 @@ export default function RecipeDetail() {
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
       <main className="container" style={{ maxWidth: 760 }}>
-        <div className="topbar"><Link to="/recipes">→ رجوع للوصفات</Link></div>
+        <div className="topbar"><Link to="/recipes">{backArrow(dir)} {t("recipe.backToRecipes")}</Link></div>
 
         {mode === "view" && (
           <div>
@@ -121,30 +125,30 @@ export default function RecipeDetail() {
             {recipe.description && <p className="subtitle">{recipe.description}</p>}
 
             <div className="recipe-meta-row">
-              {recipe.prep_time_min && <span>⏱️ تحضير {recipe.prep_time_min} د</span>}
-              {recipe.cook_time_min && <span>🔥 طبخ {recipe.cook_time_min} د</span>}
+              {recipe.prep_time_min && <span>⏱️ {t("recipe.prepLabel")} {recipe.prep_time_min} {t("recipe.minutesUnit")}</span>}
+              {recipe.cook_time_min && <span>🔥 {t("recipe.cookLabel")} {recipe.cook_time_min} {t("recipe.minutesUnit")}</span>}
               <span className="recipe-servings-stepper">
                 🍽️
-                <button type="button" onClick={() => changeServings((servings ?? recipe.servings) - 1)} disabled={scaling || (servings ?? recipe.servings) <= 1} aria-label="تقليل الحصص">−</button>
-                <span>{servings ?? recipe.servings} حصة</span>
-                <button type="button" onClick={() => changeServings((servings ?? recipe.servings) + 1)} disabled={scaling} aria-label="زيادة الحصص">+</button>
+                <button type="button" onClick={() => changeServings((servings ?? recipe.servings) - 1)} disabled={scaling || (servings ?? recipe.servings) <= 1} aria-label={t("recipe.decreaseServings")}>−</button>
+                <span>{servings ?? recipe.servings} {t("recipe.servingsUnit")}</span>
+                <button type="button" onClick={() => changeServings((servings ?? recipe.servings) + 1)} disabled={scaling} aria-label={t("recipe.increaseServings")}>+</button>
               </span>
-              <span>📊 {DIFFICULTY_LABELS[recipe.difficulty] ?? recipe.difficulty}</span>
+              <span>📊 {DIFFICULTY_LABELS[language][recipe.difficulty as "easy" | "medium" | "hard"] ?? recipe.difficulty}</span>
             </div>
 
             <div className="recipe-macro-grid">
-              <div className="recipe-macro-box"><p className="val">{recipe.calories}</p><p className="lbl">kcal</p></div>
-              <div className="recipe-macro-box"><p className="val">{recipe.protein}غ</p><p className="lbl">بروتين</p></div>
-              <div className="recipe-macro-box"><p className="val">{recipe.carbs}غ</p><p className="lbl">كارب</p></div>
-              <div className="recipe-macro-box"><p className="val">{recipe.fat}غ</p><p className="lbl">دهون</p></div>
-              {recipe.fiber != null && <div className="recipe-macro-box"><p className="val">{recipe.fiber}غ</p><p className="lbl">ألياف</p></div>}
+              <div className="recipe-macro-box"><p className="val">{recipe.calories}</p><p className="lbl">{t("recipe.caloriesUnit")}</p></div>
+              <div className="recipe-macro-box"><p className="val">{recipe.protein}غ</p><p className="lbl">{t("recipe.proteinLabel")}</p></div>
+              <div className="recipe-macro-box"><p className="val">{recipe.carbs}غ</p><p className="lbl">{t("recipe.carbsLabel")}</p></div>
+              <div className="recipe-macro-box"><p className="val">{recipe.fat}غ</p><p className="lbl">{t("recipe.fatLabel")}</p></div>
+              {recipe.fiber != null && <div className="recipe-macro-box"><p className="val">{recipe.fiber}غ</p><p className="lbl">{t("recipe.fiberLabel")}</p></div>}
             </div>
 
             {!overTarget && recipe.calories > remainingCalories && (
-              <p className="calorie-warning">⚠️ هذه الوجبة ({recipe.calories} kcal) أعلى من سعراتك المتبقية اليوم ({remainingCalories} kcal).</p>
+              <p className="calorie-warning">⚠️ {recipe.name} ({recipe.calories} kcal) {t("recipe.overBudgetWarning")} ({remainingCalories} kcal).</p>
             )}
 
-            <h3 className="font-display" style={{ marginTop: 32 }}>🥘 المكونات</h3>
+            <h3 className="font-display" style={{ marginTop: 32 }}>{t("recipe.ingredientsTitle")}</h3>
             <ul className="ingredient-list">
               {recipe.ingredients.map((i, idx) => (
                 <li key={idx}>
@@ -156,7 +160,7 @@ export default function RecipeDetail() {
 
             {recipe.substitutions.length > 0 && (
               <>
-                <h3 className="font-display" style={{ marginTop: 28 }}>🔄 بدائل مسجّلة</h3>
+                <h3 className="font-display" style={{ marginTop: 28 }}>{t("recipe.substitutionsTitle")}</h3>
                 <div className="sub-list">
                   {recipe.substitutions.map((s, idx) => (
                     <div className="sub-item" key={idx}><strong>{s.ingredient_name}:</strong> {s.replacement}</div>
@@ -167,9 +171,9 @@ export default function RecipeDetail() {
 
             {steps.length > 0 && (
               <>
-                {overTarget && <p className="calorie-warning">🚫 وصلت لهدف السعرات اليومي — بدء وصفة جديدة معطّل هسه.</p>}
+                {overTarget && <p className="calorie-warning">{t("recipe.overTargetBlock")}</p>}
                 <button className="btn btn-moss btn-block" style={{ marginTop: 16 }} disabled={starting} onClick={startCooking}>
-                  ▶️ ابدأ الطبخ
+                  {t("recipe.startCookingButton")}
                 </button>
               </>
             )}
@@ -179,7 +183,7 @@ export default function RecipeDetail() {
         {mode === "blocked" && (
           <div className="tutorial-step-card" style={{ textAlign: "center" }}>
             <p style={{ fontSize: "1.05rem", marginBottom: 20 }}>{blockedMessage}</p>
-            <Link to="/recipes" className="btn btn-moss">رجوع للوصفات</Link>
+            <Link to="/recipes" className="btn btn-moss">{t("recipe.backToRecipes")}</Link>
           </div>
         )}
 
@@ -188,10 +192,10 @@ export default function RecipeDetail() {
             <div className="tutorial-progress-bar">
               <div className="tutorial-progress-fill" style={{ width: `${Math.round(((stepIdx + 1) / steps.length) * 100)}%` }} />
             </div>
-            <p className="tutorial-progress-label">الخطوة {stepIdx + 1} / {steps.length}</p>
+            <p className="tutorial-progress-label">{t("recipe.stepLabel")} {stepIdx + 1} / {steps.length}</p>
 
             <div className="tutorial-step-card">
-              <p className="tutorial-step-number">الخطوة {stepIdx + 1}</p>
+              <p className="tutorial-step-number">{t("recipe.stepLabel")} {stepIdx + 1}</p>
               <p className="tutorial-step-text">{steps[stepIdx].instruction}</p>
               {(steps[stepIdx].duration || steps[stepIdx].temperature) && (
                 <p className="tutorial-step-extra">
@@ -203,9 +207,9 @@ export default function RecipeDetail() {
             </div>
 
             <div className="tutorial-nav">
-              <button className="btn btn-outline-dark" disabled={stepIdx === 0} onClick={() => saveStep(Math.max(0, stepIdx - 1))}>← السابق</button>
+              <button className="btn btn-outline-dark" disabled={stepIdx === 0} onClick={() => saveStep(Math.max(0, stepIdx - 1))}>{backArrow(dir)} {t("recipe.previousButton")}</button>
               <button className="btn btn-moss" onClick={() => saveStep(stepIdx + 1)}>
-                {stepIdx === steps.length - 1 ? "إنهاء الوصفة ✓" : "التالي →"}
+                {stepIdx === steps.length - 1 ? t("recipe.finishRecipeButton") : `${t("recipe.nextButton")} ${forwardArrow(dir)}`}
               </button>
             </div>
           </div>
@@ -218,16 +222,16 @@ export default function RecipeDetail() {
               <>
                 <p className="tutorial-step-text" style={{ whiteSpace: "pre-line" }}>{eatenPrompt}</p>
                 <div className="tutorial-eaten-actions">
-                  <button className="btn btn-moss" onClick={() => answerEaten("أكلتها")}>🍽️ إي، أكلتها</button>
-                  <button className="btn btn-outline-dark" onClick={() => answerEaten("بعدني")}>⏳ بعدني</button>
-                  <button className="btn btn-danger-outline" onClick={() => answerEaten("لا")}>❌ لا</button>
+                  <button className="btn btn-moss" onClick={() => answerEaten("أكلتها")}>{t("recipe.ateItButton")}</button>
+                  <button className="btn btn-outline-dark" onClick={() => answerEaten("بعدني")}>{t("recipe.stillCookingButton")}</button>
+                  <button className="btn btn-danger-outline" onClick={() => answerEaten("لا")}>{t("recipe.noButton")}</button>
                 </div>
               </>
             )}
             {eatenAnswered && (
               <>
                 <p className="tutorial-step-text" style={{ whiteSpace: "pre-line" }}>{eatenResult || "..."}</p>
-                <Link to="/recipes" className="btn btn-moss" style={{ marginTop: 16 }}>رجوع للوصفات</Link>
+                <Link to="/recipes" className="btn btn-moss" style={{ marginTop: 16 }}>{t("recipe.backToRecipes")}</Link>
               </>
             )}
           </div>

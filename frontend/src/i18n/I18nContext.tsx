@@ -40,6 +40,19 @@ export function applyDocumentDirection(lang: Language): void {
   document.documentElement.lang = lang;
 }
 
+/**
+ * سهم "رجوع/السابق" حسب الاتجاه الفعلي — باگ حقيقي مكتشَف: روابط الرجوع كانت تستخدم "→" حرفي
+ * ثابت بكل مكان (صحيح بصريًا بالعربي RTL، لأن "رجوع" = نحو بداية القراءة = يمين = سهم يمين —
+ * بس خاطئ اتجاهيًا بالإنجليزي LTR، وين "رجوع" لازم يكون سهم يسار). backArrow/forwardArrow
+ * يشتقّان الاتجاه الصحيح من `dir` الفعلي بدل نص ثابت بكل صفحة.
+ */
+export function backArrow(dir: "rtl" | "ltr"): string {
+  return dir === "rtl" ? "→" : "←";
+}
+export function forwardArrow(dir: "rtl" | "ltr"): string {
+  return dir === "rtl" ? "←" : "→";
+}
+
 function hasExplicitLocalChoice(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY) !== null;

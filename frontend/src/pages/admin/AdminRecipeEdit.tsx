@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type MeResponse } from "../../lib/api";
 import AppShell from "../../components/AppShell";
+import { useI18n, backArrow } from "../../i18n/I18nContext";
 
 interface Ingredient { name: string; quantity: string | null; unit: string | null; }
 interface Step { step_number: number; instruction: string; duration: string | null; temperature: string | null; tip: string | null; warning: string | null; }
@@ -19,6 +20,7 @@ interface Category { id: string; name: string; icon: string; }
 export default function AdminRecipeEdit() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const { t, dir } = useI18n();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [recipe, setRecipe] = useState<AdminRecipeFull | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -100,9 +102,9 @@ export default function AdminRecipeEdit() {
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin>
       <main className="container" style={{ maxWidth: 900 }}>
-        <div className="topbar"><Link to="/admin/recipes">→ رجوع لكل الوصفات</Link></div>
+        <div className="topbar"><Link to="/admin/recipes">{backArrow(dir)} {t("admin.backToAllRecipes")}</Link></div>
         <h1 className="font-display">{recipe.name}</h1>
-        <p className="subtitle">{recipe.active ? "مفعّلة ✅" : "غير مفعّلة — أكمل المكونات والخطوات ثم فعّلها من قائمة الوصفات"}</p>
+        <p className="subtitle">{recipe.active ? t("admin.recipeActive") : t("admin.recipeInactive")}</p>
 
         <div className="notice-box" style={{ textAlign: "right" }}>
           <h3 style={{ marginTop: 0 }}>صورة الوصفة</h3>
