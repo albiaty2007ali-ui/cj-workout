@@ -22,6 +22,7 @@ export const NLU_ALLOWED_INTENTS: ReadonlySet<string> = new Set([
   intents.ASK_RECIPE,
   intents.GENERAL_NUTRITION,
   intents.ASK_GENERAL_FOOD_INFO,
+  intents.WHAT_IF,
 ]);
 
 const NLU_ACTIONS = new Set(["QUESTION", "STATEMENT", "REQUEST"]);

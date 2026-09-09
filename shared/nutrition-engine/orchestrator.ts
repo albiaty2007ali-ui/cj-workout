@@ -579,6 +579,65 @@ async function handleFoodInfoQuestion(
   return { reply: await recommendations.describeFoodPortions(foodId, foodName!), meal_logged: false };
 }
 
+/**
+ * What If Simulator — "إذا أكلت برگر هسه؟" — محاكاة حسابية بحتة، **صفر تسجيل وجبة أبدًا**
+ * (meal_logged دايمًا false، صفر لمسة على pending/mealState/insertMealLog — نفس ضمان
+ * handleFoodInfoQuestion أعلاه بالضبط). لو الفرق سلبي بوضوح (أكثر من 100 سعرة تجاوز)، يبحث
+ * عن بدائل حقيقية من foods.sqlite (نفس تصنيف الطعام) ومن قسم وجبات الدايت (recipeSearch) —
+ * صفر وصفة/بديل وهمي، صفر recipe_id غير موجود فعليًا بقاعدة البيانات.
+ */
+async function handleWhatIf(repo: Repository, user: UserRecord, textNorm: string, now: Date): Promise<DispatchResult> {
+  const profile = await repo.findNutritionProfile(user.id);
+  const ctx = await context.build(repo, user.id, profile, now);
+
+  const entities = await extractFoodEntities(textNorm);
+  const resolved = entities.resolved;
+
+  let simulatedCalories: number;
+  let label: string;
+  let singleFoodId: number | null = null;
+
+  if (resolved.length > 0) {
+    let total = 0;
+    for (const hit of resolved) {
+      const n = await calculator.computeFood(hit.food_id, hit.grams ?? 0);
+      total += n.calories;
+    }
+    simulatedCalories = total;
+    label = responses.itemsInline(resolved.map((h) => ({ food_name: h.food_name, quantity: h.quantity ?? null })));
+    if (resolved.length === 1) singleFoodId = resolved[0].food_id;
+  } else {
+    // صفر طعام معروف اتطابق — نجرب رقم سعرات صريح بنفس الرسالة ("إذا أخذت وجبة 700 سعرة؟")
+    const calorieMatch = textNorm.match(/(\d+)\s*سعر/);
+    if (!calorieMatch) return { reply: responses.whatIfNoFood(), meal_logged: false };
+    simulatedCalories = parseInt(calorieMatch[1], 10);
+    label = "هذي الوجبة";
+  }
+
+  const after = ctx.remaining_calories - simulatedCalories;
+  let reply = responses.whatIfImpact(label, simulatedCalories, ctx.remaining_calories, after);
+
+  // طعام واحد محدَّد — نعرض دايمًا كمية حقيقية موصى بيها (بالخاشوقة/اللقمة/الحبة... حسب
+  // food_portions الفعلية) تناسب الباقي إلك، مو بس تأثير الكمية الكاملة الافتراضية (طلب
+  // مستخدم حقيقي: "بكم لكمة أو خاشوقة لازم آكل؟").
+  if (singleFoodId !== null) {
+    reply += `\n\n${await recommendations.suggestPortionForFood(singleFoodId, label, ctx.remaining_calories)}`;
+  }
+
+  if (after < -100) {
+    if (singleFoodId !== null) {
+      reply += `\n\n${await recommendations.suggestLighterAlternative(singleFoodId, label)}`;
+    }
+    const recipeAlts = await recipeSearch.suggestRecipesWithin(repo, Math.max(0, ctx.remaining_calories));
+    if (recipeAlts.length > 0) {
+      reply += `\n\n${responses.whatIfAlternativesIntro()}`;
+      for (const r of recipeAlts) reply += `\n🍽️ ${r.name} — ~${r.calories} kcal (موجودة بقسم وجبات الدايت)`;
+    }
+  }
+
+  return { reply, meal_logged: false };
+}
+
 /** "شكد يعني صحن؟" بدون اسم طعام — سؤال عام عن وحدة قياس، صفر تسجيل. */
 async function handleUnitQuestion(textNorm: string): Promise<DispatchResult> {
   const unit = intents.GENERIC_UNIT_WORDS.find((w) => textNorm.includes(w));
@@ -792,6 +851,7 @@ async function dispatch(
   if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, foodLookupText, "craving");
   if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, foodLookupText, "plan");
   if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now, nluFoodQuery);
+  if (intent === intents.WHAT_IF) return handleWhatIf(repo, user, foodLookupText, now);
   if (intent === intents.ASK_CALORIES) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "calories");
   if (intent === intents.ASK_FOOD_SIZE) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "size");
   if (intent === intents.ASK_FOOD_FIT) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "fit");

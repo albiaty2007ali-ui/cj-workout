@@ -315,3 +315,30 @@ export function remainingMacro(label: string, remainingGrams: number, targetGram
   }
   return `باقيلك تقريبًا ${pyRound(remainingGrams)} غم ${label} من أصل ${targetGrams} غم اليوم.`;
 }
+
+// ---- What If Simulator (محاكاة فقط، صفر تسجيل وجبة أبدًا — راجع orchestrator.ts:handleWhatIf) ----
+
+const WHAT_IF_NO_FOOD_TEMPLATES = [
+  "شنو الأكلة اللي تسأل عنها بالضبط، أو شكد سعراتها تقريبًا؟ گلي وأحسبلك التأثير على سعراتك.",
+];
+const WHAT_IF_FITS_TEMPLATES = [
+  "تگدر تاكلها كابتن 👍 {food} بيها ~{calories} سعرة، وباقيلك {remaining} سعرة اليوم — بعدها يضلّلك تقريبًا {after} سعرة.",
+  "أي، {food} (~{calories} سعرة) يناسب سعراتك المتبقية ({remaining} سعرة) — بعد ما تاكلها يضلّلك تقريبًا {after} سعرة.",
+];
+const WHAT_IF_EXCEEDS_TEMPLATES = [
+  "تگدر تاكلها، بس راح تتجاوز المتبقي اليومي بحوالي {over} سعرة ({food} ~{calories} سعرة مقابل {remaining} سعرة باقيلك).",
+  "{food} (~{calories} سعرة) أعلى من الباقي إلك ({remaining} سعرة) بحوالي {over} سعرة لو أكلتها هسه.",
+];
+const WHAT_IF_ALTERNATIVES_INTRO_TEMPLATES = [
+  "إذا تريد تبقى قريب من المتبقي، عندي كم خيار أخف من قسم وجبات الدايت:",
+  "لو تحب بديل أقرب لسعراتك المتبقية، هذي خيارات حقيقية من قسم وجبات الدايت:",
+];
+
+export const whatIfNoFood = () => pick(WHAT_IF_NO_FOOD_TEMPLATES);
+
+export function whatIfImpact(food: string, calories: number, remaining: number, after: number): string {
+  if (after >= 0) return format(pick(WHAT_IF_FITS_TEMPLATES), { food, calories, remaining, after });
+  return format(pick(WHAT_IF_EXCEEDS_TEMPLATES), { food, calories, remaining, over: Math.abs(after) });
+}
+
+export const whatIfAlternativesIntro = () => pick(WHAT_IF_ALTERNATIVES_INTRO_TEMPLATES);
