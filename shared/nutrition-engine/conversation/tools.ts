@@ -404,6 +404,56 @@ export const suggestSubstitution: CJTool<SuggestSubstitutionArgs, SuggestSubstit
 };
 
 // ---------------------------------------------------------------------------
+// calculate_allowed_portion — "اليوم غدانا تمن" (وجبة مخطَّطة، لسا ما صارت): عدد دقيق (قسمة
+// صحيحة) من أصغر حصة حقيقية مسجّلة يدخل بالسعرات المتبقية، صفر مدى مخترَع.
+// ---------------------------------------------------------------------------
+interface CalculateAllowedPortionArgs { food_id?: number; food_query?: string; remaining_calories?: number }
+interface CalculateAllowedPortionResult { found: boolean; text?: string }
+
+export const calculateAllowedPortion: CJTool<CalculateAllowedPortionArgs, CalculateAllowedPortionResult> = {
+  name: "calculate_allowed_portion",
+  description:
+    "يحسب عدد الوحدات المسموحة (خاشوقة/قطعة/حبة...، أصغر وحدة حقيقية مسجّلة للطعام) من طعام معيّن " +
+    "حسب السعرات المتبقية — استخدمها لوجبة مخطَّطة لليوم (\"اليوم غدانا تمن\") قبل ما تصير فعليًا، " +
+    "مو للاستهلاك الفعلي. مرّر food_id إذا متوفر، وإلا food_query وسيُحل تلقائيًا. لو ما مرّرت " +
+    "remaining_calories، يُستخدَم الباقي الحقيقي لليوم تلقائيًا (نفس get_daily_summary).",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      food_id: { type: "NUMBER" },
+      food_query: { type: "STRING" },
+      remaining_calories: { type: "NUMBER", description: "اختياري — الباقي الحقيقي لليوم يُستخدَم افتراضيًا" },
+    },
+  },
+  mutates: false,
+  async execute(ctx: ToolExecContext, args: CalculateAllowedPortionArgs): Promise<CalculateAllowedPortionResult> {
+    let foodId = args?.food_id != null ? Number(args.food_id) : null;
+    let foodName: string | null = null;
+    if (foodId == null && args?.food_query) {
+      const { results } = await foodSearchMod.matchMessageWithMeta(String(args.food_query));
+      if (results[0]) {
+        foodId = results[0].food_id; foodName = results[0].food_name;
+      } else {
+        const fuzzy = await resolveIngredientName(String(args.food_query));
+        if (fuzzy) { foodId = fuzzy.food_id; foodName = fuzzy.food_name; }
+      }
+    }
+    if (foodId == null) return { found: false };
+    if (foodName == null) foodName = await foodNameById(foodId);
+    if (foodName == null) return { found: false };
+
+    let remaining = args?.remaining_calories;
+    if (remaining == null) {
+      const profile = await ctx.repo.findNutritionProfile(ctx.user.id);
+      const nutritionCtx = await contextMod.build(ctx.repo, ctx.user.id, profile, ctx.now);
+      remaining = nutritionCtx.remaining_calories;
+    }
+    const text = await recommendationsMod.suggestPortionCountForRemaining(foodId, foodName, remaining);
+    return { found: true, text };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // simulate_what_if — قراءة بحتة، صفر استدعاء لأي دالة كتابة بجسم الدالة (نفس ضمان handleWhatIf)
 // ---------------------------------------------------------------------------
 interface SimulateWhatIfArgs { items?: { food_id: number; grams: number }[]; target_calories?: number }
@@ -462,5 +512,5 @@ export const simulateWhatIf: CJTool<SimulateWhatIfArgs, SimulateWhatIfResult> = 
 export const READ_ONLY_TOOLS: CJTool<any, any>[] = [
   searchFood, getFoodNutrition, resolvePortion, calculateMealNutrition, getDailySummary,
   getUserProfile, searchDietMeals, getRecipe, findRecipesFromIngredients, recommendFoods,
-  checkFoodFit, suggestSubstitution, simulateWhatIf,
+  checkFoodFit, suggestSubstitution, simulateWhatIf, calculateAllowedPortion,
 ];

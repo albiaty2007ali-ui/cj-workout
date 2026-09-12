@@ -506,7 +506,7 @@ async function extractFirstFood(textNorm: string): Promise<[number, string] | [n
   return [null, null];
 }
 
-async function handleFoodTopic(repo: Repository, user: UserRecord, textNorm: string, kind: "craving" | "plan"): Promise<DispatchResult> {
+async function handleFoodTopic(repo: Repository, user: UserRecord, textNorm: string, kind: "craving" | "plan", now: Date): Promise<DispatchResult> {
   const [foodId, foodName] = await extractFirstFood(textNorm);
   if (foodId === null) {
     user.pending_food_topic_json = null;
@@ -516,7 +516,17 @@ async function handleFoodTopic(repo: Repository, user: UserRecord, textNorm: str
 
   user.pending_food_topic_json = JSON.stringify({ food_id: foodId, food_name: foodName, kind });
   await repo.saveUser(user);
-  const ack = kind === "craving" ? responses.cravingAck(foodName) : responses.planAck(foodName);
+
+  // "plan" (وجبة مخطَّطة لليوم، "اليوم غدانا تمن") -> اقتراح كمية فوري حسب الباقي إلك، صفر انتظار
+  // سؤال ثاني ("شكد آكل؟"). "craving" يبقى كما هو (ack بس، ينتظر توضيح لاحق) — خارج نطاق هذا التغيير.
+  if (kind === "plan") {
+    const profile = await repo.findNutritionProfile(user.id);
+    const ctx = await context.build(repo, user.id, profile, now);
+    const reply = await recommendations.suggestPortionCountForRemaining(foodId, foodName!, ctx.remaining_calories);
+    return { reply, meal_logged: false };
+  }
+
+  const ack = responses.cravingAck(foodName);
   return { reply: ack, meal_logged: false };
 }
 
@@ -1054,8 +1064,8 @@ async function dispatch(
     return { reply: "تمام، خبرني لما تاكل 🌱 أو گلي شنو تشتهي وأقترحلك شي مناسب لسعراتك المتبقية.", meal_logged: false };
   }
   if (intent === intents.EXPRESS_DESIRE) return handleExpressDesire(repo, user, textNorm, now);
-  if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, foodLookupText, "craving");
-  if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, foodLookupText, "plan");
+  if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, foodLookupText, "craving", now);
+  if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, foodLookupText, "plan", now);
   if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now, nluFoodQuery);
   if (intent === intents.WHAT_IF) return handleWhatIf(repo, user, foodLookupText, now);
   if (intent === intents.COOK_FROM_INGREDIENTS) return handleCookFromIngredients(repo, foodLookupText);

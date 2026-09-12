@@ -113,11 +113,15 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
     expect(expectedOptions).toContain(r.reply);
   });
 
-  it("'راح اكل تمن' (PLAN_TO_EAT) -> رد من ضمن قوالب plan مع 'تمن (رز)'", async () => {
+  it("'راح اكل تمن' (PLAN_TO_EAT) -> اقتراح كمية حقيقي حسب الباقي إلك (2249 سعرة)، صفر تسجيل", async () => {
+    // بعد ربط handleFoodTopic("plan") باقتراح كمية فوري (suggestPortionCountForRemaining) — لم
+    // يعد يرجّع قالب ack جامد، يرجّع رقمًا حقيقيًا محسوبًا من foods.sqlite.
     const user = await freshUser(repo, "g9b");
     const r = await handleMessage(repo, user, "راح اكل تمن");
-    const expectedOptions = responses.PLAN_ACK_WITH_FOOD_TEMPLATES.map((t) => t.replace("{food}", "تمن (رز)"));
-    expect(expectedOptions).toContain(r.reply);
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("تمن (رز)");
+    expect(r.reply).toContain("2249");
+    expect(r.reply).toMatch(/يمديك تاكل لغاية \d+ خاشوقة/);
   });
 
   it("'اكلت بيضتين' (DIRECT_LOG) -> تطابق حرفي كامل مع الحقول الرقمية الحقيقية", async () => {

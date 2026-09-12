@@ -214,4 +214,28 @@ describe("conversation/tools.ts — أدوات القراءة فقط", () => {
     const r = await tools.simulateWhatIf.execute(ctx, {});
     expect(r.found).toBe(false);
   });
+
+  it("calculate_allowed_portion: food_query + الباقي التلقائي (من بروفايل المستخدم) -> رقم حقيقي", async () => {
+    const repo = new InMemoryRepository();
+    const ctx = await buildCtx(repo, makeUser({ id: "u20" }));
+    const r = await tools.calculateAllowedPortion.execute(ctx, { food_query: "رز" });
+    expect(r.found).toBe(true);
+    expect(r.text).toContain("خاشوقة");
+    expect(r.text).toMatch(/\d+/);
+  });
+
+  it("calculate_allowed_portion: remaining_calories صريح -> يتجاوز بروفايل المستخدم", async () => {
+    const repo = new InMemoryRepository();
+    const ctx = await buildCtx(repo, makeUser({ id: "u21" }));
+    const r = await tools.calculateAllowedPortion.execute(ctx, { food_id: riceId, remaining_calories: 100 });
+    expect(r.found).toBe(true);
+    expect(r.text).toContain("100");
+  });
+
+  it("calculate_allowed_portion: food_id مخترع -> found:false", async () => {
+    const repo = new InMemoryRepository();
+    const ctx = await buildCtx(repo, makeUser({ id: "u22" }));
+    const r = await tools.calculateAllowedPortion.execute(ctx, { food_id: 999999 });
+    expect(r.found).toBe(false);
+  });
 });

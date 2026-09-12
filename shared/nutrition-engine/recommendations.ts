@@ -148,6 +148,36 @@ export async function suggestPortionNearTarget(foodId: number, foodName: string,
 }
 
 /**
+ * "اليوم غدانا تمن" (وجبة مخطَّطة، لسا ما صارت) — يحسب عددًا دقيقًا (قسمة صحيحة، صفر تخمين)
+ * من أصغر حصة حقيقية مسجّلة للطعام (خاشوقة للتمن، قطعة للبيتزا...، نمط عام بدون Special-casing
+ * يدوي لكل طعام) يدخل بالسعرات المتبقية — يفرق عن suggestPortionForFood اللي يسرد كل حصة
+ * ويقول تناسب/لا، هذا يعطي رقمًا واحدًا صريحًا قابلًا للعد.
+ */
+export async function suggestPortionCountForRemaining(foodId: number, foodName: string, remainingCalories: number): Promise<string> {
+  const portions = await getPortionsFor(foodId);
+  if (portions.length === 0) {
+    return `ماكو عندي معلومة كمية دقيقة عن ${foodName} بقاعدة البيانات الحالية، بس گلي الوزن بالغرام وأحسبلك السعرات بالضبط.`;
+  }
+  const smallest = portions.reduce((a, b) => (Number(a.grams) <= Number(b.grams) ? a : b));
+  const portionName = (smallest.portion_name as string) || "حصة";
+  const nutrition = await computeFood(foodId, Number(smallest.grams));
+
+  if (remainingCalories <= 0) {
+    return `وصلت لهدفك اليوم فعلاً، فأفضل تأجل ${foodName} لبكرة أو تاخذ كمية رمزية جدًا لو ضروري.`;
+  }
+  if (nutrition.calories <= 0) {
+    return `ماكو عندي بيانات سعرات دقيقة عن ${foodName} حاليًا، گلي الوزن بالغرام وأحسبلك بالضبط.`;
+  }
+
+  const count = Math.floor(remainingCalories / nutrition.calories);
+  if (count <= 0) {
+    return `حتى ${portionName} وحدة من ${foodName} (~${nutrition.calories} kcal) أعلى من الباقي إلك (~${remainingCalories} سعرة) — خل هذي الوجبة أخف أو أجّلها شوي.`;
+  }
+  const totalCalories = count * nutrition.calories;
+  return `باقيلك تقريبًا ${remainingCalories} سعرة، يمديك تاكل لغاية ${count} ${portionName} من ${foodName} (~${totalCalories} سعرة تقريبًا).`;
+}
+
+/**
  * سؤال معلوماتي صرف عن أحجام/سعرات طعام معيّن ("شكد سعرات X؟"/"شكد حجم X؟") — بدون أي افتراض
  * نية أكل أو ربط بالسعرات المتبقية (يفرق عن suggestPortionForFood المخصص لتوصية "شكد آكل؟").
  */
