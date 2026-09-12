@@ -113,14 +113,19 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
     expect(expectedOptions).toContain(r.reply);
   });
 
-  it("'راح اكل تمن' (PLAN_TO_EAT) -> اقتراح كمية حقيقي حسب الباقي إلك (2249 سعرة)، صفر تسجيل", async () => {
+  it("'راح اكل تمن' (PLAN_TO_EAT) -> اقتراح كمية حقيقي حسب ميزانية *الوجبة* (مو كل سعرات اليوم)، صفر تسجيل", async () => {
     // بعد ربط handleFoodTopic("plan") باقتراح كمية فوري (suggestPortionCountForRemaining) — لم
-    // يعد يرجّع قالب ack جامد، يرجّع رقمًا حقيقيًا محسوبًا من foods.sqlite.
+    // يعد يرجّع قالب ack جامد. اكتُشف حي (Browser) إن استخدام *كل* الباقي اليومي لوجبة وحدة يعطي
+    // رقمًا غير منطقي (111 خاشوقة!) — أُصلح بتوزيع الباقي على الوجبات غير المسجَّلة (mealBudget.ts،
+    // منفذ من meal_budget.py) حسب نوع الوجبة المفهوم من الفترة الحالية. now ثابتة هنا (ظهرًا
+    // ببغداد = noon) حتى تكون النية (lunch) والحصة (1086 من 2249) حتميتين لا تعتمدان على وقت التشغيل.
     const user = await freshUser(repo, "g9b");
-    const r = await handleMessage(repo, user, "راح اكل تمن");
+    const noonBaghdad = new Date("2026-01-01T09:00:00Z"); // UTC+3 -> 12:00 ظهرًا
+    const r = await handleMessage(repo, user, "راح اكل تمن", noonBaghdad);
     expect(r.meal_logged).toBe(false);
     expect(r.reply).toContain("تمن (رز)");
-    expect(r.reply).toContain("2249");
+    expect(r.reply).toContain("1086"); // ميزانية الغداء فقط (noon)، مو 2249 (كل سعرات اليوم)
+    expect(r.reply).not.toContain("2249");
     expect(r.reply).toMatch(/يمديك تاكل لغاية \d+ خاشوقة/);
   });
 

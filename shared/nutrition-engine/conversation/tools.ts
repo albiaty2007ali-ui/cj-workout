@@ -17,6 +17,9 @@ import * as recommendationsMod from "../recommendations.js";
 import * as recipeSearchMod from "../recipeSearch.js";
 import { resolveIngredientName } from "../ingredientResolver.js";
 import { scoreRecipesByIngredients, classifyMatchTier, type MentionedFood } from "../recipeMatching.js";
+import * as mealBudgetMod from "../mealBudget.js";
+import { findMealType } from "../mealTypeDetection.js";
+import { getCurrentPeriod, nowBaghdad } from "../iraqTime.js";
 import type { CJTool, ToolExecContext } from "./types.js";
 
 function clamp(n: number, min: number, max: number): number {
@@ -444,9 +447,17 @@ export const calculateAllowedPortion: CJTool<CalculateAllowedPortionArgs, Calcul
 
     let remaining = args?.remaining_calories;
     if (remaining == null) {
+      // حرج: الباقي اليومي الكامل غير منطقي لوجبة وحدة (نفس الاكتشاف الحي اللي أصلح
+      // orchestrator.ts's handleFoodTopic — "111 خاشوقة" لوجبة وحدة). نوزّع بنفس منطق
+      // mealBudget.ts على الوجبات غير المسجَّلة اليوم، حسب نوع الوجبة المفهوم من رسالة المستخدم.
       const profile = await ctx.repo.findNutritionProfile(ctx.user.id);
       const nutritionCtx = await contextMod.build(ctx.repo, ctx.user.id, profile, ctx.now);
-      remaining = nutritionCtx.remaining_calories;
+      const targetMealType = findMealType(ctx.rawText, ctx.now);
+      const { year, month, day } = nowBaghdad(ctx.now);
+      const meals = await calculatorMod.mealsByTypeForDay(ctx.repo, ctx.user.id, year, month, day);
+      const unlogged = (["breakfast", "lunch", "dinner"] as const).filter((m) => meals[m].status === "NOT_STARTED");
+      const budgets = mealBudgetMod.distributeRemainingBudget(Math.max(nutritionCtx.remaining_calories, 0), unlogged, getCurrentPeriod(ctx.now));
+      remaining = budgets[targetMealType] ?? nutritionCtx.remaining_calories;
     }
     const text = await recommendationsMod.suggestPortionCountForRemaining(foodId, foodName, remaining);
     return { found: true, text };

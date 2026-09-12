@@ -30,7 +30,9 @@ import * as tipsEngine from "./tipsEngine.js";
 import * as weightOps from "./weightOps.js";
 import * as xpEngine from "./xpEngine.js";
 import { getPortionsFor } from "./foodSearch.js";
-import { getCurrentPeriod, relevantMealForPeriod, todayBaghdadIso } from "./iraqTime.js";
+import { getCurrentPeriod, nowBaghdad, todayBaghdadIso } from "./iraqTime.js";
+import * as mealBudget from "./mealBudget.js";
+import { explicitMealTypeKeyword, findMealType } from "./mealTypeDetection.js";
 import * as nluConfig from "./nlu/config.js";
 import { NLU_ALLOWED_INTENTS } from "./nlu/knownIntents.js";
 import type { NLUContext } from "./nlu/types.js";
@@ -64,33 +66,9 @@ async function matchRecipeCategoryId(repo: Repository, textNorm: string): Promis
   return null;
 }
 
-const MEAL_KEYWORDS: Record<string, string[]> = {
-  breakfast: ["فطرت", "فطور", "فطرة", "فطرنا"],
-  // ملاحظة: عمدًا ما ضفنا "غدا" (بدون همزة) هنا رغم كونها إملاء عامي شائع لـ"غداء" — نفس الكلمة
-  // حرفيًا تعني "غدًا/بكرة" بالفصحى، وإضافتها substring-match بلا سياق كانت تخلق التباس حقيقي
-  // (مثلاً أي رسالة فيها "غدا" بمعنى tomorrow تنحسب صدفة لمسة "غداء"). "عشا" ماله هالتصادم.
-  lunch: ["تغديت", "تغدينا", "غداء", "غدانا", "غدينا"],
-  // "عشا" (بدون همزة، نفس السبب) — اكتُشفت ناقصة أثناء تصليح شكوى مستخدم حقيقية ("عشا؟" ما كانت تنطابق).
-  dinner: ["عشيت", "عشينا", "عشاء", "عشا", "تعشيت"],
-  snack: ["سناك", "سنك", "وجبة خفيفة"],
-};
-
 const REOPEN_INTENTS = new Set([
   intents.CORRECTION, intents.CHANGE_QUANTITY, intents.REMOVE_FOOD, intents.SWAP_FOOD, intents.ADD_FOOD,
 ]);
-
-function explicitMealTypeKeyword(text: string): string | null {
-  for (const [mealType, keywords] of Object.entries(MEAL_KEYWORDS)) {
-    if (keywords.some((k) => text.includes(k))) return mealType;
-  }
-  return null;
-}
-
-function findMealType(text: string, now: Date): string {
-  const explicit = explicitMealTypeKeyword(text);
-  if (explicit) return explicit;
-  return relevantMealForPeriod(getCurrentPeriod(now));
-}
 
 async function markMealLogged(repo: Repository, user: UserRecord, mealType: string, now: Date): Promise<void> {
   if (mealType !== "breakfast" && mealType !== "lunch" && mealType !== "dinner") return;
@@ -517,12 +495,23 @@ async function handleFoodTopic(repo: Repository, user: UserRecord, textNorm: str
   user.pending_food_topic_json = JSON.stringify({ food_id: foodId, food_name: foodName, kind });
   await repo.saveUser(user);
 
-  // "plan" (وجبة مخطَّطة لليوم، "اليوم غدانا تمن") -> اقتراح كمية فوري حسب الباقي إلك، صفر انتظار
-  // سؤال ثاني ("شكد آكل؟"). "craving" يبقى كما هو (ack بس، ينتظر توضيح لاحق) — خارج نطاق هذا التغيير.
+  // "plan" (وجبة مخطَّطة لليوم، "اليوم غدانا تمن") -> اقتراح كمية فوري، صفر انتظار سؤال ثاني.
+  // "craving" يبقى كما هو (ack بس) — خارج نطاق هذا التغيير.
   if (kind === "plan") {
     const profile = await repo.findNutritionProfile(user.id);
     const ctx = await context.build(repo, user.id, profile, now);
-    const reply = await recommendations.suggestPortionCountForRemaining(foodId, foodName!, ctx.remaining_calories);
+
+    // حرج: الباقي اليومي الكامل غير منطقي لوجبة وحدة (اكتُشف بتحقق حي حقيقي — "اليوم غدانا تمن"
+    // كانت تعطي "111 خاشوقة" لأنها استخدمت كل سعرات اليوم). نوزّع نفس منطق meal_budget.py
+    // المُثبَت أصلًا (يومي الغذائي بالفلاسك) على الوجبات غير المسجَّلة فقط لهذا اليوم بالذات.
+    const targetMealType = findMealType(textNorm, now);
+    const { year, month, day } = nowBaghdad(now);
+    const meals = await calculator.mealsByTypeForDay(repo, user.id, year, month, day);
+    const unloggedMealTypes = (["breakfast", "lunch", "dinner"] as const).filter((m) => meals[m].status === "NOT_STARTED");
+    const budgets = mealBudget.distributeRemainingBudget(Math.max(ctx.remaining_calories, 0), unloggedMealTypes, getCurrentPeriod(now));
+    const mealBudgetCalories = budgets[targetMealType] ?? ctx.remaining_calories; // fallback: الوجبة أصلًا مسجَّلة أو نوع غير معروف
+
+    const reply = await recommendations.suggestPortionCountForRemaining(foodId, foodName!, mealBudgetCalories);
     return { reply, meal_logged: false };
   }
 
