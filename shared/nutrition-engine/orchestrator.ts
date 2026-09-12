@@ -802,6 +802,29 @@ export interface IntentContextFlags {
 }
 
 /** نقطة الدخول الرئيسية — يعادل nutrition_engine.handle_message عبر orchestrator.py. */
+/**
+ * نقطة دخول مصدَّرة لمنطق تسجيل الوجبة الكامل — تُستخدم من أداة log_meal
+ * (conversation/mutationTools.ts) بدل تكرار المنطق. تغطي 3 حالات بنفس أولوية dispatch() الحالية:
+ * (1) pending منتهي (صفر clarifications متبقية) + النص نفسه عبارة تأكيد صريحة -> confirmPending
+ *     (finalizeMeal source="confirmed") — هذي بالضبط الحالة اللي handleMealMessage وحدها لا
+ *     تكفي لها (تعيد عرض الملخص فقط، لا تُنهي الوجبة أبدًا بدون هذا الفرع).
+ * (2) أي حالة ثانية (رسالة جديدة كليًا، أو رد على clarification قائم) -> handleMealMessage، بنفس
+ *     منطقها الداخلي (resolveClarificationItem يتعامل مع "اي"/"لا" لكل clarification بمفرده).
+ * لا تستدعِها إلا بعد أن يتحقق الطالب من intents.isConsumptionAuthorized على النص الخام نفسه.
+ */
+export async function runMealLoggingPipeline(
+  repo: Repository, user: UserRecord, rawText: string, now: Date = new Date(),
+): Promise<DispatchResult> {
+  const textNorm = rawText.trim();
+  const pending = mealState.loadPending(user);
+  if (pending && !hasAnswerableClarification(pending) && intents.CONFIRM_PHRASES.includes(textNorm)) {
+    const profile = await repo.findNutritionProfile(user.id);
+    const target = profile ? profile.calorie_target : 2000;
+    return confirmPending(repo, user, pending, target, now);
+  }
+  return handleMealMessage(repo, user, textNorm, pending, now);
+}
+
 export async function handleMessage(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
   const textNorm = text.trim();
   const profile = await repo.findNutritionProfile(user.id);

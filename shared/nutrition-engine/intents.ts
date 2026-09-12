@@ -369,3 +369,27 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   // افتراضي: نحاول نطابقها كوجبة جديدة (المتصل orchestrator يقرر UNKNOWN إذا ما لقى أكل)
   return LOG_MEAL;
 }
+
+/**
+ * محكّم صلاحية لأداة log_meal ضمن طبقة المحادثة الجديدة (conversation/mutationTools.ts) — راجع
+ * خطة "Gemini-First Conversational AI Rearchitecture" لسبب وجوده. Gemini قد يصبح "الدماغ" لكل
+ * رسالة، لكن قرار "هل هذا استهلاك فعلي؟" يبقى محليًا وحتميًا 100% (detectIntent نفسه، صفر تغيير)
+ * — يُستدعى على النص الخام الأصلي فقط، أبدًا على أي نية/كمية يدّعيها Gemini.
+ *
+ * ملاحظة حرجة (تحقّقت من detectIntent نفسه قبل كتابة هذا): وجود pending **لا يعني تلقائيًا أن
+ * أي رسالة تالية آمنة** — الفرع `if (hasPending)` بالأعلى يفحص فقط عبارات محدّدة (إلغاء/تأكيد/
+ * تصحيح/...)، وأي رسالة ثانية (بما فيها سؤال معلوماتي مثل "شكد حجم البيتزا؟") تكمل لبقية الدالة
+ * وترجع نيتها الحقيقية (ASK_FOOD_SIZE مثلاً) بغض النظر عن pending. لذا الشرط هنا **دقيق**: يصرّح
+ * فقط لـLOG_MEAL/ADD_FOOD (رسالة استهلاك فعلي)، أو CONFIRM **مع pending فعلي موجود تحديدًا**
+ * (has_pending، مو has_pending_recipe/has_pending_food_topic — تينك حالتين مختلفتين تمامًا خارج
+ * نطاق هذه الأداة). أي شي غير هذا (أسئلة/رغبة/نية مستقبلية/CANCEL) يُرفض هيكليًا — بالضبط ما يمنع
+ * تكرار "حادثة البيتزا" حتى لو Gemini بقصور أو تلاعب ادّعى ثقة كاملة بتسجيل وجبة.
+ */
+export function isConsumptionAuthorized(rawText: string, ctx: IntentContext): { authorized: boolean; localIntent: string } {
+  const textNorm = rawText.trim();
+  const localIntent = detectIntent(textNorm, ctx);
+  const authorized =
+    localIntent === LOG_MEAL || localIntent === ADD_FOOD ||
+    (localIntent === CONFIRM && (ctx.has_pending ?? false));
+  return { authorized, localIntent };
+}
