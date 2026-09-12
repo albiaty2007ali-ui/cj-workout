@@ -9,8 +9,8 @@
  * بقصور أو تلاعب ادّعى ثقة كاملة بتسجيل وجبة من سؤال معلوماتي بريء.
  */
 import * as directLog from "../directLog.js";
-import { isConsumptionAuthorized } from "../intents.js";
-import { runMealLoggingPipeline } from "../orchestrator.js";
+import { isConsumptionAuthorized, isWaterLogAuthorized } from "../intents.js";
+import { runMealLoggingPipeline, runWaterLoggingPipeline } from "../orchestrator.js";
 import type { CJTool, ToolExecContext } from "./types.js";
 
 export interface LogMealToolResult {
@@ -40,6 +40,34 @@ export const logMeal: CJTool<Record<string, never>, LogMealToolResult> = {
     }
     const { reply, meal_logged, ...rest } = await runMealLoggingPipeline(ctx.repo, ctx.user, ctx.rawText, ctx.now);
     return { ok: meal_logged === true, meal_logged, local_reply: reply, ...rest };
+  },
+};
+
+export interface LogWaterToolResult {
+  ok: boolean;
+  local_reply: string | null;
+  rejection_reason?: "NOT_A_WATER_STATEMENT";
+  [key: string]: unknown;
+}
+
+export const logWater: CJTool<Record<string, never>, LogWaterToolResult> = {
+  name: "log_water",
+  description:
+    "يسجّل كمية ماي حقيقية شربها المستخدم الآن، بناءً على رسالته الأصلية فقط — لا تستدعِها إلا " +
+    'إذا صرّح فعليًا إنه شرب ماي الآن (مثلاً "شربت 500 مل ماي" أو "شربت كوب ماي")، أبدًا لسؤال ' +
+    "عن كمية الماي الموصى بيها أو نية مستقبلية.",
+  parameters: { type: "OBJECT", properties: {} },
+  mutates: true,
+  async execute(ctx: ToolExecContext): Promise<LogWaterToolResult> {
+    const { authorized } = isWaterLogAuthorized(ctx.rawText, ctx.ctxFlags);
+    if (!authorized) {
+      return { ok: false, local_reply: null, rejection_reason: "NOT_A_WATER_STATEMENT" };
+    }
+    const { reply, meal_logged: _ml, ...rest } = await runWaterLoggingPipeline(ctx.repo, ctx.user, ctx.rawText, ctx.now);
+    // handleWaterLog يرجّع new_milestones فقط بمسار التسجيل الفعلي الناجح — غيابه يعني الرسالة
+    // كانت مصرَّح لها (WATER_LOG) لكن الكمية نفسها غير واضحة (يسأل توضيح، صفر كتابة فعلية).
+    const ok = "new_milestones" in rest;
+    return { ok, local_reply: reply, ...rest };
   },
 };
 

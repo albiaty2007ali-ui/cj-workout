@@ -393,3 +393,9 @@ export function isConsumptionAuthorized(rawText: string, ctx: IntentContext): { 
     (localIntent === CONFIRM && (ctx.has_pending ?? false));
   return { authorized, localIntent };
 }
+
+/** نفس فلسفة isConsumptionAuthorized أعلاه لكن لأداة log_water — يصرّح فقط لـWATER_LOG محليًا. */
+export function isWaterLogAuthorized(rawText: string, ctx: IntentContext): { authorized: boolean; localIntent: string } {
+  const localIntent = detectIntent(rawText.trim(), ctx);
+  return { authorized: localIntent === WATER_LOG, localIntent };
+}

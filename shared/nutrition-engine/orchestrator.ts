@@ -857,8 +857,18 @@ async function runLocalPipeline(repo: Repository, user: UserRecord, text: string
   return dispatch(repo, user, textNorm, intent, pending, target, now, nluFoodQuery);
 }
 
+/**
+ * نقطة دخول مصدَّرة لتسجيل الماي — تُستخدم من أداة log_water (conversation/mutationTools.ts).
+ * لا تستدعِها إلا بعد أن يتحقق الطالب من intents.isWaterLogAuthorized على النص الخام نفسه.
+ */
+export async function runWaterLoggingPipeline(
+  repo: Repository, user: UserRecord, rawText: string, now: Date = new Date(),
+): Promise<DispatchResult> {
+  return handleWaterLog(repo, user, rawText.trim(), now);
+}
+
 const ALL_CONVERSATION_TOOLS: conversationTypes.CJTool<any, any>[] = [
-  ...conversationTools.READ_ONLY_TOOLS, mutationTools.logMeal, mutationTools.undoLastMeal,
+  ...conversationTools.READ_ONLY_TOOLS, mutationTools.logMeal, mutationTools.undoLastMeal, mutationTools.logWater,
 ];
 
 /** يبني ChatReply من نتيجة أداة (لو موجودة) — الحقول العددية تجي حرفيًا من الأداة، Gemini يؤثر فقط على reply. */

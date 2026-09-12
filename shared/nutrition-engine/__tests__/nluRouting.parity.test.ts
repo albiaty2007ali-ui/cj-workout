@@ -3,6 +3,13 @@
  * مزيّف عبر setNluProviderForTesting، نفس نمط dependency injection). الاختبار الأهم بكل هذا
  * الملف هو "شرّير يدّعي LOG_MEAL" — يثبت إن الحماية بنيوية (NLU_ALLOWED_INTENTS)، مو مجرد وعد
  * بالـsystem prompt، وإن Gemini ما يقدر يسجّل وجبة بأي حال مهما ادّعى.
+ *
+ * ملاحظة (مرحلة "Gemini-First Conversational AI" اللاحقة): هذا الملف يبقى كما هو تمامًا —
+ * نطاقه أصبح تحديدًا "المسار القديم الضيق (resolveIntentViaNlu، يعمل فقط لما GEMINI_CONVERSATIONAL_
+ * MODE=OFF وGEMINI_NLU_ENABLED=true معًا)"، مو الطبقة الجديدة. نظير "المزوّد الشرّير" لهذا
+ * الاختبار بالطبقة الجديدة موجود بـ__tests__/conversation/{mutationTools,brain,orchestratorModes,
+ * acceptanceCorpus}.test.ts — يغطي نفس الضمانة (Gemini ما يقدر يسجّل وجبة أبدًا) لكن عبر آلية
+ * جديدة (isConsumptionAuthorized على أداة log_meal) بدل NLU_ALLOWED_INTENTS القديمة.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { InMemoryRepository, DEFAULT_MILESTONES } from "../db/inMemoryRepository.js";

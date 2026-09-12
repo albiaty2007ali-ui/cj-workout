@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import { InMemoryRepository } from "../../db/inMemoryRepository.js";
 import { makeUser } from "../testHelpers.js";
 import * as mealState from "../../mealState.js";
-import { logMeal, undoLastMeal } from "../../conversation/mutationTools.js";
+import { logMeal, logWater, undoLastMeal } from "../../conversation/mutationTools.js";
 import type { ToolExecContext } from "../../conversation/types.js";
 import type { NutritionProfileRecord, UserRecord } from "../../db/repository.js";
 
@@ -164,5 +164,33 @@ describe("undo_last_meal", () => {
     const r = await undoLastMeal.execute(ctxFor(repo, user, "لا"), {});
     expect(r.meal_logged).toBe(false);
     expect(typeof r.reply).toBe("string");
+  });
+});
+
+describe("log_water", () => {
+  it("'شربت 500 مل ماي' -> ok:true، WaterLog حقيقي واحد", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "water1");
+    const r = await logWater.execute(ctxFor(repo, user, "شربت 500 مل ماي"), {});
+    expect(r.ok).toBe(true);
+    expect(await repo.countWaterLogsForUser(user.id)).toBe(1);
+  });
+
+  it("'اكلت بيضتين' (رسالة أكل، مالها علاقة بالماي) -> ok:false، صفر WaterLog", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "water2");
+    const r = await logWater.execute(ctxFor(repo, user, "اكلت بيضتين"), {});
+    expect(r.ok).toBe(false);
+    expect(r.rejection_reason).toBe("NOT_A_WATER_STATEMENT");
+    expect(await repo.countWaterLogsForUser(user.id)).toBe(0);
+  });
+
+  it("'شربت ماي' بدون كمية واضحة -> ok:false (يسأل توضيح)، صفر WaterLog", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "water3");
+    const r = await logWater.execute(ctxFor(repo, user, "شربت ماي هسه"), {});
+    expect(r.ok).toBe(false);
+    expect(await repo.countWaterLogsForUser(user.id)).toBe(0);
+    expect(typeof r.local_reply).toBe("string");
   });
 });
