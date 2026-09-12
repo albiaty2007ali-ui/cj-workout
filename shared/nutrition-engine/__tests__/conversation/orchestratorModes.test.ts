@@ -43,6 +43,48 @@ afterEach(() => {
   resetConversationProviderForTesting();
 });
 
+/** يسجّل كل سياق استُدعي فيه decide() — يسمح نتحقق شنو "شاف" Gemini بالدورة الثانية فعليًا. */
+class QueuedSpyProvider implements ConversationProvider {
+  public seenContexts: ConversationTurnContext[] = [];
+  private queue: ConversationDecision[];
+  constructor(decisions: ConversationDecision[], private finalText: string | ((toolResult: unknown) => string) = "رد") {
+    this.queue = [...decisions];
+  }
+  async decide(_raw: string, ctx: ConversationTurnContext): Promise<ConversationDecision | null> {
+    this.seenContexts.push(ctx);
+    return this.queue.shift() ?? null;
+  }
+  async finalize(_raw: string, _ctx: ConversationTurnContext, _decision: ToolCallDecision, toolResult: unknown): Promise<string | null> {
+    return typeof this.finalText === "function" ? this.finalText(toolResult) : this.finalText;
+  }
+}
+
+describe("handleMessage — ذاكرة المحادثة (المرحلة 5) تعبر رسائل منفصلة فعليًا", () => {
+  it("رسالة ثانية تشوف آخر أداة استُدعيت وrecent_turns من الرسالة الأولى", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "mem1");
+    setConversationalModeForTesting("ACTIVE");
+    const spy = new QueuedSpyProvider([
+      { kind: "tool_call", toolName: "get_food_nutrition", toolArgs: { food_query: "رز", grams: 100 } },
+      { kind: "text", text: "تمام" },
+    ], (toolResult) => `الرز فيه ${(toolResult as { calories: number }).calories} سعرة`);
+    setConversationProviderForTesting(spy);
+
+    const first = await handleMessage(repo, user, "شكد سعرات الرز؟");
+    expect(first.reply).toContain("سعرة");
+    expect(spy.seenContexts).toHaveLength(1);
+    expect(spy.seenContexts[0].conversation_state.active_food).toBeNull(); // أول رسالة، صفر ذاكرة بعد
+
+    const reloadedUser = (await repo.findUser(user.id))!;
+    await handleMessage(repo, reloadedUser, "وإذا ثنتين؟");
+    expect(spy.seenContexts).toHaveLength(2);
+    // الرسالة الثانية لازم تشوف الطعام المطروح بالأولى + نص الدورين السابقين
+    expect(spy.seenContexts[1].conversation_state.active_food?.food_id).toBe(8);
+    expect(spy.seenContexts[1].recent_turns.some((t) => t.text === "شكد سعرات الرز؟")).toBe(true);
+    expect(spy.seenContexts[1].recent_turns.some((t) => t.text.includes("سعرة"))).toBe(true);
+  });
+});
+
 describe("handleMessage — وضع OFF (الافتراضي)", () => {
   it("صفر استدعاء لأي مزوّد — نفس المسار المحلي حرفيًا حتى مع مزوّد مضبوط", async () => {
     const repo = new InMemoryRepository();

@@ -42,6 +42,7 @@ import * as brain from "./conversation/brain.js";
 import * as conversationConfig from "./conversation/config.js";
 import * as conversationTools from "./conversation/tools.js";
 import * as mutationTools from "./conversation/mutationTools.js";
+import * as stateStore from "./conversation/stateStore.js";
 import type * as conversationTypes from "./conversation/types.js";
 
 // كلمات تصنيف تُمرَّر مباشرة لـrecipeSearch بدل بحث نصي حر — نفس عبارات
@@ -860,10 +861,6 @@ const ALL_CONVERSATION_TOOLS: conversationTypes.CJTool<any, any>[] = [
   ...conversationTools.READ_ONLY_TOOLS, mutationTools.logMeal, mutationTools.undoLastMeal,
 ];
 
-const EMPTY_CONVERSATION_STATE: conversationTypes.ConversationState = {
-  active_food: null, active_intent: null, target_calories: null, awaiting: null, last_tool_calls: [],
-};
-
 /** يبني ChatReply من نتيجة أداة (لو موجودة) — الحقول العددية تجي حرفيًا من الأداة، Gemini يؤثر فقط على reply. */
 function assembleActiveResult(outcome: brain.ConversationalTurnOutcome): DispatchResult {
   const reply = outcome.reply ?? null;
@@ -901,20 +898,30 @@ export async function handleMessage(repo: Repository, user: UserRecord, text: st
   const profile = await repo.findNutritionProfile(user.id);
   const nutritionCtx = await context.build(repo, user.id, profile, now);
 
+  const conversationState = stateStore.loadConversationState(user);
   const execCtx: conversationTypes.ToolExecContext = { repo, user, rawText: textNorm, ctxFlags, now };
   const turnCtx: conversationTypes.ConversationTurnContext = {
     current_time_iraq: getCurrentPeriod(now),
     remaining_calories: profile ? nutritionCtx.remaining_calories : null,
     target_calories: profile ? nutritionCtx.target_calories : null,
     goal: profile ? nutritionCtx.goal : null,
-    conversation_state: EMPTY_CONVERSATION_STATE, // ذاكرة المحادثة الحقيقية بالمرحلة 5
-    recent_turns: [],
+    conversation_state: conversationState,
+    recent_turns: conversationState.recent_turns,
   };
 
   const provider = conversationConfig.getConversationProvider();
   const outcome = await brain.runConversationalTurn(provider, execCtx, turnCtx, ALL_CONVERSATION_TOOLS, {
     dryRunMutations: mode === "SHADOW",
   });
+
+  // ذاكرة المحادثة تُحدَّث وتُحفَظ سواء SHADOW أو ACTIVE (بيانات وصفية بحتة، صفر تأثير على أي
+  // تحوّر) — حتى لو المستخدم بدّل لاحقًا لوضع ACTIVE، آخر أدوار SHADOW تبقى مفيدة كسياق.
+  if (outcome.handled) {
+    const nextState = stateStore.nextConversationState(
+      conversationState, textNorm, outcome.reply ?? null, outcome.toolUsed, undefined, outcome.toolResult,
+    );
+    await stateStore.saveConversationState(repo, user, nextState);
+  }
 
   if (mode === "SHADOW") {
     console.log("[conversation]", JSON.stringify({

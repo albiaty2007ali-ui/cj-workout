@@ -29,6 +29,10 @@ export interface UserRecord {
    *  (streaks.ts)، يُستهلَك صراحة عبر streakFreeze.ts، أبدًا تلقائيًا. حد أقصى موثَّق (راجع
    *  streakFreeze.MAX_STREAK_FREEZE_BALANCE) — صفر تراكم لا نهائي. */
   streak_freeze_balance: number;
+  /** حالة محادثة Gemini-First مركّبة (conversation/types.ts's ConversationState، JSON-serialized) —
+   *  نفس نمط pending_food_topic_json/last_direct_log_json تمامًا. null قبل أول رسالة بوضع
+   *  SHADOW/ACTIVE، أو لأي مستخدم لم يستخدم هذا الوضع إطلاقًا. */
+  conversation_state_json: string | null;
 }
 
 export interface XpTransactionInput {

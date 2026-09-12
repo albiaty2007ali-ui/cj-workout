@@ -31,7 +31,7 @@ function execCtxFor(repo: InMemoryRepository, user: UserRecord, rawText: string)
   return { repo, user, rawText, ctxFlags: {}, now: new Date() };
 }
 
-const EMPTY_STATE: ConversationState = { active_food: null, active_intent: null, target_calories: null, awaiting: null, last_tool_calls: [] };
+const EMPTY_STATE: ConversationState = { active_food: null, active_intent: null, target_calories: null, awaiting: null, last_tool_calls: [], recent_turns: [] };
 
 function turnCtx(): ConversationTurnContext {
   return { current_time_iraq: "afternoon", remaining_calories: 1000, target_calories: 2249, goal: "lose", conversation_state: EMPTY_STATE, recent_turns: [] };

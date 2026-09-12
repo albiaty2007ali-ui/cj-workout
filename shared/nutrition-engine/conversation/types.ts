@@ -26,13 +26,16 @@ export interface CJTool<TArgs = Record<string, unknown>, TResult = unknown> {
   execute(ctx: ToolExecContext, args: TArgs): Promise<TResult>;
 }
 
-/** حالة محادثة مركّبة قصيرة (المرحلة 5) — لا تُستخدم قبلها، معرّفة هنا مسبقًا لثبات الشكل. */
+/** حالة محادثة مركّبة، تُحفَظ فعليًا بـUserRecord.conversation_state_json (المرحلة 5). */
 export interface ConversationState {
   active_food: { food_id: number; food_name: string } | null;
   active_intent: string | null;
   target_calories: number | null;
   awaiting: "quantity" | "confirmation" | "target_calories" | null;
   last_tool_calls: { tool: string; args_summary: string; result_summary: string }[];
+  /** آخر 3 أدوار محادثة كحد أقصى (مستخدم+نموذج) — هذا ما يخلي متابعات قصيرة مثل "وإذا ثنتين؟"
+   *  أو "500" (بعد "مشتهي دولمة") مفهومة لـGemini بدون إعادة سؤال المستخدم. */
+  recent_turns: { role: "user" | "model"; text: string }[];
 }
 
 export type ConversationalMode = "OFF" | "SHADOW" | "ACTIVE";

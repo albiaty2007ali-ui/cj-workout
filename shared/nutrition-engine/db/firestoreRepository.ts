@@ -97,6 +97,7 @@ export class FirestoreRepository implements Repository {
       pending_meal_json: d.pending_meal_json ?? null, last_direct_log_json: d.last_direct_log_json ?? null,
       ai_response_style: d.ai_response_style ?? "balanced",
       streak_freeze_balance: d.streak_freeze_balance ?? 0,
+      conversation_state_json: d.conversation_state_json ?? null,
     };
   }
 
@@ -110,6 +111,7 @@ export class FirestoreRepository implements Repository {
       pending_food_topic_json: user.pending_food_topic_json, pending_meal_json: user.pending_meal_json,
       last_direct_log_json: user.last_direct_log_json, ai_response_style: user.ai_response_style,
       streak_freeze_balance: user.streak_freeze_balance,
+      conversation_state_json: user.conversation_state_json,
       updated_at: FieldValue.serverTimestamp(),
     }, { merge: true });
   }
