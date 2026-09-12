@@ -131,6 +131,13 @@ export const CRAVING_MARKERS = ["مشتهي", "مشتهية", "نفسي ب", "ن
 // نية مستقبلية صريحة بالأكل — مو استهلاك فعلي، ما يسجّل وجبة أبدًا (يفرق جوهري عن "اكلت دولمة")
 export const PLAN_TO_EAT_MARKERS = ["راح آكل", "راح اكل", "ناوي آكل", "ناوي اكل", "بروح آكل", "بروح اكل"];
 
+// وجبة مخطَّطة بصيغة اسمية ("اليوم غدانا تمن"، "باجر عشانه كباب") — لا فعل ماضي فيها إطلاقًا،
+// بعكس "تغديت تمن"/"عشيت كباب" (بالفعل بـCONSUMPTION_VERB_HINTS، تبقى LOG_MEAL كما هي). كانت
+// هذي الصيغة تسقط سابقًا للافتراضي LOG_MEAL (Bug حقيقي — كانت تسجّل الوجبة كأنها أُكلت فعلاً).
+// MEAL_TYPE_WORDS نفسها تكفي (تحتوي "غدا"/"عشا" كسلسلة فرعية ضمن "غدانا"/"عشانه" تلقائيًا)، بس
+// نطلب أيضًا إشارة زمن يومي حتى ما تنعامل أي جملة عابرة تذكر "غداء" كنية مخطَّطة بالغلط.
+export const PLAN_TO_EAT_DAY_MARKERS = ["اليوم", "باجر", "بكرة", "بكره"];
+
 // سؤال عن كمية مناسبة لطعام محدد (وليس "شكد أكلت؟" التوضيحي لوجبة قيد التسجيل) — يُفحص بأولوية
 // أعلى من CRAVING_MARKERS/PLAN_TO_EAT_MARKERS حتى رسالة مركّبة متل "مشتهي دولمه شكد لازم اكل؟"
 // تروح لتوصية الكمية مباشرة، مو لرد اشتهاء عام بس.
@@ -346,6 +353,12 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   if (includesAny(textNorm, PORTION_QUESTION_MARKERS)) return ASK_PORTION_FOR_FOOD;
   if (includesAny(textNorm, CRAVING_MARKERS)) return EXPRESS_CRAVING;
   if (includesAny(textNorm, PLAN_TO_EAT_MARKERS)) return PLAN_TO_EAT;
+  if (
+    includesAny(textNorm, PLAN_TO_EAT_DAY_MARKERS) && includesAny(textNorm, MEAL_TYPE_WORDS) &&
+    !hasConsumptionHint(textNorm) && !looksLikeQuestion(textNorm)
+  ) {
+    return PLAN_TO_EAT;
+  }
 
   if (!hasPending && includesAny(textNorm, ADD_FOOD_PHRASES)) return ADD_FOOD;
 

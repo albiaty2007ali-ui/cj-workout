@@ -14,6 +14,26 @@ describe("detectIntent — تكافؤ حرفي مع Python (قيم حقيقية 
     expect(detectIntent(norm("راح اكل دولمة"), {})).toBe("PLAN_TO_EAT");
   });
 
+  it("'اليوم غدانا تمن' -> PLAN_TO_EAT (صيغة اسمية بدون فعل ماضي — Bug حقيقي كانت تسقط لـLOG_MEAL)", () => {
+    expect(detectIntent(norm("اليوم غدانا تمن"), {})).toBe("PLAN_TO_EAT");
+  });
+
+  it("'باجر عشانه كباب' -> PLAN_TO_EAT (نفس النمط، 'باجر' بدل 'اليوم')", () => {
+    expect(detectIntent(norm("باجر عشانه كباب"), {})).toBe("PLAN_TO_EAT");
+  });
+
+  it("'تغديت تمن' -> LOG_MEAL (فعل ماضي صريح، استهلاك فعلي حقيقي — صفر Regression)", () => {
+    expect(detectIntent(norm("تغديت تمن"), {})).toBe("LOG_MEAL");
+  });
+
+  it("'اليوم عشيت كباب' -> LOG_MEAL (فعل ماضي 'عشيت' رغم وجود 'اليوم' — صفر Regression)", () => {
+    expect(detectIntent(norm("اليوم عشيت كباب"), {})).toBe("LOG_MEAL");
+  });
+
+  it("'اليوم الغدا شنو؟' (سؤال، مالها نية مخطَّطة) -> أي شي إلا PLAN_TO_EAT", () => {
+    expect(detectIntent(norm("اليوم الغدا شنو؟"), {})).not.toBe("PLAN_TO_EAT");
+  });
+
   it("'مشتهي دولمة' -> EXPRESS_CRAVING (مو ASK_RECIPE — باگ الفازي ماتش الأصلي)", () => {
     expect(detectIntent(norm("مشتهي دولمة"), {})).toBe("EXPRESS_CRAVING");
   });
