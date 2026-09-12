@@ -874,19 +874,23 @@ const ALL_CONVERSATION_TOOLS: conversationTypes.CJTool<any, any>[] = [
 /** يبني ChatReply من نتيجة أداة (لو موجودة) — الحقول العددية تجي حرفيًا من الأداة، Gemini يؤثر فقط على reply. */
 function assembleActiveResult(outcome: brain.ConversationalTurnOutcome): DispatchResult {
   const reply = outcome.reply ?? null;
+  // علامة داخلية بحتة (تُحذَف قبل jsonOk بـchat.mts) — نص reply هنا صيغة Gemini الطبيعية
+  // أصلًا، فتمريره لـprovider.rephrase() ثانيةً (تنويع الجملة فقط) نداء Gemini إضافي زائد
+  // بلا فائدة حقيقية، وربما يغيّر معنى صاغه Gemini نفسه بقصد.
+  const _composed_by_gemini = true;
   if (!outcome.toolResult || typeof outcome.toolResult !== "object") {
-    return { reply, meal_logged: false };
+    return { reply, meal_logged: false, _composed_by_gemini };
   }
   const tr = outcome.toolResult as Record<string, unknown>;
   if ("meal_logged" in tr) {
     // نتيجة أداة تحوّر (log_meal/undo) — كل الحقول العددية حرفيًا منها، reply فقط من Gemini
     const { local_reply: _lr, ok: _ok, rejection_reason: _rr, ...rest } = tr as Record<string, unknown>;
-    return { ...rest, reply, meal_logged: Boolean(tr.meal_logged) } as DispatchResult;
+    return { ...rest, reply, meal_logged: Boolean(tr.meal_logged), _composed_by_gemini } as DispatchResult;
   }
   // نتيجة أداة قراءة — لو فيها وصفة حقيقية (recipe/recipes[0])، نعبّئ suggested_recipe للواجهة
   const recipeCandidate = (tr.recipe as { id?: string } | undefined) ?? (Array.isArray(tr.recipes) ? tr.recipes[0] : undefined);
   const suggested_recipe = recipeCandidate && typeof recipeCandidate === "object" && "id" in recipeCandidate ? recipeCandidate : null;
-  return { reply, meal_logged: false, suggested_recipe };
+  return { reply, meal_logged: false, suggested_recipe, _composed_by_gemini };
 }
 
 export async function handleMessage(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {

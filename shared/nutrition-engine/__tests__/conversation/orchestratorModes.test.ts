@@ -190,4 +190,31 @@ describe("handleMessage — وضع ACTIVE", () => {
     expect(r.meal_logged).toBe(true);
     expect(await repo.countMealLogsForUser(user.id)).toBe(1); // مرة وحدة فقط، صفر تسجيل مضاعف
   });
+
+  it("علامة _composed_by_gemini الداخلية موجودة (chat.mts يستخدمها لتخطي rephrase الزائد)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "active7");
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider({ kind: "text", text: "هلا" }));
+    const r = await handleMessage(repo, user, "هلا");
+    expect((r as { _composed_by_gemini?: boolean })._composed_by_gemini).toBe(true);
+  });
+});
+
+describe("handleMessage — علامة _composed_by_gemini غائبة خارج ACTIVE", () => {
+  it("OFF: صفر علامة _composed_by_gemini", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "marker-off");
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect((r as { _composed_by_gemini?: boolean })._composed_by_gemini).toBeUndefined();
+  });
+
+  it("SHADOW: صفر علامة _composed_by_gemini (الرد من المسار المحلي)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "marker-shadow");
+    setConversationalModeForTesting("SHADOW");
+    setConversationProviderForTesting(new ScriptedProvider({ kind: "text", text: "رد Gemini المحاكى" }));
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect((r as { _composed_by_gemini?: boolean })._composed_by_gemini).toBeUndefined();
+  });
 });

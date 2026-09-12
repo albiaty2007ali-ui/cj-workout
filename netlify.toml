@@ -14,6 +14,16 @@
   # وقت التشغيل (بنية مجلدات الحزمة النهائية بعد esbuild غير مضمونة سلفًا بدون تجربة حية).
   included_files = ["data/database/foods.sqlite", "node_modules/sql.js/dist/sql-wasm.wasm"]
 
+# GEMINI_CONVERSATIONAL_MODE=ACTIVE (راجع AI_ARCHITECTURE.md قسم "Gemini-First") يضيف حتى نداءين
+# متسلسلين لـGemini بطلب /api/chat الواحد. قياس فعلي حقيقي (مو نظري) أظهر: الحالة الدافئة
+# ~1.5 ثانية إجمالًا، لكن حالة واحدة باردة (Cold call) وصلت 8.4 ثانية لنداء finalize() لوحده —
+# قريب جدًا من سقف Netlify الافتراضي لدالة متزامنة (10 ثواني بالخطة المجانية/Starter). الكود
+# نفسه يتحمّل هذا (Timeout داخلي 5s/4s لكل نداء + سقوط آمن لمسار محلي)، لكن لو لوحظت أخطاء
+# Timeout حقيقية بالإنتاج بعد تفعيل ACTIVE، الحل هو تمديد صريح هنا (يحتاج خطة Netlify مدفوعة —
+# قرار Tier/تكلفة منفصل، لا يُفعَّل تلقائيًا):
+# [functions."chat"]
+#   timeout = 26
+
 # يخفي شكل /.netlify/functions/xxx عن الواجهة — نفس توصية الطلب الأصلي (API نظيفة /api/...)
 [[redirects]]
   from = "/api/chat"

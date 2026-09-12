@@ -51,20 +51,26 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     // صياغة اختيارية عبر Gemini — لا تلمس أي رقم، فقط تنويع الجملة. تُتخطى بأمان بدون
     // GEMINI_API_KEY (getProvider() ترجع NullAIProvider)، ولا ترمي أبدًا ولا تعطّل الرد الأصلي.
+    // تُتخطى أيضًا صراحة لو الرد أصلًا صادر من طبقة المحادثة الجديدة (GEMINI_CONVERSATIONAL_
+    // MODE=ACTIVE، علامة _composed_by_gemini) — نداء Gemini ثانٍ لتنويع نص Gemini نفسه زائد
+    // بلا فائدة (تكلفة/زمن إضافي مجانًا)، راجع orchestrator.ts's assembleActiveResult.
+    const composedByGemini = Boolean((result as { _composed_by_gemini?: boolean })._composed_by_gemini);
+    delete (result as { _composed_by_gemini?: boolean })._composed_by_gemini;
     const provider = getProvider();
-    if (result.reply && provider.isAvailable()) {
+    if (!composedByGemini && result.reply && provider.isAvailable()) {
       const rephrased = await provider.rephrase(result.reply, { kind: result.meal_logged ? "meal_logged" : "chat_reply" });
       if (rephrased) result.reply = rephrased;
     }
 
     // Push حقيقي لأي محطة Streak جديدة — Best-effort دائمًا (sendNotification لا ترمي، ولا تؤخر
-    // إرسال رد الشات نفسه لو فشلت). Event-driven هنا، عمدًا بدون انتظار Scheduled Function.
+    // إرسال رد الشات نفسه لو فشلت). await عمدًا (مو fire-and-forget) — بيئة Serverless ما تضمن
+    // إكمال عمل بالخلفية بعد رجوع الاستجابة (قرار مقصود من قبل، لم يُعاد النظر فيه بمرحلة
+    // Gemini-First: هذا الفرع نادر أصلًا — يعمل فقط عند عبور محطة Streak حقيقية، مو بكل رسالة —
+    // فتكلفته الزمنية على الحالة الشائعة صفرية، وسلامة تسليم الـPush أهم من توفير ms نادرة).
     const newMilestones = result.new_milestones as NewMilestone[] | undefined;
     if (newMilestones && newMilestones.length > 0) {
       const db = getFirestore(getFirebaseApp());
       for (const m of newMilestones) {
-        // await عمدًا (مو fire-and-forget) — بيئة Serverless ما تضمن إكمال عمل بالخلفية بعد
-        // رجوع الاستجابة؛ sendNotification نفسها لا ترمي أبدًا فما تؤخر الرد بفشل غير متوقع.
         await sendNotification(db, claims.sub, "STREAK", `streak_${m.days}`, "/profile", "🔥 محطة جديدة!", `${m.label} — +${m.xp_reward} XP`);
       }
     }
