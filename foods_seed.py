@@ -129,7 +129,14 @@ FOODS_SEED = [
     {
         "name": "كبة", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 250, "protein": 9, "carbs": 28, "fat": 11, "fiber": 1.5},
-        "aliases": [{"text": "كبة", "multiplier": 1}],
+        # أسماء أنواع كبة شائعة (موصل/حلب/حامض/سراي/برغل) تختلف بطريقة التحضير أكثر من فرق غذائي
+        # جوهري موثَّق — تُربط كـaliases لنفس الطعام العام بدل اختراع بيانات غذائية منفصلة لكل نوع
+        "aliases": [
+            {"text": "كبة", "multiplier": 1}, {"text": "كبة موصل", "multiplier": 1},
+            {"text": "كبة الموصل", "multiplier": 1}, {"text": "كبة حلب", "multiplier": 1},
+            {"text": "كبة حامض", "multiplier": 1}, {"text": "كبة سراي", "multiplier": 1},
+            {"text": "كبة برغل", "multiplier": 1},
+        ],
         "portions": [{"name": "حبة", "grams": 120}],
     },
     {
@@ -207,7 +214,7 @@ FOODS_SEED = [
     {
         "name": "شاورما", "category": "وجبات سريعة", "is_bulk": False,
         "nutrients_per_100g": {"calories": 250, "protein": 12, "carbs": 22, "fat": 12, "fiber": 1.5},
-        "aliases": [{"text": "شاورما", "multiplier": 1}],
+        "aliases": [{"text": "شاورما", "multiplier": 1}, {"text": "كص", "multiplier": 1}],
         "portions": [{"name": "لفة", "grams": 220}],
     },
     {
@@ -309,5 +316,104 @@ FOODS_SEED = [
         "nutrients_per_100g": {"calories": 546, "protein": 5, "carbs": 60, "fat": 31, "fiber": 3.4},
         "aliases": [{"text": "شوكولاتة", "multiplier": 1}, {"text": "شوكلاته", "multiplier": 1}],
         "portions": [{"name": "قطعة متوسطة", "grams": 40}],
+    },
+
+    # ==================== إضافات لاحقة (تُضاف هنا فقط، بآخر القائمة — صفر إدراج بالنص/إعادة
+    # ترتيب، حتى تبقى food_id لكل الأطعمة أعلاه ثابتة؛ راجع scripts/import_foods.py) ====================
+
+    # ---------------- أنواع بيتزا حقيقية (بدل "بيتزا" العامة وحدها، food_id=32 أعلاه صفر تعديل) ----------------
+    {
+        "name": "بيتزا لحم", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 273, "protein": 13, "carbs": 28, "fat": 15, "fiber": 2},
+        "aliases": [{"text": "بيتزا لحم", "multiplier": 1}, {"text": "بيتزا باللحم", "multiplier": 1}],
+        "portions": [{"name": "قطعة", "grams": 110}],
+    },
+    {
+        "name": "بيتزا دجاج", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 223, "protein": 14, "carbs": 26, "fat": 9, "fiber": 2},
+        "aliases": [{"text": "بيتزا دجاج", "multiplier": 1}, {"text": "بيتزا بالدجاج", "multiplier": 1}, {"text": "بيتزا باربكيو", "multiplier": 1}],
+        "portions": [{"name": "قطعة", "grams": 110}],
+    },
+    {
+        "name": "بيتزا خضار", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 177, "protein": 8, "carbs": 26, "fat": 7, "fiber": 3},
+        "aliases": [{"text": "بيتزا خضار", "multiplier": 1}, {"text": "بيتزا نباتية", "multiplier": 1}],
+        "portions": [{"name": "قطعة", "grams": 110}],
+    },
+    {
+        "name": "بيتزا مارگريتا", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 245, "protein": 12, "carbs": 30, "fat": 11, "fiber": 2},
+        "aliases": [
+            {"text": "بيتزا مارگريتا", "multiplier": 1}, {"text": "بيتزا مارغريتا", "multiplier": 1},
+            {"text": "بيتزا اجبان", "multiplier": 1}, {"text": "بيتزا أجبان", "multiplier": 1},
+        ],
+        "portions": [{"name": "قطعة", "grams": 110}],
+    },
+    {
+        "name": "بيتزا ببروني", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 282, "protein": 13, "carbs": 27, "fat": 17, "fiber": 2},
+        "aliases": [{"text": "بيتزا ببروني", "multiplier": 1}, {"text": "بيتزا پيبروني", "multiplier": 1}],
+        "portions": [{"name": "قطعة", "grams": 110}],
+    },
+
+    # ---------------- خضار خام ناقصة (اكتُشفت أثناء إضافة "تبسي باذنجان": بدونها، بحث "باذنجان"
+    # المجرد كان يتطابق ضبابيًا مع اسم الطبق المطبوخ بدل ما يبقى صفر تطابق — إضافة الخضار الخام
+    # نفسها هو الحل الصحيح دلاليًا، مو Workaround) ----------------
+    {
+        "name": "باذنجان", "category": "خضار", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 25, "protein": 1, "carbs": 6, "fat": 0.2, "fiber": 3},
+        "aliases": [{"text": "باذنجان", "multiplier": 1}, {"text": "بادنجان", "multiplier": 1}],
+        "portions": [{"name": "حبة", "grams": 200}],
+    },
+
+    # ---------------- أكلات عراقية جديدة فعليًا (تأكدت مباشرة إن البقية — دولمة/تشريب/قوزي/مسكوف/
+    # باجة/برياني/كباب/شاورما/صمون/خبز عربي/قيمر — موجودة أصلًا أعلاه، صفر تكرار) ----------------
+    {
+        "name": "تبسي باذنجان", "category": "أكلات عراقية", "is_bulk": True,
+        "nutrients_per_100g": {"calories": 180, "protein": 7, "carbs": 12, "fat": 12, "fiber": 2.5},
+        "aliases": [{"text": "تبسي باذنجان", "multiplier": 1}, {"text": "تبسي بادنجان", "multiplier": 1}, {"text": "باذنجان بالفرن", "multiplier": 1}],
+        "portions": [{"name": "ماعون صغير", "grams": 300}, {"name": "ماعون متوسط", "grams": 375}, {"name": "ماعون كبير", "grams": 450}],
+    },
+    {
+        "name": "بورك", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 280, "protein": 9, "carbs": 25, "fat": 17, "fiber": 1.5},
+        "aliases": [{"text": "بورك", "multiplier": 1}, {"text": "بوركة", "multiplier": 1}, {"text": "بوريك", "multiplier": 1}],
+        "portions": [{"name": "قطعة", "grams": 50}],
+    },
+    {
+        "name": "مخلمة", "category": "إفطار عراقي", "is_bulk": True,
+        "nutrients_per_100g": {"calories": 150, "protein": 9, "carbs": 5, "fat": 10, "fiber": 1},
+        "aliases": [{"text": "مخلمة", "multiplier": 1}, {"text": "مخلمه", "multiplier": 1}],
+        "portions": [{"name": "خاشوقة", "grams": 25}, {"name": "ماعون صغير", "grams": 150}, {"name": "ماعون كبير", "grams": 250}],
+    },
+    {
+        "name": "حنينة", "category": "إفطار عراقي", "is_bulk": True,
+        "nutrients_per_100g": {"calories": 320, "protein": 4, "carbs": 55, "fat": 10, "fiber": 3},
+        "aliases": [{"text": "حنينة", "multiplier": 1}, {"text": "حنينه", "multiplier": 1}],
+        "portions": [{"name": "خاشوقة", "grams": 25}, {"name": "ماعون صغير", "grams": 100}],
+    },
+    {
+        "name": "باسترمة", "category": "لحوم", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 250, "protein": 28, "carbs": 2, "fat": 15, "fiber": 0},
+        "aliases": [{"text": "باسترمة", "multiplier": 1}, {"text": "پاسترمة", "multiplier": 1}, {"text": "باسترما", "multiplier": 1}],
+        "portions": [{"name": "شريحة", "grams": 20}],
+    },
+    {
+        "name": "كليجة", "category": "حلويات", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 400, "protein": 6, "carbs": 55, "fat": 18, "fiber": 2.5},
+        "aliases": [{"text": "كليجة", "multiplier": 1}, {"text": "كليچة", "multiplier": 1}, {"text": "كليجه", "multiplier": 1}],
+        "portions": [{"name": "قطعة", "grams": 45}],
+    },
+    {
+        "name": "دهينة نجفية", "category": "حلويات", "is_bulk": True,
+        "nutrients_per_100g": {"calories": 500, "protein": 3, "carbs": 45, "fat": 35, "fiber": 1},
+        "aliases": [{"text": "دهينة نجفية", "multiplier": 1}, {"text": "دهينة", "multiplier": 1}, {"text": "دهينه نجفية", "multiplier": 1}],
+        "portions": [{"name": "خاشوقة", "grams": 20}, {"name": "قطعة صغيرة", "grams": 30}],
+    },
+    {
+        "name": "زردة", "category": "حلويات", "is_bulk": True,
+        "nutrients_per_100g": {"calories": 180, "protein": 2, "carbs": 38, "fat": 2, "fiber": 0.5},
+        "aliases": [{"text": "زردة", "multiplier": 1}, {"text": "زرده", "multiplier": 1}],
+        "portions": [{"name": "كاسة صغيرة", "grams": 100}, {"name": "كاسة كبيرة", "grams": 180}],
     },
 ]

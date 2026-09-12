@@ -5,7 +5,12 @@
  *   - "رز"/"تمن"/"الرز" -> نفس food_id=8
  *   - "طماطة"/"طماطم"/"بندورة" -> نفس food_id=42
  *   - "دجاج" (نيء/عام) -> food_id=20، "دجاج مشوي" -> food_id=19 منفصل
- *   - "باذنجان"/"فروج" -> غير موجودين إطلاقًا بالقاعدة (صفر alias)
+ *   - "كرفس"/"فروج" -> غير موجودين إطلاقًا بالقاعدة (صفر alias)
+ *
+ * ملاحظة: "باذنجان" كانت هنا سابقًا كمثال "غير موجود" — أصبحت موجودة فعليًا (food_id حقيقي،
+ * خضار خام) بعد إضافة "تبسي باذنجان" (اكتشاف حقيقي: بدون الخضار الخام نفسها، "باذنجان" المجرد
+ * كان يتطابق ضبابيًا مع اسم الطبق المطبوخ بدل صفر تطابق — أُصلح بإضافة الخضار الخام كإدخال منفصل،
+ * راجع foods_seed.py). استُبدلت بـ"كرفس" (لسا غير موجود فعليًا) لتبقى نية الاختبار نفسها.
  */
 import { describe, it, expect } from "vitest";
 import { resolveIngredientName } from "../ingredientResolver.js";
@@ -44,9 +49,18 @@ describe("resolveIngredientName — تطابق حرفي (Tier 1)", () => {
 });
 
 describe("resolveIngredientName — صفر افتراض لما القاعدة ما تحتوي الطعام", () => {
-  it("'باذنجان' غير موجود بالقاعدة إطلاقًا -> null صريح، صفر alias مخترع", async () => {
-    const r = await resolveIngredientName("باذنجان");
+  it("'كرفس' غير موجود بالقاعدة إطلاقًا -> null صريح، صفر alias مخترع", async () => {
+    const r = await resolveIngredientName("كرفس");
     expect(r).toBeNull();
+  });
+
+  it("'باذنجان' أصبح موجودًا فعليًا (خضار خام حقيقي، food_id منفصل عن طبق 'تبسي باذنجان')", async () => {
+    const eggplant = await resolveIngredientName("باذنجان");
+    const dish = await resolveIngredientName("تبسي باذنجان");
+    expect(eggplant).not.toBeNull();
+    expect(dish).not.toBeNull();
+    expect(eggplant!.tier).toBe("exact");
+    expect(eggplant!.food_id).not.toBe(dish!.food_id);
   });
 
   it("'فروج' غير موجود بالقاعدة إطلاقًا -> null صريح", async () => {
