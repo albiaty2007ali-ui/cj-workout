@@ -36,3 +36,38 @@ export interface ConversationState {
 }
 
 export type ConversationalMode = "OFF" | "SHADOW" | "ACTIVE";
+
+/** سياق محدود يُرسَل لـGemini — أرقام حقيقية جاهزة (صفر داعي يطلبها بأداة منفصلة) + آخر أدوار قصيرة. */
+export interface ConversationTurnContext {
+  current_time_iraq: string;
+  remaining_calories: number | null;
+  target_calories: number | null;
+  goal: string | null;
+  conversation_state: ConversationState;
+  /** آخر 3 أدوار كحد أقصى، كل نص مختصر — صفر تاريخ محادثة كامل غير محدود (ضبط تكلفة). */
+  recent_turns: { role: "user" | "model"; text: string }[];
+}
+
+export interface ToolCallDecision {
+  kind: "tool_call";
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+  /** بيانات خاصة بالمزوّد نفسه (مثلاً thoughtSignature بموديلات Gemini "المفكّرة") — تُمرَّر
+   *  حرفيًا لـfinalize() لاحقًا بنفس المزوّد، لا يفتحها أو يفسّرها أي كود عام. */
+  providerMeta?: unknown;
+}
+
+export type ConversationDecision = { kind: "text"; text: string } | ToolCallDecision;
+
+/** الواجهة اللي أي مزوّد محادثة (Gemini حقيقي أو مزيّف بالاختبارات) يطبّقها — بروتوكول جولتين. */
+export interface ConversationProvider {
+  /** الجولة الأولى: رسالة + سياق + قائمة الأدوات المتاحة -> نص مباشر أو طلب أداة واحد. null = فشل/غير متاح. */
+  decide(rawMessage: string, ctx: ConversationTurnContext, tools: CJTool[]): Promise<ConversationDecision | null>;
+  /** الجولة الثانية: بعد تنفيذ الأداة فعليًا، يُعطى الناتج الموثوق فقط لصياغة رد نهائي طبيعي. null = فشل. */
+  finalize(rawMessage: string, ctx: ConversationTurnContext, decision: ToolCallDecision, toolResult: unknown): Promise<string | null>;
+}
+
+export class NullConversationProvider implements ConversationProvider {
+  async decide(): Promise<ConversationDecision | null> { return null; }
+  async finalize(): Promise<string | null> { return null; }
+}
