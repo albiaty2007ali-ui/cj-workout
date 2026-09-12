@@ -9,6 +9,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { InMemoryRepository } from "../../db/inMemoryRepository.js";
 import { makeUser } from "../testHelpers.js";
 import { handleMessage } from "../../orchestrator.js";
+import * as foodSearchMod from "../../foodSearch.js";
 import {
   setConversationalModeForTesting, resetConversationalModeForTesting,
   setConversationProviderForTesting, resetConversationProviderForTesting,
@@ -177,5 +178,56 @@ describe("قبول شامل — 'مشتهي دولمة خليها 500 سعرة' 
     ));
     const r = await handleMessage(repo, user, "مشتهي دولمة، خليها تقريبًا 500 سعرة");
     expect(r.meal_logged).toBe(false);
+  });
+});
+
+describe("قبول شامل — وجبة مخطَّطة اليوم (اقتراح كمية ذكي)", () => {
+  it("'اليوم غدانا تمن' -> calculate_allowed_portion يُستدعى، صفر تسجيل", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "plan1");
+    activate(new ScriptedProvider(
+      { kind: "tool_call", toolName: "calculate_allowed_portion", toolArgs: { food_query: "تمن" } },
+      (toolResult) => (toolResult as { text: string }).text,
+    ));
+    const r = await handleMessage(repo, user, "اليوم غدانا تمن");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).toContain("خاشوقة");
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
+  it("'باجر عشانه كباب' -> نفس السلوك (نية مخطَّطة، مو استهلاك فعلي)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "plan2");
+    activate(new ScriptedProvider({ kind: "tool_call", toolName: "calculate_allowed_portion", toolArgs: { food_query: "كباب" } }));
+    const r = await handleMessage(repo, user, "باجر عشانه كباب");
+    expect(r.meal_logged).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+});
+
+describe("قبول شامل — تصنيف البيتزا (أنواع فعلية بسعرات مختلفة حقًا)", () => {
+  it("'اكلت بيتزا دجاج' -> get_food_nutrition يرجّع سعرات نوع الدجاج تحديدًا (223 kcal/100g، مختلفة عن اللحم/الخضار)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "pizza1");
+    activate(new ScriptedProvider(
+      { kind: "tool_call", toolName: "log_meal", toolArgs: {} },
+      (toolResult) => `تمام، بيتزا الدجاج سجّلتلك بـ${(toolResult as { today_calories?: number }).today_calories} سعرة`,
+    ));
+    const r = await handleMessage(repo, user, "اكلت بيتزا دجاج");
+    expect(r.meal_logged).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+    const log = await repo.findFirstMealLogForUser(user.id);
+    // بيتزا دجاج (223 kcal/100g × 110غ ≈ 245) مختلفة فعليًا عن بيتزا اللحم (273×1.1≈300) أو
+    // البيتزا العامة (266×1.1≈293) — تأكيد حقيقي إن النوع المحدد أثّر على الرقم، صفر قيمة عامة موحّدة.
+    expect(log!.total_calories).toBeGreaterThan(200);
+    expect(log!.total_calories).toBeLessThan(280);
+  });
+
+  it("بحث عن دولمة/باجة/تشريب/كبة موصل/قيمر/كباب -> نتائج حقيقية عبر search_food", async () => {
+    const repo = new InMemoryRepository();
+    for (const query of ["دولمة", "باجة", "تشريب", "كبة موصل", "قيمر", "كباب"]) {
+      const { results } = await foodSearchMod.matchMessageWithMeta(query);
+      expect(results.length, `صفر تطابق لـ"${query}"`).toBeGreaterThan(0);
+    }
   });
 });
