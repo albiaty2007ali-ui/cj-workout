@@ -38,6 +38,11 @@ import { pyFloatStr } from "./pyRound.js";
 import { FREE_MEALS_CAP } from "./userStatus.js";
 import type { Repository, UserRecord } from "./db/repository.js";
 import type { PendingMeal, PendingItem } from "./corrections.js";
+import * as brain from "./conversation/brain.js";
+import * as conversationConfig from "./conversation/config.js";
+import * as conversationTools from "./conversation/tools.js";
+import * as mutationTools from "./conversation/mutationTools.js";
+import type * as conversationTypes from "./conversation/types.js";
 
 // كلمات تصنيف تُمرَّر مباشرة لـrecipeSearch بدل بحث نصي حر — نفس عبارات
 // intents.RECIPE_CATEGORY_PHRASES المركّبة عمدًا (تفادي تصادم مع تسجيل وجبة فعلي)
@@ -825,7 +830,12 @@ export async function runMealLoggingPipeline(
   return handleMealMessage(repo, user, textNorm, pending, now);
 }
 
-export async function handleMessage(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
+/**
+ * المسار المحلي الحتمي الكامل — نفس handleMessage() تمامًا قبل مرحلة "Gemini-First Conversational
+ * AI" (صفر تغيير سلوكي). هذا هو مسار OFF الافتراضي بالكامل، وأيضًا الشبكة الآمنة اللي ACTIVE يسقط
+ * لها عند أي فشل بطبقة المحادثة الجديدة (قبل أي أداة تحوّر تنجح — راجع conversation/brain.ts).
+ */
+async function runLocalPipeline(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
   const textNorm = text.trim();
   const profile = await repo.findNutritionProfile(user.id);
   const target = profile ? profile.calorie_target : 2000;
@@ -844,6 +854,79 @@ export async function handleMessage(repo: Repository, user: UserRecord, text: st
   const { intent, nluFoodQuery } = await resolveIntentViaNlu(repo, user, textNorm, localIntent, pending, profile, now);
 
   return dispatch(repo, user, textNorm, intent, pending, target, now, nluFoodQuery);
+}
+
+const ALL_CONVERSATION_TOOLS: conversationTypes.CJTool<any, any>[] = [
+  ...conversationTools.READ_ONLY_TOOLS, mutationTools.logMeal, mutationTools.undoLastMeal,
+];
+
+const EMPTY_CONVERSATION_STATE: conversationTypes.ConversationState = {
+  active_food: null, active_intent: null, target_calories: null, awaiting: null, last_tool_calls: [],
+};
+
+/** يبني ChatReply من نتيجة أداة (لو موجودة) — الحقول العددية تجي حرفيًا من الأداة، Gemini يؤثر فقط على reply. */
+function assembleActiveResult(outcome: brain.ConversationalTurnOutcome): DispatchResult {
+  const reply = outcome.reply ?? null;
+  if (!outcome.toolResult || typeof outcome.toolResult !== "object") {
+    return { reply, meal_logged: false };
+  }
+  const tr = outcome.toolResult as Record<string, unknown>;
+  if ("meal_logged" in tr) {
+    // نتيجة أداة تحوّر (log_meal/undo) — كل الحقول العددية حرفيًا منها، reply فقط من Gemini
+    const { local_reply: _lr, ok: _ok, rejection_reason: _rr, ...rest } = tr as Record<string, unknown>;
+    return { ...rest, reply, meal_logged: Boolean(tr.meal_logged) } as DispatchResult;
+  }
+  // نتيجة أداة قراءة — لو فيها وصفة حقيقية (recipe/recipes[0])، نعبّئ suggested_recipe للواجهة
+  const recipeCandidate = (tr.recipe as { id?: string } | undefined) ?? (Array.isArray(tr.recipes) ? tr.recipes[0] : undefined);
+  const suggested_recipe = recipeCandidate && typeof recipeCandidate === "object" && "id" in recipeCandidate ? recipeCandidate : null;
+  return { reply, meal_logged: false, suggested_recipe };
+}
+
+export async function handleMessage(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
+  const mode = conversationConfig.getConversationalMode();
+  if (mode === "OFF") return runLocalPipeline(repo, user, text, now);
+
+  const localResult = mode === "SHADOW" ? await runLocalPipeline(repo, user, text, now) : null;
+
+  const textNorm = text.trim();
+  const pending = mealState.loadPending(user);
+  const undoSnapshot = await directLog.loadValid(repo, user, now);
+  const ctxFlags: IntentContextFlags = {
+    has_pending: pending !== null,
+    has_recipe: user.current_recipe_id !== null,
+    has_undoable_log: undoSnapshot !== null,
+    has_pending_recipe: user.pending_recipe_confirmation_id !== null,
+    has_pending_food_topic: user.pending_food_topic_json !== null,
+  };
+  const profile = await repo.findNutritionProfile(user.id);
+  const nutritionCtx = await context.build(repo, user.id, profile, now);
+
+  const execCtx: conversationTypes.ToolExecContext = { repo, user, rawText: textNorm, ctxFlags, now };
+  const turnCtx: conversationTypes.ConversationTurnContext = {
+    current_time_iraq: getCurrentPeriod(now),
+    remaining_calories: profile ? nutritionCtx.remaining_calories : null,
+    target_calories: profile ? nutritionCtx.target_calories : null,
+    goal: profile ? nutritionCtx.goal : null,
+    conversation_state: EMPTY_CONVERSATION_STATE, // ذاكرة المحادثة الحقيقية بالمرحلة 5
+    recent_turns: [],
+  };
+
+  const provider = conversationConfig.getConversationProvider();
+  const outcome = await brain.runConversationalTurn(provider, execCtx, turnCtx, ALL_CONVERSATION_TOOLS, {
+    dryRunMutations: mode === "SHADOW",
+  });
+
+  if (mode === "SHADOW") {
+    console.log("[conversation]", JSON.stringify({
+      local_reply_present: localResult!.reply !== null, gemini_handled: outcome.handled,
+      gemini_tool_used: outcome.toolUsed ?? null, shadow_mode: true,
+    }));
+    return localResult!; // الرد الفعلي دائمًا من المسار المحلي بوضع الظل
+  }
+
+  // ACTIVE
+  if (!outcome.handled) return runLocalPipeline(repo, user, text, now);
+  return assembleActiveResult(outcome);
 }
 
 /**

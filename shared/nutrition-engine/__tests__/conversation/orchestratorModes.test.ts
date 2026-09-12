@@ -1,0 +1,151 @@
+/**
+ * اختبارات الربط الفعلي بـorchestrator.handleMessage تحت الأوضاع الثلاث (OFF/SHADOW/ACTIVE) —
+ * بمزوّد مزيّف (DI) دائمًا، صفر اتصال شبكة حقيقي. الهدف: تأكيد أن OFF يبقى المسار المحلي حرفيًا
+ * (شبكة الأمان)، SHADOW لا يكتب أبدًا ولا يؤثر على الرد الفعلي، وACTIVE يستخدم الأداة الحقيقية
+ * مع سقوط آمن للمسار المحلي عند فشل المزوّد — وصفر سقوط بعد نجاح تحوّر فعلي.
+ */
+import { describe, it, expect, afterEach } from "vitest";
+import { InMemoryRepository } from "../../db/inMemoryRepository.js";
+import { makeUser } from "../testHelpers.js";
+import { handleMessage } from "../../orchestrator.js";
+import {
+  setConversationalModeForTesting, resetConversationalModeForTesting,
+  setConversationProviderForTesting, resetConversationProviderForTesting,
+} from "../../conversation/config.js";
+import type { ConversationDecision, ConversationProvider, ConversationTurnContext, ToolCallDecision } from "../../conversation/types.js";
+import type { NutritionProfileRecord, UserRecord } from "../../db/repository.js";
+
+const STANDARD_PROFILE: Omit<NutritionProfileRecord, "user_id"> = {
+  age: 25, weight_kg: 80, height_cm: 175, sex: "male", goal: "lose", activity_level: "moderate",
+  bmr: 1774, tdee: 2749, calorie_target: 2249, water_target_ml: 2640, goal_weight: null,
+};
+
+async function freshUser(repo: InMemoryRepository, id: string): Promise<UserRecord> {
+  const user = makeUser({ id });
+  repo.nutritionProfiles.set(id, { user_id: id, ...STANDARD_PROFILE });
+  await repo.saveUser(user);
+  return user;
+}
+
+class ScriptedProvider implements ConversationProvider {
+  constructor(
+    private decision: ConversationDecision | null,
+    private finalText: string | null | ((toolResult: unknown) => string | null) = "رد تجريبي",
+  ) {}
+  async decide(): Promise<ConversationDecision | null> { return this.decision; }
+  async finalize(_raw: string, _ctx: ConversationTurnContext, _decision: ToolCallDecision, toolResult: unknown): Promise<string | null> {
+    return typeof this.finalText === "function" ? this.finalText(toolResult) : this.finalText;
+  }
+}
+
+afterEach(() => {
+  resetConversationalModeForTesting();
+  resetConversationProviderForTesting();
+});
+
+describe("handleMessage — وضع OFF (الافتراضي)", () => {
+  it("صفر استدعاء لأي مزوّد — نفس المسار المحلي حرفيًا حتى مع مزوّد مضبوط", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "off1");
+    setConversationProviderForTesting(new ScriptedProvider({ kind: "text", text: "لازم ما توصل هذا الرد" }));
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect(r.meal_logged).toBe(true);
+    expect(r.reply).not.toBe("لازم ما توصل هذا الرد");
+  });
+});
+
+describe("handleMessage — وضع SHADOW", () => {
+  it("المزوّد يعمل بالخلفية لكن الرد الفعلي دائمًا من المسار المحلي، صفر تحوّر حتى لو طلب log_meal", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "shadow1");
+    setConversationalModeForTesting("SHADOW");
+    setConversationProviderForTesting(new ScriptedProvider({ kind: "tool_call", toolName: "log_meal", toolArgs: {} }, "رد Gemini المحاكى"));
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect(r.meal_logged).toBe(true); // المسار المحلي فعلًا يسجّل (هذا سلوك اليوم الحقيقي، مو Gemini)
+    expect(r.reply).not.toBe("رد Gemini المحاكى");
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1); // مرة وحدة، من المحلي فقط
+  });
+
+  it("سؤال بريء (حادثة البيتزا) + مزوّد شرّير يطلب log_meal بوضع SHADOW -> صفر تسجيل من أي مصدر", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "shadow2");
+    setConversationalModeForTesting("SHADOW");
+    setConversationProviderForTesting(new ScriptedProvider({ kind: "tool_call", toolName: "log_meal", toolArgs: {} }));
+    const r = await handleMessage(repo, user, "شكد حجم البيتزا؟");
+    expect(r.meal_logged).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+});
+
+describe("handleMessage — وضع ACTIVE", () => {
+  it("رد نصي مباشر من المزوّد (صفر أداة) -> يوصل حرفيًا للمستخدم", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "active1");
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider({ kind: "text", text: "هلا بيك، شلونك اليوم؟" }));
+    const r = await handleMessage(repo, user, "هلا");
+    expect(r.reply).toBe("هلا بيك، شلونك اليوم؟");
+    expect(r.meal_logged).toBe(false);
+  });
+
+  it("استدعاء أداة قراءة (get_daily_summary) -> الحقول العددية من الأداة، النص من Gemini", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "active2");
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider(
+      { kind: "tool_call", toolName: "get_daily_summary", toolArgs: {} },
+      "باقيلك سعرات هواية اليوم 🌱",
+    ));
+    const r = await handleMessage(repo, user, "باقيلي شكد؟");
+    expect(r.reply).toBe("باقيلك سعرات هواية اليوم 🌱");
+    expect(r.meal_logged).toBe(false);
+  });
+
+  it("استهلاك فعلي حقيقي ('اكلت بيضتين') عبر log_meal -> MealLog حقيقي واحد، الأرقام من الأداة", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "active3");
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider(
+      { kind: "tool_call", toolName: "log_meal", toolArgs: {} },
+      (toolResult) => `تمام، سجلتلك! باقيلك ${(toolResult as { remaining: number }).remaining} سعرة`,
+    ));
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect(r.meal_logged).toBe(true);
+    expect(r.reply).toContain("سجلتلك");
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+  });
+
+  it("حادثة البيتزا تحت ACTIVE — مزوّد شرّير يطلب log_meal مباشرة لسؤال بريء -> يُرفض، Gemini يجاوب طبيعيًا بدون تسجيل", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "active4");
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider(
+      { kind: "tool_call", toolName: "log_meal", toolArgs: {} },
+      (toolResult) => ((toolResult as { ok: boolean }).ok ? "سجلتلك!" : "تقصد تسأل عن حجمها بس؟ 🙂"),
+    ));
+    const r = await handleMessage(repo, user, "شكد حجم البيتزا؟");
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).not.toContain("سجلتلك");
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
+  it("المزوّد يفشل (decide يرجع null) -> يسقط تلقائيًا للمسار المحلي بنفس نتيجته", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "active5");
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider(null));
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect(r.meal_logged).toBe(true); // المسار المحلي سجّلها فعليًا رغم فشل Gemini بالكامل
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+  });
+
+  it("تحوّر ناجح لكن صياغة الرد النهائي فشلت -> صفر سقوط لمسار محلي بعده (يمنع تسجيل مزدوج)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "active6");
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider({ kind: "tool_call", toolName: "log_meal", toolArgs: {} }, null));
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect(r.meal_logged).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1); // مرة وحدة فقط، صفر تسجيل مضاعف
+  });
+});
