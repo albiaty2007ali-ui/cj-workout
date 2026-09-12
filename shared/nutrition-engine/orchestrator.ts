@@ -21,6 +21,7 @@ import * as intents from "./intents.js";
 import * as mealState from "./mealState.js";
 import * as patternDetection from "./patternDetection.js";
 import { findLeadingNumber, parseWaterMl } from "./quantity.js";
+import * as recipeMatching from "./recipeMatching.js";
 import * as recipeSearch from "./recipeSearch.js";
 import * as recommendations from "./recommendations.js";
 import * as responses from "./responses.js";
@@ -35,7 +36,7 @@ import { NLU_ALLOWED_INTENTS } from "./nlu/knownIntents.js";
 import type { NLUContext } from "./nlu/types.js";
 import { pyFloatStr } from "./pyRound.js";
 import { FREE_MEALS_CAP } from "./userStatus.js";
-import type { Repository, UserRecord, RecipeRecord, RecipeIngredientRecord } from "./db/repository.js";
+import type { Repository, UserRecord } from "./db/repository.js";
 import type { PendingMeal, PendingItem } from "./corrections.js";
 
 // كلمات تصنيف تُمرَّر مباشرة لـrecipeSearch بدل بحث نصي حر — نفس عبارات
@@ -548,14 +549,6 @@ async function handlePortionForFood(
   return { reply, meal_logged: false };
 }
 
-/** EXACT/HIGH/PARTIAL/LOW حسب نسبة تطابق حقيقية — NO_MATCH (0%) لا يوصل هنا أصلاً (يُستبعَد قبلها). */
-function classifyMatchTier(percentage: number): "EXACT_MATCH" | "HIGH_MATCH" | "PARTIAL_MATCH" | "LOW_MATCH" {
-  if (percentage >= 1) return "EXACT_MATCH";
-  if (percentage >= 0.8) return "HIGH_MATCH";
-  if (percentage >= 0.6) return "PARTIAL_MATCH";
-  return "LOW_MATCH";
-}
-
 /**
  * Cook From What I Have — "عندي بيض وبطاطا، شنو اگدر اطبخ؟" — يبحث بوصفات قسم وجبات الدايت
  * الحقيقية عن أعلى نسبة تطابق مكونات، صفر تسجيل وجبة أبدًا (نفس ضمان handleWhatIf). يعيد
@@ -583,33 +576,8 @@ async function handleCookFromIngredients(repo: Repository, textNorm: string): Pr
     return { reply: "گلي شنو عندك من مكونات وأشوفلك وصفة حقيقية تناسبها (مثلاً: عندي بيض وبطاطا وطماطة).", meal_logged: false, suggested_recipe: null };
   }
 
-  const mentionedFoodIds = new Set(mentioned.map((m) => m.food_id).filter((id): id is number => id !== null));
-  const mentionedNames = mentioned.map((m) => m.food_name);
-
-  const isMatched = (ing: RecipeIngredientRecord): boolean => {
-    if (ing.food_id != null && mentionedFoodIds.has(ing.food_id)) return true;
-    return mentionedNames.some((name) => ing.name.includes(name) || name.includes(ing.name));
-  };
-
   const recipes = await repo.findActiveRecipes(null);
-  const scored: { recipe: RecipeRecord; matchPercentage: number; missingRequired: string[]; missingOptional: string[] }[] = [];
-  for (const r of recipes) {
-    if (r.ingredients.length === 0) continue;
-    const requiredIngredients = r.ingredients.filter((ing) => ing.required !== false);
-    const consideredIngredients = requiredIngredients.length > 0 ? requiredIngredients : r.ingredients;
-
-    const missingRequired = consideredIngredients.filter((ing) => !isMatched(ing));
-    const matchPercentage = (consideredIngredients.length - missingRequired.length) / consideredIngredients.length;
-    if (matchPercentage <= 0) continue;
-
-    const missingOptional = r.ingredients.filter((ing) => ing.required === false && !isMatched(ing));
-    scored.push({
-      recipe: r, matchPercentage,
-      missingRequired: missingRequired.map((m) => m.name),
-      missingOptional: missingOptional.map((m) => m.name),
-    });
-  }
-  scored.sort((a, b) => b.matchPercentage - a.matchPercentage);
+  const scored = recipeMatching.scoreRecipesByIngredients(recipes, mentioned);
   const top = scored.slice(0, 3);
 
   if (top.length === 0) {
@@ -631,7 +599,7 @@ async function handleCookFromIngredients(repo: Repository, textNorm: string): Pr
 
   // suggested_recipe من HIGH_MATCH فأعلى (≥80%) — كان 100% بس، الآن يعتمد على تصنيف حقيقي
   const best = top[0];
-  const bestTier = classifyMatchTier(best.matchPercentage);
+  const bestTier = recipeMatching.classifyMatchTier(best.matchPercentage);
   const suggestedRecipe = (bestTier === "EXACT_MATCH" || bestTier === "HIGH_MATCH")
     ? { id: best.recipe.id, slug: best.recipe.slug, name: best.recipe.name, calories: best.recipe.calories, protein: best.recipe.protein, carbs: best.recipe.carbs, fat: best.recipe.fat }
     : null;
