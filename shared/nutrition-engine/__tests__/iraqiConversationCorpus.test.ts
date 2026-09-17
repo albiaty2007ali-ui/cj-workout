@@ -9,10 +9,13 @@
  * فعلية تغطي تنويع لغوي/إملائي حقيقي، مو تكرار لنفس الجملة بصياغة مختلفة شكليًا بس.
  */
 import { describe, it, expect } from "vitest";
-import { normalize } from "../arabicNormalize.js";
 import { detectIntent } from "../intents.js";
 
-const d = (t: string) => detectIntent(normalize(t), {});
+// detectIntent يطبّع النص داخليًا (منذ إصلاح البق البنيوي: كان الإنتاج الفعلي يمرر rawText.trim()
+// بدون normalize() إطلاقًا بينما الاختبارات تنادي normalize() يدويًا قبله — يعني مجموعة الاختبارات
+// كانت تتحقق من مسار لا يعمل فعليًا بالإنتاج). هنا الاستدعاء الآن مطابق حرفيًا لما يسويه
+// orchestrator.ts فعليًا (نص خام فقط، صفر تطبيع يدوي بالاختبار).
+const d = (t: string) => detectIntent(t, {});
 
 describe("سجل محادثات عراقية موسّع — تصنيف النية المحلي", () => {
   describe("تسجيل أكل حقيقي (LOG_MEAL) — صيغ وأخطاء إملائية متعددة", () => {
@@ -34,16 +37,19 @@ describe("سجل محادثات عراقية موسّع — تصنيف الني�
 
   describe("كميات وتصحيحات (CORRECTION/CHANGE_QUANTITY/ADD_FOOD/REMOVE_FOOD)", () => {
     it("'لا مو بيضتين، 3' مع has_undoable_log -> CORRECTION", () => {
-      expect(detectIntent(normalize("لا مو بيضتين، 3"), { has_undoable_log: true })).toBe("CORRECTION");
+      expect(detectIntent("لا مو بيضتين، 3", { has_undoable_log: true })).toBe("CORRECTION");
     });
     it("'شيلها' مع has_undoable_log -> CANCEL (تراجع مباشر)", () => {
-      expect(detectIntent(normalize("شيلها"), { has_undoable_log: true })).toBe("CANCEL");
+      expect(detectIntent("شيلها", { has_undoable_log: true })).toBe("CANCEL");
     });
     it("'زيدلي خبز' مع has_pending -> ADD_FOOD", () => {
-      expect(detectIntent(normalize("زيدلي خبز"), { has_pending: true })).toBe("ADD_FOOD");
+      expect(detectIntent("زيدلي خبز", { has_pending: true })).toBe("ADD_FOOD");
     });
     it("'شيل الجبن' مع has_pending -> REMOVE_FOOD", () => {
-      expect(detectIntent(normalize("شيل الجبن"), { has_pending: true })).toBe("REMOVE_FOOD");
+      expect(detectIntent("شيل الجبن", { has_pending: true })).toBe("REMOVE_FOOD");
+    });
+    it("'اكد' (بلا همزة) مع has_pending -> CONFIRM (Bug مُصلَح: قائمة CONFIRM_PHRASES فيها همزة، النص المُطبَّع بلاها)", () => {
+      expect(detectIntent("اكد", { has_pending: true })).toBe("CONFIRM");
     });
   });
 
@@ -183,6 +189,37 @@ describe("سجل محادثات عراقية موسّع — تصنيف الني�
     });
     it("'اكلت بيضتين، شكد سعراتها؟' -> ASK_CALORIES (سؤال محدد يسبق LOG_MEAL بالأولوية)", () => {
       expect(d("اكلت بيضتين، شكد سعراتها؟")).toBe("ASK_CALORIES");
+    });
+  });
+
+  describe("نفي استهلاك (NOT_YET) — Bug حقيقي مُصلَح: ما كان فيه وعي بالنفي إطلاقًا", () => {
+    it.each([
+      "لسا ما اكلت دولمة اليوم",
+      "ما اكلت شي هسه",
+      "لسه ما تغديت",
+    ])("'%s' -> NOT_YET (مو LOG_MEAL رغم وجود فعل استهلاك بالجملة)", (msg) => {
+      expect(d(msg)).toBe("NOT_YET");
+    });
+  });
+
+  describe("رسائل مركّبة أكل+ماي — Bug حقيقي مُصلَح: كانت WATER_PHRASES المجرّدة تبلع الأكل بالكامل", () => {
+    it("'اكلت بيض وشربت جوس' -> LOG_MEAL (مو WATER_LOG، الأكل ما يضيع)", () => {
+      expect(d("اكلت بيض وشربت جوس")).toBe("LOG_MEAL");
+    });
+    it("'شربت مي' لوحدها تبقى WATER_LOG طبيعي", () => {
+      expect(d("شربت مي")).toBe("WATER_LOG");
+    });
+  });
+
+  describe("فجوات فهم إضافية مُصلَحة (طبي/اشتهاء بدون 'ب'/لهجة چ)", () => {
+    it("'عندي سكري نوع 2، شنو آكل؟' -> MEDICAL (مو ASK_RECOMMENDATION)", () => {
+      expect(d("عندي سكري نوع 2، شنو آكل؟")).toBe("MEDICAL");
+    });
+    it("'نفسي اكل شاورمة' (بدون 'ب' لاحقة) -> EXPRESS_CRAVING", () => {
+      expect(d("نفسي اكل شاورمة")).toBe("EXPRESS_CRAVING");
+    });
+    it("'الرز چم سعرة' (چ عراقية بدل ك) -> ASK_CALORIES (مو LOG_MEAL)", () => {
+      expect(d("الرز چم سعرة")).toBe("ASK_CALORIES");
     });
   });
 });

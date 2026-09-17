@@ -2,6 +2,7 @@
  * منفذ حرفي من nutrition_ai/intents.py — Intent Detector بقواعد/كلمات مفتاحية عراقية (لا LLM هنا).
  * نفس ترتيب الأولوية بالضبط، نفس القوائم، نفس التعليقات التوثيقية للقرارات غير البديهية.
  */
+import { normalize } from "./arabicNormalize.js";
 
 export const LOG_MEAL = "LOG_MEAL";
 export const ADD_FOOD = "ADD_FOOD";
@@ -54,7 +55,10 @@ export const UNKNOWN = "UNKNOWN";
 // ---------------- قوائم الكلمات المفتاحية (عراقي/لهجة) ----------------
 
 export const OFFTOPIC_KEYWORDS = ["كود", "برمجة", "python", "javascript", "اكتبلي برنامج", "سكربت"];
-export const MEDICAL_KEYWORDS = ["دواء", "مرض", "تشخيص", "أعاني من", "وجع", "الم مزمن", "دكتور شنو"];
+export const MEDICAL_KEYWORDS = [
+  "دواء", "مرض", "تشخيص", "أعاني من", "وجع", "الم مزمن", "دكتور شنو",
+  "سكري", "حامل", "ضغط الدم", "حساسية", "عملية",
+];
 
 export const END_DAY_PHRASES = ["راح أنام", "راح انام", "خلص يومي", "بنام", "أنام هسه", "انام هسه"];
 export const REMAINING_QUERY_PHRASES = ["باقيلي", "شكد باقي", "كم باقي", "شكد متبقي", "الباقي شكد"];
@@ -126,7 +130,10 @@ export const DESIRE_MARKERS = [
 // اشتهاء طعام محدد بالاسم ("مشتهي دولمة") — يختلف عن DESIRE_MARKERS العامة بإنه غالبًا يستحق
 // عرض مساعدة بتحديد كمية مناسبة للطعام المذكور تحديدًا، مو رد عام. لا تضعها ضمن RECIPE_TRIGGERS
 // أبدًا — كانت هناك سابقًا وسببت تحويل أي رسالة اشتهاء لبحث وصفة حر بكامل نص الرسالة.
-export const CRAVING_MARKERS = ["مشتهي", "مشتهية", "نفسي ب", "نفسي بـ", "خاطري ب", "خاطري بـ"];
+export const CRAVING_MARKERS = [
+  "مشتهي", "مشتهية", "نفسي ب", "نفسي بـ", "خاطري ب", "خاطري بـ",
+  "نفسي اكل", "نفسي آكل", "خاطري اكل", "خاطري آكل",
+];
 
 // نية مستقبلية صريحة بالأكل — مو استهلاك فعلي، ما يسجّل وجبة أبدًا (يفرق جوهري عن "اكلت دولمة")
 export const PLAN_TO_EAT_MARKERS = ["راح آكل", "راح اكل", "ناوي آكل", "ناوي اكل", "بروح آكل", "بروح اكل"];
@@ -149,7 +156,7 @@ export const PORTION_QUESTION_MARKERS = ["شكد لازم اكل", "شكد اخ�
 // سؤال معلوماتي صرف عن سعرات/حجم/وحدة/ملاءمة طعام معيّن — يفرق جوهري عن PORTION_QUESTION_MARKERS
 // (اللي يطلب توصية "شكد لازم آكل")، هذا بس معلومة بدون أي نية أكل أو توصية كمية.
 export const CALORIES_QUESTION_MARKERS = [
-  "شكد سعرات", "شكد سعره", "شكد سعرة", "كم سعرة", "كم سعرات", "شكد سعراتها",
+  "شكد سعرات", "شكد سعره", "شكد سعرة", "كم سعرة", "كم سعرات", "شكد سعراتها", "چم سعرة", "چم سعرات",
   "سعراتها شكد", "سعراته شكد", "شكد فيها سعرة", "شكد فيه سعرة", "شكد تحسب",
 ];
 export const FOOD_SIZE_QUESTION_MARKERS = [
@@ -167,10 +174,10 @@ export const SUBSTITUTION_MARKERS = [
   "بديل أخف", "بديل اخف", "بديل أقل سعرات", "بديل اقل سعرات", "شنو البديل",
   "أخف منها", "اخف منها", "بديل صحي", "شي أخف", "شي اخف",
 ];
-// أدوات الشرط الفرضي — "لو"/"إذا". ملاحظة مهمة: detectIntent يستلم النص كما هو (trim فقط، صفر
-// normalize() فعلي — راجع handleMessage بـorchestrator.ts)، فلازم نذكر صيغتي الهمزة صراحة
-// ("إذا" و"اذا") بنفس نمط CONSUMPTION_VERB_HINTS أعلاه ("اكلت"/"أكلت") بدل الاعتماد على توحيد
-// تلقائي غير موجود فعليًا بهذا المسار. مقصود عدم تضييقها لعبارات محددة ("اذا اكلت") لأن الصيغ
+// أدوات الشرط الفرضي — "لو"/"إذا". detectIntent يطبّع النص داخليًا (normalize()، يوحّد الهمزة
+// والألف المقصورة) قبل أي مطابقة، فصيغتا "إذا"/"اذا" تتوحّدان تلقائيًا — الإبقاء على الصيغتين
+// هنا غير ضروري لكنه غير مضر (توثيق تاريخي: كانت مطلوبة يدويًا قبل نقل normalize() لداخل
+// detectIntent، راجع git history). مقصود عدم تضييقها لعبارات محددة ("اذا اكلت") لأن الصيغ
 // كثيرة ("لو اخذت"، "شنو اذا سويت")، والشرط الفعلي بـdetectIntent يجمعها مع hasConsumptionHint
 // فقط — صفر خطر مصادفة مع رسالة عادية بدون فعل استهلاك.
 export const WHAT_IF_PARTICLES = ["اذا", "إذا", "لو", "شنو لو", "شنو اذا", "شنو إذا"];
@@ -200,7 +207,7 @@ export const CONSUMPTION_VERB_HINTS = [
 export const WHAT_IF_CONSUMPTION_HINTS = [...CONSUMPTION_VERB_HINTS, "اكل", "أكل"];
 // أدوات استفهام عراقية عامة — أي رسالة تحتوي إحداها (أو علامة ؟) ومالها فعل استهلاك صريح
 // أعلاه، تُعتبر سؤال معلوماتي، مو تسجيل وجبة، بغض النظر هل طابقت نية محددة فوق أو لا.
-export const QUESTION_INDICATORS = ["شكد", "كم", "شنو", "هل", "شلون", "وين", "متى", "ليش", "أي حجم", "اي حجم"];
+export const QUESTION_INDICATORS = ["شكد", "چم", "كم", "شنو", "هل", "شلون", "وين", "متى", "ليش", "أي حجم", "اي حجم"];
 
 export function looksLikeQuestion(textNorm: string): boolean {
   if (textNorm.includes("؟") || textNorm.includes("?")) return true;
@@ -209,6 +216,13 @@ export function looksLikeQuestion(textNorm: string): boolean {
 
 export function hasConsumptionHint(textNorm: string): boolean {
   return CONSUMPTION_VERB_HINTS.some((w) => textNorm.includes(w));
+}
+
+// نفي فعل استهلاك ("ما اكلت"، "لسا ما تغديت") — "ما" ملاصقة (بحد أقصى 3 أحرف مسافة/فاصل) لفعل
+// استهلاك من CONSUMPTION_VERB_HINTS نفسها (صفر تكرار قائمة). راجع detectIntent للاستخدام.
+const NEGATED_CONSUMPTION_RE = new RegExp(`ما\\s{0,3}(${CONSUMPTION_VERB_HINTS.join("|")})`);
+export function hasNegatedConsumption(textNorm: string): boolean {
+  return NEGATED_CONSUMPTION_RE.test(textNorm);
 }
 
 // عبارات اجتماعية قصيرة — تُفحص بمطابقة شبه-تامة (مو substring حر) حتى ما تبلع رسالة أكل حقيقية
@@ -238,20 +252,32 @@ export interface IntentContext {
  * (مثلاً "هلا كابتن") — يمنع ابتلاع رسالة أكل حقيقية تبدأ صدفة بكلمة ترحيب.
  */
 function isMostlyPhrase(text: string, phrases: string[], maxExtra = 8): boolean {
-  for (const p of phrases) {
+  for (const raw of phrases) {
+    const p = normalize(raw);
     if (text === p) return true;
     if (text.startsWith(p) && text.length - p.length <= maxExtra) return true;
   }
   return false;
 }
 
-const includesAny = (text: string, phrases: string[]): boolean => phrases.some((p) => text.includes(p));
+const includesAny = (text: string, phrases: string[]): boolean => phrases.some((p) => text.includes(normalize(p)));
+
+/**
+ * مطابقة تامة (مو احتواء) لقائمة عبارات — تطبّع الطرفين قبل المقارنة، حتى صيغة همزة/ألف مقصورة
+ * بقائمة العبارات (مثلاً "أكد") تطابق نصًا مُطبَّعًا مسبقًا (مثلاً "اكد" بلا همزة). يُستخدم بدل
+ * `PHRASES.includes(textNorm)` المباشر أينما احتجنا مساواة تامة، سواء هنا أو بـorchestrator.ts.
+ */
+export function matchesPhrase(text: string, phrases: string[]): boolean {
+  const t = normalize(text);
+  return phrases.some((p) => normalize(p) === t);
+}
 
 /**
  * ctx المتوقع: has_pending/has_recipe/has_undoable_log/has_pending_recipe/has_pending_food_topic.
  * الترتيب هنا هو ترتيب الأولوية (نفس فلسفة nutrition_engine.py القديمة، لكن مركزّة بمكان واحد).
  */
-export function detectIntent(textNorm: string, ctx: IntentContext): string {
+export function detectIntent(rawText: string, ctx: IntentContext): string {
+  const textNorm = normalize(rawText);
   const hasPending = ctx.has_pending ?? false;
   const hasRecipe = ctx.has_recipe ?? false;
   const hasUndoableLog = ctx.has_undoable_log ?? false;
@@ -267,8 +293,8 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   if (isMostlyPhrase(textNorm, THANKS_PHRASES)) return THANKS;
 
   if (hasPending) {
-    if (CANCEL_PHRASES.includes(textNorm)) return CANCEL;
-    if (CONFIRM_PHRASES.includes(textNorm)) return CONFIRM;
+    if (matchesPhrase(textNorm, CANCEL_PHRASES)) return CANCEL;
+    if (matchesPhrase(textNorm, CONFIRM_PHRASES)) return CONFIRM;
     if (includesAny(textNorm, CORRECTION_PHRASES)) return CORRECTION;
     if (includesAny(textNorm, SWAP_FOOD_PHRASES) && textNorm.includes("ب")) return SWAP_FOOD;
     if (includesAny(textNorm, REMOVE_FOOD_PHRASES)) return REMOVE_FOOD;
@@ -279,16 +305,16 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   // جواب على "سويتها 😋 أكلتها لو بعدك؟" (وصفة خلص طبخها) — أولوية بعد pending (بناء وجبة) مباشرة
   // وقبل نافذة تراجع قديمة، حتى لو فيه undo سابق منتهي الأثر
   if (hasPendingRecipe && !hasPending) {
-    if (CANCEL_PHRASES.includes(textNorm)) return CANCEL;
-    if (CONFIRM_PHRASES.includes(textNorm) || RECIPE_EATEN_PHRASES.includes(textNorm)) return CONFIRM;
-    if (NOT_YET_PHRASES.includes(textNorm)) return NOT_YET;
+    if (matchesPhrase(textNorm, CANCEL_PHRASES)) return CANCEL;
+    if (matchesPhrase(textNorm, CONFIRM_PHRASES) || matchesPhrase(textNorm, RECIPE_EATEN_PHRASES)) return CONFIRM;
+    if (includesAny(textNorm, NOT_YET_PHRASES)) return NOT_YET;
   }
 
   // جواب على اشتهاء/نية أكل طعام محدد ("مشتهي دولمة" ثم "اي"/"ماريد") — نفس منطق
   // has_pending_recipe فوق، بس لموضوع طعام عادي مو وصفة قيد الطبخ
   if (hasPendingFoodTopic && !hasPending && !hasPendingRecipe) {
-    if (CANCEL_PHRASES.includes(textNorm)) return CANCEL;
-    if (CONFIRM_PHRASES.includes(textNorm)) return CONFIRM;
+    if (matchesPhrase(textNorm, CANCEL_PHRASES)) return CANCEL;
+    if (matchesPhrase(textNorm, CONFIRM_PHRASES)) return CONFIRM;
     // "مشتهي دولمة" ← "500 سعرة" / "أريدها 500 سعرة" — رقم هدف يخص نفس الطعام المطروح توًا،
     // مو محادثة جديدة (نفس التوجيه اللي يستلمه ASK_PORTION_FOR_FOOD أصلاً، انظر handlePortionForFood)
     if (/\d/.test(textNorm) && (textNorm.includes("سعر"))) return ASK_PORTION_FOR_FOOD;
@@ -297,7 +323,7 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   // وجبة اتسجّلت مباشرة (DIRECT_LOG) وبعدها ضمن نافذة التراجع — نفس عائلة أوامر التعديل
   // تشتغل عليها هي، مو على وجبة جديدة (مثلاً "لا مو بيضتين، 3" بعد "اكلت بيضتين")
   if (hasUndoableLog && !hasPending) {
-    if (UNDO_PHRASES.includes(textNorm)) return CANCEL;
+    if (matchesPhrase(textNorm, UNDO_PHRASES)) return CANCEL;
     if (includesAny(textNorm, CORRECTION_PHRASES)) return CORRECTION;
     if (includesAny(textNorm, SWAP_FOOD_PHRASES) && textNorm.includes("ب")) return SWAP_FOOD;
     if (includesAny(textNorm, REMOVE_FOOD_PHRASES)) return REMOVE_FOOD;
@@ -305,7 +331,13 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
     if (includesAny(textNorm, ADD_FOOD_PHRASES)) return ADD_FOOD;
   }
 
-  if (NOT_YET_PHRASES.includes(textNorm)) return NOT_YET;
+  if (includesAny(textNorm, NOT_YET_PHRASES)) return NOT_YET;
+  // نفي استهلاك صريح ("لسا ما اكلت دولمة"، "ما اكلت شي هسه") — Bug حقيقي مُكتشَف: بدون هذا
+  // الحارس، فعل الاستهلاك بالجملة (اللي hasConsumptionHint يكتشفه بصح) كان يخلي الرسالة تسقط
+  // لـLOG_MEAL الافتراضي رغم إن المستخدم قال صراحة إنه ما أكل. نطاق محافظ عمدًا: أي رسالة فيها
+  // "ما" ملاصقة لفعل استهلاك تُعتبر نفي وما تُسجَّل وجبة أبدًا — حتى لو الرسالة مركّبة (مثلاً
+  // "اكلت رز وما شربت شي")، تفويت تسجيل جزء حقيقي أهون بكثير من تسجيل وجبة لم تُؤكَل فعلاً.
+  if (hasNegatedConsumption(textNorm)) return NOT_YET;
   if (includesAny(textNorm, END_DAY_PHRASES)) return END_DAY;
   if (includesAny(textNorm, REMAINING_QUERY_PHRASES)) return ASK_REMAINING;
   if (includesAny(textNorm, GENERAL_NUTRITION_MARKERS) && includesAny(textNorm, GENERAL_NUTRITION_TOPICS)) {
@@ -322,7 +354,15 @@ export function detectIntent(textNorm: string, ctx: IntentContext): string {
   if (includesAny(textNorm, SUGGEST_QUERY_PHRASES)) return ASK_RECOMMENDATION;
   if (includesAny(textNorm, ASK_TIP_PHRASES)) return ASK_TIP;
   if (includesAny(textNorm, WEIGHT_PHRASES)) return WEIGHT_UPDATE;
-  if (includesAny(textNorm, WATER_PHRASES)) return WATER_LOG;
+  // "اكلت بيض وشربت جوس" — Bug حقيقي مُكتشَف: WATER_PHRASES يحتوي "شربت" المجرّدة، وكانت تبلع
+  // الرسالة كاملة كـWATER_LOG حتى لو فيها فعل استهلاك أكل حقيقي ثاني (الأكل يضيع تمامًا). هنا:
+  // WATER_LOG يفوز فقط لو ماكو فعل استهلاك آخر غير "شربت" نفسها بنفس الرسالة.
+  if (
+    includesAny(textNorm, WATER_PHRASES) &&
+    !CONSUMPTION_VERB_HINTS.some((w) => w !== "شربت" && textNorm.includes(w))
+  ) {
+    return WATER_LOG;
+  }
 
   if (hasRecipe && (includesAny(textNorm, COOKING_NEXT_PHRASES) || includesAny(textNorm, COOKING_START_PHRASES))) {
     return COOKING_STEP;

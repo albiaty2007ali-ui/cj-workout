@@ -144,11 +144,11 @@ async function resolveClarificationItem(item: ClarificationItem, textNorm: strin
   }
 
   if (item.kind === "confirm_match") {
-    if (intents.CONFIRM_PHRASES.includes(textNorm)) {
+    if (intents.matchesPhrase(textNorm, intents.CONFIRM_PHRASES)) {
       const hit = await resolveAliasAt(item.alias_row as never, item.source_text, item.start ?? 0);
       return toResult(hit);
     }
-    if (intents.CANCEL_PHRASES.includes(textNorm)) return "REJECTED";
+    if (intents.matchesPhrase(textNorm, intents.CANCEL_PHRASES)) return "REJECTED";
     return null;
   }
 
@@ -822,7 +822,7 @@ export async function runMealLoggingPipeline(
 ): Promise<DispatchResult> {
   const textNorm = rawText.trim();
   const pending = mealState.loadPending(user);
-  if (pending && !hasAnswerableClarification(pending) && intents.CONFIRM_PHRASES.includes(textNorm)) {
+  if (pending && !hasAnswerableClarification(pending) && intents.matchesPhrase(textNorm, intents.CONFIRM_PHRASES)) {
     const profile = await repo.findNutritionProfile(user.id);
     const target = profile ? profile.calorie_target : 2000;
     return confirmPending(repo, user, pending, target, now);
