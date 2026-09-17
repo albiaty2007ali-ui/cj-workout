@@ -191,6 +191,23 @@ describe("handleMessage — وضع ACTIVE", () => {
     expect(await repo.countMealLogsForUser(user.id)).toBe(1); // مرة وحدة فقط، صفر تسجيل مضاعف
   });
 
+  it("سقف الوجبات المجانية يبقى فعّال تحت ACTIVE — مستخدم غير مشترك ووصل السقف -> premium_required:true، صفر تسجيل رغم موافقة Gemini", async () => {
+    const repo = new InMemoryRepository();
+    const user = makeUser({ id: "active-cap", is_premium: false, free_meals_used: 6 }); // 6 = FREE_MEALS_CAP
+    repo.nutritionProfiles.set(user.id, { user_id: user.id, ...STANDARD_PROFILE });
+    await repo.saveUser(user);
+    setConversationalModeForTesting("ACTIVE");
+    setConversationProviderForTesting(new ScriptedProvider(
+      { kind: "tool_call", toolName: "log_meal", toolArgs: {} },
+      (toolResult) => ((toolResult as { ok: boolean }).ok ? "سجلتلك!" : "خلص اشتراكك المجاني، اشترك حتى تكمل 🌱"),
+    ));
+    const r = await handleMessage(repo, user, "اكلت بيضتين");
+    expect((r as { premium_required?: boolean }).premium_required).toBe(true);
+    expect(r.meal_logged).toBe(false);
+    expect(r.reply).not.toContain("سجلتلك");
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
   it("علامة _composed_by_gemini الداخلية موجودة (chat.mts يستخدمها لتخطي rephrase الزائد)", async () => {
     const repo = new InMemoryRepository();
     const user = await freshUser(repo, "active7");

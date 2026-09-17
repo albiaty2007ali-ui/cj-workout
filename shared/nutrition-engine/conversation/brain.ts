@@ -1,7 +1,9 @@
 /**
- * منسّق دورة محادثة واحدة (decide -> [تنفيذ أداة] -> finalize) — لا يُستدعى بعد من
- * orchestrator.ts (الربط الفعلي بالمرحلة 4). يُختبَر هنا فقط بمزوّد مزيّف (DI)، صفر اتصال شبكة
- * حقيقي، تمامًا نفس فلسفة nlu/config.ts's setNluProviderForTesting.
+ * منسّق دورة محادثة واحدة (decide -> [تنفيذ أداة] -> finalize) — يُستدعى فعليًا من
+ * orchestrator.ts's handleMessage() بوضعي SHADOW/ACTIVE (راجع GEMINI_CONVERSATIONAL_MODE
+ * بـconversation/config.ts). اختبارات هذا الملف نفسه تستخدم مزوّد مزيّف (DI)، صفر اتصال شبكة
+ * حقيقي، تمامًا نفس فلسفة nlu/config.ts's setNluProviderForTesting — لكن هذا لا يعني عدم
+ * الربط الفعلي، فقط إن اختبارات الوحدة هنا لا تتصل بـGemini API الحقيقي.
  *
  * قاعدة حرجة (راجع خطة "Gemini-First..."، قسم السقوط الآمن): السقوط لمسار محلي بديل يصح فقط
  * **قبل** نجاح أي أداة تحوّر — أداة log_meal/undo_last_meal ناجحة تُرجع نتيجتها فورًا، لا سقوط

@@ -81,4 +81,4 @@ export const undoLastMeal: CJTool<Record<string, never>, directLog.UndoResult> =
   },
 };
 
-export const MUTATION_TOOLS: CJTool<any, any>[] = [logMeal, undoLastMeal];
+export const MUTATION_TOOLS: CJTool<any, any>[] = [logMeal, logWater, undoLastMeal];
