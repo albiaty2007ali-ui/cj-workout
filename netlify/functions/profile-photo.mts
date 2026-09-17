@@ -1,25 +1,21 @@
 /**
- * /api/profile/photo — رفع صورة بروفايل حقيقية إلى Firebase Storage (لم يكن منفَّذًا إطلاقًا
- * قبل هذا — راجع تعليق profile.mts القديم). العميل يرسل صورة **مصغَّرة ومقصوصة مربّعة أصلًا
- * من طرف المتصفح** (Canvas API، Profile.tsx) — صفر معالجة صور هنا (صفر sharp/تبعية Node جديدة،
- * صفر مخاطرة Native Binary مع esbuild bundler، نفس الدرس الموثَّق بـfoodDb.ts's قرار sql.js).
+ * /api/profile/photo — رفع صورة بروفايل. العميل يرسل صورة **مصغَّرة ومقصوصة مربّعة أصلًا من
+ * طرف المتصفح** (Canvas API، Profile.tsx، ~512px JPEG) — صفر معالجة صور هنا.
  *
- * الوصول لـStorage حصرًا عبر Admin SDK هنا (يتجاوز storage.rules أصلًا) — العميل لا يملك أي
- * SDK Firebase مباشر، نفس نمط Firestore الحالي بكل هذا المشروع.
+ * تُخزَّن كـData URI (Base64) مباشرة بحقل photo_url بمستند المستخدم على Firestore، بدل
+ * Firebase Storage — اللي يتطلب ترقية المشروع لخطة Blaze (بطاقة دفع) وهذا غير متاح حاليًا.
+ * صفر تبعية سحابية جديدة، يعيد استخدام Firestore الموجود أصلًا بكل هذا المشروع. الحد الأقصى
+ * للحجم صارم (500KB بعد فك الترميز) حتى لا يقترب مستند المستخدم من حد Firestore (1 ميغابايت)
+ * — صورة 512px JPEG حقيقية عادة أصغر من هذا بكثير (30-80KB).
  */
 import type { Context } from "@netlify/functions";
-import { getStorage } from "firebase-admin/storage";
-import {
-  FirestoreRepository, getFirebaseApp, FIREBASE_STORAGE_BUCKET, updateUserDisplayFields,
-} from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { getFirestore } from "firebase-admin/firestore";
+import { FirestoreRepository, getFirebaseApp, updateUserDisplayFields } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 
-const ALLOWED_CONTENT_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
-};
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB — سخي جدًا مقارنة بحجم صورة 512px الفعلي المتوقَّع (عادة <200KB)
+const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_BYTES = 500 * 1024;
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method !== "POST") return jsonError(405, "METHOD_NOT_ALLOWED", "استخدم POST فقط.");
@@ -35,8 +31,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   }
 
   const contentType = typeof body.content_type === "string" ? body.content_type : "";
-  const ext = ALLOWED_CONTENT_TYPES[contentType];
-  if (!ext) {
+  if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return jsonError(400, "VALIDATION_ERROR", "نوع الصورة غير مدعوم — JPEG أو PNG أو WebP فقط.");
   }
   const base64 = typeof body.image_base64 === "string" ? body.image_base64 : "";
@@ -49,7 +44,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     return jsonError(400, "VALIDATION_ERROR", "ترميز الصورة غير صالح.");
   }
   if (buffer.length === 0 || buffer.length > MAX_BYTES) {
-    return jsonError(400, "VALIDATION_ERROR", "حجم الصورة غير صالح (الحد الأقصى 5 ميغابايت).");
+    return jsonError(400, "VALIDATION_ERROR", "حجم الصورة كبير جدًا (الحد الأقصى 500 كيلوبايت بعد التصغير).");
   }
 
   try {
@@ -57,14 +52,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const user = await repo.findUser(claims.sub);
     if (!user) return jsonError(404, "USER_NOT_FOUND", "الحساب غير موجود.");
 
-    const bucket = getStorage(getFirebaseApp()).bucket();
-    // مسار ثابت لكل مستخدم (صفر امتداد قديم متراكم) — رفعة جديدة تستبدل القديمة تلقائيًا
-    const path = `profile-photos/${claims.sub}.${ext}`;
-    const file = bucket.file(path);
-    await file.save(buffer, { contentType, metadata: { cacheControl: "public, max-age=3600" } });
-    await file.makePublic();
-    const photoUrl = `https://storage.googleapis.com/${FIREBASE_STORAGE_BUCKET}/${path}?v=${Date.now()}`;
-
+    const photoUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
     const db = getFirestore(getFirebaseApp());
     await updateUserDisplayFields(db, claims.sub, { photo_url: photoUrl });
 
