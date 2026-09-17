@@ -64,7 +64,7 @@ export default function RecipesList() {
   const shown = state ? (fitsOnly ? state.recipes.filter((r) => r.fits_remaining === true) : state.recipes) : [];
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="container">
         <div className="topbar"><Link to="/chat">→ رجوع للشات</Link></div>
         <h1 className="font-display">🍳 وصفات دايت</h1>

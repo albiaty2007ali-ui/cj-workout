@@ -25,6 +25,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     return jsonOk({
       id: user.id, role: isAdminClaims(claims) ? "admin" : "user", name: display?.name ?? "", username: display?.username ?? null,
+      photo_url: display?.photo_url ?? null,
       xp: user.xp, streak_days: user.streak_days,
       longest_streak: user.longest_streak, is_premium: user.is_premium,
       free_meals_remaining: freeMealsRemaining(user), trial_exhausted: trialExhausted(user),

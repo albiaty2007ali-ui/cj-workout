@@ -49,7 +49,7 @@ export default function Subscribe() {
   if (!me) return null;
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="container" style={{ maxWidth: 560 }}>
         {submitted ? (
           <div className="notice-box">

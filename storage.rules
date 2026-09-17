@@ -1,0 +1,12 @@
+// قواعد Firebase Storage — رفض كامل للوصول المباشر من أي عميل (متصفح/تطبيق). كل رفع/قراءة
+// لصور البروفايل يمر حصرًا عبر Netlify Function (profile-photo.mts) بصلاحيات Admin SDK، اللي
+// يتجاوز هذي القواعد أصلًا — نفس نمط Firestore الحالي بهذا المشروع (صفر Firebase SDK عميل
+// موجود بالفرونت إند). الصور نفسها تُقرأ عبر رابط عام (makePublic) لا عبر Storage SDK مباشرة.
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

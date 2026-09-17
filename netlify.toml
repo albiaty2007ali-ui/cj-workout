@@ -68,6 +68,10 @@
 [[redirects]]
   from = "/api/profile"
   to = "/.netlify/functions/profile"
+
+[[redirects]]
+  from = "/api/profile/photo"
+  to = "/.netlify/functions/profile-photo"
   status = 200
 
 [[redirects]]

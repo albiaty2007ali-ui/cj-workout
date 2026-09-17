@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import type { ProfileResponse, CalendarDay } from "../lib/profileApi";
 import AppShell from "../components/AppShell";
 import { useI18n, backArrow, forwardArrow } from "../i18n/I18nContext";
 import { WEEKDAY_LABELS, MONTH_LABELS } from "../i18n/translations";
+import { resizeImageToSquareJpeg } from "../lib/imageResize";
 
 function monthKey(iso: string): string {
   return iso.slice(0, 7);
@@ -34,6 +35,9 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [viewMonth, setViewMonth] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const STATUS_LABEL: Record<CalendarDay["status"], string> = {
     green: t("profile.statusGreen"), yellow: t("profile.statusYellow"),
@@ -83,6 +87,27 @@ export default function Profile() {
     }
   }
 
+  async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoError(null);
+    setUploadingPhoto(true);
+    try {
+      const { base64, contentType } = await resizeImageToSquareJpeg(file);
+      const res = await api.post<{ photo_url: string }>("/profile/photo", { image_base64: base64, content_type: contentType });
+      if (!res.success || !res.data) {
+        setPhotoError(res.error?.message ?? t("profile.photoError"));
+        return;
+      }
+      setProfile((prev) => (prev ? { ...prev, photo_url: res.data!.photo_url } : prev));
+    } catch {
+      setPhotoError(t("profile.photoError"));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   const calendarByDate = useMemo(() => {
     const map = new Map<string, CalendarDay>();
     profile?.stats.calendar.forEach((d) => map.set(d.date, d));
@@ -106,11 +131,37 @@ export default function Profile() {
   })();
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="page-container">
         <h1 className="font-display">{t("profile.pageTitle")}</h1>
 
         <div className="notice-box">
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "var(--surface-alt, var(--surface))", fontSize: "2rem",
+              }}
+            >
+              {profile.photo_url ? (
+                <img src={profile.photo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                "👤"
+              )}
+            </div>
+            <div>
+              <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handlePhotoChange} />
+              <button
+                type="button" className="btn btn-outline-dark"
+                disabled={uploadingPhoto}
+                onClick={() => photoInputRef.current?.click()}
+              >
+                {uploadingPhoto ? t("profile.photoUploading") : t("profile.photoUpload")}
+              </button>
+              {photoError && <p className="field-error" style={{ marginTop: 6 }}>{photoError}</p>}
+            </div>
+          </div>
           {!editing ? (
             <>
               <p style={{ fontWeight: 700, fontSize: "1.1rem" }}>{profile.name}</p>

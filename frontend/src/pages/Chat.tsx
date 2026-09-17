@@ -128,7 +128,7 @@ export default function Chat() {
   ];
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} onQuickPrompt={quickPrompt}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url} onQuickPrompt={quickPrompt}>
       <div className="chat-page">
         <div className="chat-header">
           <strong>{t("chat.appName")}</strong>

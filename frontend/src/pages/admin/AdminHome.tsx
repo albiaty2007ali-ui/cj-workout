@@ -27,7 +27,7 @@ export default function AdminHome() {
   if (!me) return null;
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin>
+    <AppShell userName={me.name || "حسابي"} isAdmin photoUrl={me.photo_url}>
       <main className="container" style={{ maxWidth: 900 }}>
         <h1 className="font-display">🛠️ لوحة الإدارة</h1>
         <p className="subtitle">إدارة البيانات المرجعية بدون لمس الكود.</p>

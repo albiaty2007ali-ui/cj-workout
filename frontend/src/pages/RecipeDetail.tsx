@@ -106,7 +106,7 @@ export default function RecipeDetail() {
 
   if (!me) return null;
   if (notFound) return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="container"><p className="calorie-warning">{t("recipe.notFound")}</p></main>
     </AppShell>
   );
@@ -115,7 +115,7 @@ export default function RecipeDetail() {
   const { recipe, over_target: overTarget, remaining_calories: remainingCalories } = data;
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="container" style={{ maxWidth: 760 }}>
         <div className="topbar"><Link to="/recipes">{backArrow(dir)} {t("recipe.backToRecipes")}</Link></div>
 

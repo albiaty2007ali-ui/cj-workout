@@ -33,6 +33,9 @@ export function genId(): string {
 
 let app: App | null = null;
 
+/** اسم Bucket الحقيقي لمشروع Firebase (مؤكَّد من google-services.json الموجود بالمستودع). */
+export const FIREBASE_STORAGE_BUCKET = "cj-workout.firebasestorage.app";
+
 /** يبني (أو يرجّع من الكاش) تطبيق Firebase Admin — بيانات اعتماد Service Account من متغير بيئة JSON. */
 export function getFirebaseApp(): App {
   if (getApps().length > 0) return getApps()[0]!;
@@ -41,7 +44,7 @@ export function getFirebaseApp(): App {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON غير مضبوط بالبيئة");
   const serviceAccount = JSON.parse(raw);
-  app = initializeApp({ credential: cert(serviceAccount) });
+  app = initializeApp({ credential: cert(serviceAccount), storageBucket: FIREBASE_STORAGE_BUCKET });
   return app;
 }
 
@@ -575,7 +578,7 @@ export async function findUserIdByUsername(db: Firestore, username: string): Pro
 }
 
 export async function updateUserDisplayFields(
-  db: Firestore, userId: string, patch: Partial<Pick<UserDisplayFields, "name" | "username" | "bio">>,
+  db: Firestore, userId: string, patch: Partial<Pick<UserDisplayFields, "name" | "username" | "bio" | "photo_url">>,
 ): Promise<void> {
   await db.collection("users").doc(userId).set(patch, { merge: true });
 }

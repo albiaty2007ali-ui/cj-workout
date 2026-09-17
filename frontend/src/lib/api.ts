@@ -40,6 +40,7 @@ export interface MeResponse {
   role: string;
   name: string;
   username: string | null;
+  photo_url: string | null;
   xp: number;
   streak_days: number;
   longest_streak: number;

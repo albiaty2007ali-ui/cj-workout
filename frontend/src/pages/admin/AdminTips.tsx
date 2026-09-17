@@ -50,7 +50,7 @@ export default function AdminTips() {
   if (!me) return null;
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin>
+    <AppShell userName={me.name || "حسابي"} isAdmin photoUrl={me.photo_url}>
       <main className="container" style={{ maxWidth: 900 }}>
         <div className="topbar"><Link to="/admin">→ رجوع للوحة الإدارة</Link></div>
         <h1 className="font-display">إدارة النصائح الغذائية</h1>

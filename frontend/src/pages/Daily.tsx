@@ -68,7 +68,7 @@ export default function Daily() {
   }
 
   return (
-    <AppShell userName={me!.name || "حسابي"} isAdmin={me!.role === "admin"}>
+    <AppShell userName={me!.name || "حسابي"} isAdmin={me!.role === "admin"} photoUrl={me!.photo_url}>
       <main className="container" style={{ maxWidth: 720 }}>
         <div className="topbar">
           <Link to="/chat">{backArrow(dir)} {t("daily.backToChat")}</Link>

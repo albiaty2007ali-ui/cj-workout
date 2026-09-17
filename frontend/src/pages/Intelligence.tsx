@@ -90,7 +90,7 @@ export default function Intelligence() {
   if (!me) return null;
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="page-container">
         <h1 className="font-display">{t("intelligence.pageTitle")}</h1>
 

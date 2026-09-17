@@ -100,7 +100,7 @@ export default function AdminRecipeEdit() {
   if (!me || !recipe) return null;
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin>
+    <AppShell userName={me.name || "حسابي"} isAdmin photoUrl={me.photo_url}>
       <main className="container" style={{ maxWidth: 900 }}>
         <div className="topbar"><Link to="/admin/recipes">{backArrow(dir)} {t("admin.backToAllRecipes")}</Link></div>
         <h1 className="font-display">{recipe.name}</h1>

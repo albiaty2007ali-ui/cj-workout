@@ -6,10 +6,11 @@ import { useI18n } from "../i18n/I18nContext";
 interface SidebarProps {
   userName: string;
   isAdmin: boolean;
+  photoUrl?: string | null;
   onQuickPrompt?: (prompt: string) => void;
 }
 
-export default function Sidebar({ userName, isAdmin, onQuickPrompt }: SidebarProps) {
+export default function Sidebar({ userName, isAdmin, photoUrl, onQuickPrompt }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -46,7 +47,9 @@ export default function Sidebar({ userName, isAdmin, onQuickPrompt }: SidebarPro
           <Link className="sidebar-item" to="/subscribe" onClick={() => setOpen(false)}>{t("sidebar.subscribe")}</Link>
         </nav>
         <div className="sidebar-bottom">
-          <Link className="sidebar-item" to="/profile" onClick={() => setOpen(false)}>👤 {userName}</Link>
+          <Link className="sidebar-item sidebar-item-profile" to="/profile" onClick={() => setOpen(false)}>
+            {photoUrl ? <img src={photoUrl} alt="" className="sidebar-avatar" /> : <span>👤</span>} {userName}
+          </Link>
           <Link className="sidebar-item" to="/settings" onClick={() => setOpen(false)}>{t("sidebar.settings")}</Link>
           {isAdmin && <Link className="sidebar-item" to="/admin" onClick={() => setOpen(false)}>{t("sidebar.admin")}</Link>}
           <button className="sidebar-item" onClick={logout}>{t("sidebar.logout")}</button>
