@@ -6,7 +6,6 @@ import ThemeToggle from "../components/ThemeToggle";
 import { pushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from "../lib/push";
 import { useIntroSlides } from "./IntroTour";
 import { useI18n } from "../i18n/I18nContext";
-import LanguageToggle from "../components/LanguageToggle";
 
 interface SettingsData {
   ai_response_style: string;
@@ -218,11 +217,6 @@ export default function Settings() {
         <div className="notice-box">
           <h3 style={{ marginTop: 0 }}>المظهر</h3>
           <ThemeToggle />
-        </div>
-
-        <div className="notice-box">
-          <h3 style={{ marginTop: 0 }}>{t("settings.languageTitle")}</h3>
-          <LanguageToggle />
         </div>
 
         <div className="notice-box">

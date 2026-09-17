@@ -3,7 +3,7 @@
 // المسار بالنسخة الجديدة بعد).
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "CJ WORKOUT", body: "", url: "/chat" };
+  let payload = { title: "CJ FOOD", body: "", url: "/chat" };
   try {
     payload = { ...payload, ...event.data.json() };
   } catch (e) {}

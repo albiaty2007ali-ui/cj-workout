@@ -106,7 +106,7 @@ def _seed_default_plan():
     """يضمن وجود خطة الاشتراك الأساسية بقاعدة البيانات دائمًا (مو Hardcoded بالكود)."""
     if not Plan.query.filter_by(code="monthly").first():
         price = int(os.environ.get("SUBSCRIPTION_PRICE_IQD", "10000"))
-        db.session.add(Plan(code="monthly", name="CJ WORKOUT Monthly",
+        db.session.add(Plan(code="monthly", name="CJ FOOD Monthly",
                              price_iqd=price, duration_days=30, active=True))
         db.session.commit()
 

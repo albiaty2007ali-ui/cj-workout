@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useI18n } from "../i18n/I18nContext";
-import LanguageToggle from "../components/LanguageToggle";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 
 export default function Login() {
@@ -31,7 +30,6 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <LanguageToggle persistToBackend={false} />
       <form className="auth-card" onSubmit={onSubmit}>
         <h1>{t("auth.loginTitle")}</h1>
         <div className="field">

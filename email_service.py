@@ -16,13 +16,13 @@ def _wrap(body_html: str) -> str:
     <div dir="rtl" style="font-family: Tahoma, Arial, sans-serif; background:{BRAND_CREAM}; padding: 32px 0;">
       <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e5e0d3;">
         <div style="background:{BRAND_GREEN};padding:28px 32px;text-align:center;">
-          <p style="margin:0;color:#faf8f3;font-size:22px;font-weight:800;letter-spacing:1px;">CJ WORKOUT</p>
+          <p style="margin:0;color:#faf8f3;font-size:22px;font-weight:800;letter-spacing:1px;">CJ FOOD</p>
         </div>
         <div style="padding:32px;color:#22201b;line-height:1.9;font-size:15px;">
           {body_html}
         </div>
         <div style="padding:20px 32px;background:#f4efe3;text-align:center;font-size:12px;color:#7a7563;">
-          CJ WORKOUT — كابتن CJ وياك
+          CJ FOOD — كابتن CJ وياك
         </div>
       </div>
     </div>"""
@@ -30,7 +30,7 @@ def _wrap(body_html: str) -> str:
 
 def _send(to: str, subject: str, html: str) -> bool:
     api_key = os.environ.get("RESEND_API_KEY")
-    from_addr = os.environ.get("EMAIL_FROM", "CJ WORKOUT <onboarding@resend.dev>")
+    from_addr = os.environ.get("EMAIL_FROM", "CJ FOOD <onboarding@resend.dev>")
     if not api_key:
         raise RuntimeError("RESEND_API_KEY غير موجود بـ .env — لا يمكن إرسال إيميلات")
 
@@ -53,10 +53,10 @@ def _send(to: str, subject: str, html: str) -> bool:
 def send_welcome_email(to: str, name: str) -> bool:
     html = _wrap(f"""
       <h2 style="color:{BRAND_GREEN};margin-top:0;">أهلًا بيك، {name} 👋</h2>
-      <p>حسابك بـ CJ WORKOUT جاهز. من هسه صاعد، عندك رفيق يساعدك توصل لهدفك بخطوات واضحة وواقعية.</p>
+      <p>حسابك بـ CJ FOOD جاهز. من هسه صاعد، عندك رفيق يساعدك توصل لهدفك بخطوات واضحة وواقعية.</p>
       <p>افتح حسابك وكمل بياناتك حتى نجهزلك خطتك الشخصية.</p>
     """)
-    return _send(to, "أهلًا بيك بـ CJ WORKOUT 💪", html)
+    return _send(to, "أهلًا بيك بـ CJ FOOD 💪", html)
 
 
 def send_password_reset_email(to: str, reset_url: str) -> bool:
@@ -73,7 +73,7 @@ def send_password_reset_email(to: str, reset_url: str) -> bool:
         هذا الرابط صالح لمدة 30 دقيقة فقط. إذا ما طلبت هذا، تجاهل الرسالة ولا داعي لأي إجراء.
       </p>
     """)
-    return _send(to, "إعادة تعيين كلمة المرور — CJ WORKOUT", html)
+    return _send(to, "إعادة تعيين كلمة المرور — CJ FOOD", html)
 
 
 def send_payment_confirmed_email(to: str, name: str, amount: int, end_date_str: str) -> bool:
@@ -87,7 +87,7 @@ def send_payment_confirmed_email(to: str, name: str, amount: int, end_date_str: 
       </div>
       <p>استمر نحو جسم ومستوى أحلامك 💪</p>
     """)
-    return _send(to, "تم تفعيل اشتراكك بنجاح — CJ WORKOUT", html)
+    return _send(to, "تم تفعيل اشتراكك بنجاح — CJ FOOD", html)
 
 
 def send_payment_rejected_email(to: str, name: str, reason: str) -> bool:
@@ -98,4 +98,4 @@ def send_payment_rejected_email(to: str, name: str, reason: str) -> bool:
       <p style="background:#fdeeee;border-radius:12px;padding:14px;color:#7a1f1f;">{reason}</p>
       <p>تكدر تعيد إرسال طلب الدفع من صفحة الاشتراك، أو تراسلنا إذا تحتاج مساعدة.</p>
     """)
-    return _send(to, "بخصوص عملية الدفع — CJ WORKOUT", html)
+    return _send(to, "بخصوص عملية الدفع — CJ FOOD", html)

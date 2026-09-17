@@ -71,7 +71,7 @@ class TestCookingAssistant:
 class TestOfftopicAndMedical:
     def test_offtopic_declines_gracefully(self, user, models_dict):
         r = send(user, models_dict, "اكتبلي كود بايثون")
-        assert "CJ WORKOUT" in r["reply"]
+        assert "CJ FOOD" in r["reply"]
         assert MealLog.query.filter_by(user_id=user.id).count() == 0
 
     def test_medical_declines_gracefully(self, user, models_dict):

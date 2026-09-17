@@ -69,7 +69,7 @@ export default function Subscribe() {
         ) : (
           <>
             <h1 className="font-display">إتمام الاشتراك</h1>
-            <p className="subtitle">CJ WORKOUT Monthly — {info ? info.price.toLocaleString("en-US") : "..."} د.ع / شهر</p>
+            <p className="subtitle">CJ FOOD Monthly — {info ? info.price.toLocaleString("en-US") : "..."} د.ع / شهر</p>
 
             <AdSlot html={AD_SLOTS.subscribeInterstitial} className="ad-slot ad-slot-large" />
 

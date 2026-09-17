@@ -11,5 +11,5 @@ def build_whatsapp_link(message: str) -> str:
 
 
 def consultation_whatsapp_link() -> str:
-    message = "السلام عليكم، أريد الاستفسار عن CJ WORKOUT والاستشارة الغذائية."
+    message = "السلام عليكم، أريد الاستفسار عن CJ FOOD والاستشارة الغذائية."
     return build_whatsapp_link(message)

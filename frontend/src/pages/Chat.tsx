@@ -39,7 +39,7 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { t, syncFromAccount } = useI18n();
+  const { t } = useI18n();
 
   useEffect(() => {
     api.get<MeResponse>("/me").then((res) => {
@@ -47,9 +47,6 @@ export default function Chat() {
         navigate("/login");
         return;
       }
-      // نزامن تفضيل اللغة المحفوظ بالحساب مع الواجهة — بس لو هذا المتصفح ماله اختيار صريح
-      // أصلاً (أول فتح من جهاز/متصفح جديد). راجع تعليق syncFromAccount بـI18nContext.tsx.
-      syncFromAccount(res.data.language);
       if (!res.data.intro_completed) {
         navigate("/intro");
         return;

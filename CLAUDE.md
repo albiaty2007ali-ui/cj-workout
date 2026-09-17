@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-CJ WORKOUT is a Flask server-rendered web app (Arabic/Iraqi-dialect UI) combining subscription/payment management with a **local-first nutrition chat assistant**. "Local-first" is a hard architectural constraint here, not an implementation detail: there is no external LLM/nutrition API call at runtime. All food matching, quantity resolution, and calorie math run against a local SQLite database and hand-written Arabic NLP rules in this repo.
+CJ FOOD is a Flask server-rendered web app (Arabic/Iraqi-dialect UI) combining subscription/payment management with a **local-first nutrition chat assistant**. "Local-first" is a hard architectural constraint here, not an implementation detail: there is no external LLM/nutrition API call at runtime. All food matching, quantity resolution, and calorie math run against a local SQLite database and hand-written Arabic NLP rules in this repo.
 
 > **Note — parallel Netlify/TypeScript engine also exists in this repo.** Everything below in this
 > file documents the *original* Flask/Python app (`nutrition_ai/`, `templates/`, etc.), which is

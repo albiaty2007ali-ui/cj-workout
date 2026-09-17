@@ -23,7 +23,7 @@ function shiftMonth(key: string, delta: number): string {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { t, dir, language } = useI18n();
+  const { t, dir } = useI18n();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [editing, setEditing] = useState(false);
@@ -218,13 +218,13 @@ export default function Profile() {
                 <button type="button" disabled={!earliestMonth || viewMonth <= earliestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, -1) : v); setSelectedDate(null); }}>
                   {backArrow(dir)} {t("profile.prevMonth")}
                 </button>
-                <strong>{MONTH_LABELS[language][Number(viewMonth.split("-")[1]) - 1]} {viewMonth.split("-")[0]}</strong>
+                <strong>{MONTH_LABELS[Number(viewMonth.split("-")[1]) - 1]} {viewMonth.split("-")[0]}</strong>
                 <button type="button" disabled={!latestMonth || viewMonth >= latestMonth} onClick={() => { setViewMonth((v) => v ? shiftMonth(v, 1) : v); setSelectedDate(null); }}>
                   {t("profile.nextMonth")} {forwardArrow(dir)}
                 </button>
               </div>
               <div className="calendar-weekdays">
-                {WEEKDAY_LABELS[language].map((d) => <span key={d}>{d}</span>)}
+                {WEEKDAY_LABELS.map((d) => <span key={d}>{d}</span>)}
               </div>
               <div className="calendar-grid">
                 {monthGrid.map((date, i) => {

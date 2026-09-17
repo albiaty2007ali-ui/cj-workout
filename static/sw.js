@@ -2,7 +2,7 @@
 // الرابط الصحيح عند الضغط عليه (فطور -> الشات، وصفة -> صفحتها، Streak -> البروفايل).
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "CJ WORKOUT", body: "", url: "/app" };
+  let payload = { title: "CJ FOOD", body: "", url: "/app" };
   try {
     payload = { ...payload, ...event.data.json() };
   } catch (e) {}

@@ -1043,7 +1043,7 @@ async function dispatch(
   }
 
   if (intent === intents.OFFTOPIC) {
-    return { reply: "أنا مخصص لمساعدتك بالأكل واللياقة والتغذية داخل CJ WORKOUT 💪، ما أكدر أساعد بطلبات ثانية.", meal_logged: false };
+    return { reply: "أنا مخصص لمساعدتك بالأكل واللياقة والتغذية داخل CJ FOOD 💪، ما أكدر أساعد بطلبات ثانية.", meal_logged: false };
   }
   if (intent === intents.MEDICAL) {
     return { reply: "هذا سؤال يحتاج رأي مختص طبي، أنا ما أقدر أشخص أو أنصح بعلاج. تواصل مع دكتور أو مختص تغذية لهذا الموضوع 🙏", meal_logged: false };

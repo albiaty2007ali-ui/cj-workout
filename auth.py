@@ -77,7 +77,7 @@ def register():
                 current_app.logger.warning(f"welcome email failed: {e}")
 
             login_user(user)
-            flash("تم إنشاء حسابك بنجاح، أهلًا بيك بـ CJ WORKOUT", "success")
+            flash("تم إنشاء حسابك بنجاح، أهلًا بيك بـ CJ FOOD", "success")
             return _post_auth_redirect()
 
     return render_template("register.html", form=form, errors=errors,

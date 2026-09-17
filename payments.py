@@ -37,7 +37,7 @@ def subscribe():
     price = int(os.environ.get("SUBSCRIPTION_PRICE_IQD", "10000"))
 
     def _whatsapp_link(reference: str = "") -> str:
-        msg = f"هلا، أنا {current_user.name}. أرسلت تحويل اشتراك CJ WORKOUT."
+        msg = f"هلا، أنا {current_user.name}. أرسلت تحويل اشتراك CJ FOOD."
         if reference:
             msg += f" الرقم المرجعي: {reference}"
         msg += " (هذا الإثبات مرفق بالصورة)"

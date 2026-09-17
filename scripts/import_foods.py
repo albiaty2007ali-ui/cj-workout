@@ -1,8 +1,8 @@
 """
-استيراد بيانات الأكل إلى قاعدة CJ WORKOUT المحلية.
+استيراد بيانات الأكل إلى قاعدة CJ FOOD المحلية.
 
 الاستخدام:
-    python scripts/import_foods.py --seed          # يبني القاعدة من بيانات CJ WORKOUT المنسّقة
+    python scripts/import_foods.py --seed          # يبني القاعدة من بيانات CJ FOOD المنسّقة
     python scripts/import_foods.py --usda <folder>  # يستورد ملفات USDA CSV (بعد رفعها يدويًا)
 
 لا يوجد أي اتصال إنترنت هنا — الاستيراد يقرأ ملفات محلية فقط.
@@ -74,7 +74,7 @@ def import_seed():
 
     conn.commit()
     conn.close()
-    print(f"✅ تم استيراد {inserted} طعام من بيانات CJ WORKOUT المحلية.")
+    print(f"✅ تم استيراد {inserted} طعام من بيانات CJ FOOD المحلية.")
 
 
 def import_usda(folder: str):
@@ -217,8 +217,8 @@ def import_usda(folder: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="استيراد بيانات الأكل لقاعدة CJ WORKOUT المحلية")
-    parser.add_argument("--seed", action="store_true", help="استورد بيانات CJ WORKOUT المنسّقة (عراقية/عربية)")
+    parser = argparse.ArgumentParser(description="استيراد بيانات الأكل لقاعدة CJ FOOD المحلية")
+    parser.add_argument("--seed", action="store_true", help="استورد بيانات CJ FOOD المنسّقة (عراقية/عربية)")
     parser.add_argument("--usda", type=str, help="مسار مجلد يحتوي ملفات USDA CSV بعد فك الضغط")
     parser.add_argument("--reset", action="store_true", help="احذف القاعدة الحالية قبل الاستيراد")
     args = parser.parse_args()

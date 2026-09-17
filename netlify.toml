@@ -1,4 +1,4 @@
-# CJ WORKOUT — إعداد Netlify (راجع NETLIFY_MIGRATION_AUDIT.md لتفاصيل حالة الهجرة الكاملة).
+# CJ FOOD — إعداد Netlify (راجع NETLIFY_MIGRATION_AUDIT.md لتفاصيل حالة الهجرة الكاملة).
 
 [build]
   # لا نستخدم [build.base] عمدًا — يخلي functions.directory وpublish نسبيين لجذر المستودع

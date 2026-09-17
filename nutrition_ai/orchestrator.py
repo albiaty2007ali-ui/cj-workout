@@ -634,7 +634,7 @@ def _dispatch(user, text_norm, intent, pending, target, db, models, dbg) -> dict
         # ADD_FOOD بدون pending ولا وجبة قابلة لإعادة الفتح -> يبدأ وجبة جديدة (يمر تحت بدون تغيير)
 
     if intent == intents.OFFTOPIC:
-        return {"reply": "أنا مخصص لمساعدتك بالأكل واللياقة والتغذية داخل CJ WORKOUT 💪، ما أكدر أساعد بطلبات ثانية.", "meal_logged": False}
+        return {"reply": "أنا مخصص لمساعدتك بالأكل واللياقة والتغذية داخل CJ FOOD 💪، ما أكدر أساعد بطلبات ثانية.", "meal_logged": False}
 
     if intent == intents.MEDICAL:
         return {"reply": "هذا سؤال يحتاج رأي مختص طبي، أنا ما أقدر أشخص أو أنصح بعلاج. تواصل مع دكتور أو مختص تغذية لهذا الموضوع 🙏", "meal_logged": False}

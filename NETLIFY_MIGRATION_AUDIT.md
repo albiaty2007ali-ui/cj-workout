@@ -151,7 +151,7 @@ per-request.
 ## MIGRATION PLAN (نظرة عامة)
 
 ```
-CJ WORKOUT (Flask Monolith)
+CJ FOOD (Flask Monolith)
         │
         ├── Frontend (24 Jinja templates + 7 JS files)
         │        → React + Vite SPA على Netlify Hosting

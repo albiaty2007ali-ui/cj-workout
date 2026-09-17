@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.cjworkout.app',
-  appName: 'CJ WORKOUT',
+  appName: 'CJ FOOD',
   webDir: 'dist',
   // WebView حقيقي يفتح الموقع المنشور مباشرة — كل تحديث ينشر على Netlify ينعكس بالتطبيق فورًا
   // بدون الحاجة لإعادة بناء APK جديد، بعكس تضمين dist/ محليًا داخل الحزمة.

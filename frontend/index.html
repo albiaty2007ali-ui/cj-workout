@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CJ WORKOUT</title>
+    <title>CJ FOOD</title>
     <!-- إثبات ملكية الموقع لـGoogle AdSense (ca-pub-1010119768826215) -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1010119768826215"
      crossorigin="anonymous"></script>
@@ -13,15 +13,6 @@
       try {
         var t = localStorage.getItem("cj_theme");
         if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
-      } catch (e) {}
-      // نفس المبدأ لاتجاه/لغة الصفحة — يمنع "ومضة" RTL/LTR خاطئة لحظة التحميل (المفتاح
-      // "cj_language" نفسه المستخدم بـI18nContext.tsx)
-      try {
-        var l = localStorage.getItem("cj_language");
-        if (l === "en") {
-          document.documentElement.setAttribute("dir", "ltr");
-          document.documentElement.setAttribute("lang", "en");
-        }
       } catch (e) {}
     </script>
   </head>

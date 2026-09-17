@@ -1,4 +1,4 @@
-# CJ WORKOUT — Flask + Local-First Nutrition AI Chat
+# CJ FOOD — Flask + Local-First Nutrition AI Chat
 
 نسخة Python (Flask) + HTML/CSS/JS عادي، بدون أي اتصال API خارجي وقت التشغيل.
 كل شيء فُحص فعليًا بسيناريوهات حقيقية (تسجيل، دخول، دفع، تفعيل، محادثة تغذية،

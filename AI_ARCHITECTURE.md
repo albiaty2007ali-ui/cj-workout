@@ -1,6 +1,6 @@
-# AI Architecture — CJ WORKOUT (Netlify/TypeScript engine)
+# AI Architecture — CJ FOOD (Netlify/TypeScript engine)
 
-هذا الملف يوثّق كيف تُستخدم Gemini بمشروع CJ WORKOUT الجديد (`shared/nutrition-engine/` +
+هذا الملف يوثّق كيف تُستخدم Gemini بمشروع CJ FOOD الجديد (`shared/nutrition-engine/` +
 `netlify/functions/chat.mts`)، وليش بُنيت بهذا الشكل بالضبط. يفترض قراءة `CLAUDE.md` أولاً
 لفهم الهيكل العام (هذا الملف نسخة Netlify/TypeScript الجديدة، منفصلة عن Flask الأصلي الموثّق
 هناك).

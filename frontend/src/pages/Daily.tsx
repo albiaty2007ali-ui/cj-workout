@@ -13,11 +13,11 @@ const MEAL_KEYS: Array<"breakfast" | "lunch" | "dinner"> = ["breakfast", "lunch"
 
 /** يعتمد كليًا على data.budgets الحقيقية المحسوبة أصلًا (progress-daily.mts -> mealBudget.ts) —
  * "رتبلي باقي اليوم" هو تجميع/عرض لما هو موجود فعلاً، صفر توزيع جديد. */
-function FixMyDayPlan({ data, language }: { data: DailyResponse; language: "ar" | "en" }) {
+function FixMyDayPlan({ data }: { data: DailyResponse }) {
   const { t } = useI18n();
   const items = MEAL_KEYS
     .filter((key) => data.meals![key].status !== "LOGGED" && data.budgets?.[key])
-    .map((key) => ({ label: MEAL_LABELS[language][key], icon: MEAL_ICONS[key], kcal: data.budgets![key] }));
+    .map((key) => ({ label: MEAL_LABELS[key], icon: MEAL_ICONS[key], kcal: data.budgets![key] }));
   if (items.length === 0) return null;
   return (
     <div className="notice-box" style={{ marginTop: 16 }}>
@@ -40,7 +40,7 @@ function shiftDate(iso: string, days: number): string {
 
 export default function Daily() {
   const navigate = useNavigate();
-  const { t, dir, language } = useI18n();
+  const { t, dir } = useI18n();
   const [params, setParams] = useSearchParams();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [data, setData] = useState<DailyResponse | null>(null);
@@ -109,7 +109,7 @@ export default function Daily() {
                 <button className="btn btn-moss" onClick={() => setShowFixPlan((v) => !v)}>
                   {t("daily.fixMyDayButton")}
                 </button>
-                {showFixPlan && <FixMyDayPlan data={data} language={language} />}
+                {showFixPlan && <FixMyDayPlan data={data} />}
               </div>
             )}
 
@@ -117,7 +117,7 @@ export default function Daily() {
               {MEAL_KEYS.map((key) => {
                 const meal: MealBucket = data.meals![key];
                 const budget = data.budgets?.[key];
-                const label = MEAL_LABELS[language][key];
+                const label = MEAL_LABELS[key];
                 const icon = MEAL_ICONS[key];
                 return (
                   <div className="meal-slot-card" key={key}>

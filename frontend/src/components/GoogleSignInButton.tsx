@@ -55,7 +55,7 @@ function loadGoogleScript(): Promise<void> {
 
 export default function GoogleSignInButton() {
   const navigate = useNavigate();
-  const { language, t } = useI18n();
+  const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
@@ -72,7 +72,7 @@ export default function GoogleSignInButton() {
       buttonRef.current.innerHTML = "";
       window.google.accounts.id.renderButton(buttonRef.current, {
         type: "standard", theme: "filled_black", shape: "pill", size: "large", width,
-        locale: language === "ar" ? "ar" : "en", text: "continue_with", logo_alignment: "left",
+        locale: "ar", text: "continue_with", logo_alignment: "left",
       });
     }
 
@@ -103,7 +103,7 @@ export default function GoogleSignInButton() {
       window.removeEventListener("resize", onResize);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, language]);
+  }, [navigate]);
 
   if (!CLIENT_ID) return null;
 

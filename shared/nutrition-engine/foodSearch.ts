@@ -1,5 +1,5 @@
 /**
- * منفذ من food_search.py — البحث والمطابقة داخل قاعدة CJ WORKOUT المحلية (foods.sqlite عبر
+ * منفذ من food_search.py — البحث والمطابقة داخل قاعدة CJ FOOD المحلية (foods.sqlite عبر
  * sql.js). لا يوجد أي طلب شبكة هنا — كل شيء محلي، بنفس الاستعلامات SQL الأصلية حرفيًا.
  *
  * ملاحظة هجرة مهمة: هذا الملف له NUMBER_WORDS خاص به منفصل عن quantity.ts's NUMBER_WORDS —

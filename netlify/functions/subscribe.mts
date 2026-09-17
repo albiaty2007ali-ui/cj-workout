@@ -12,7 +12,7 @@ import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js
 function whatsappLink(name: string, reference: string): string {
   const number = process.env.SUPPORT_WHATSAPP_NUMBER;
   if (!number) return "";
-  let msg = `هلا، أنا ${name}. أرسلت تحويل اشتراك CJ WORKOUT.`;
+  let msg = `هلا، أنا ${name}. أرسلت تحويل اشتراك CJ FOOD.`;
   if (reference) msg += ` الرقم المرجعي: ${reference}`;
   msg += " (هذا الإثبات مرفق بالصورة)";
   return `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;

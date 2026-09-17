@@ -25,7 +25,7 @@ export default function Sidebar({ userName, isAdmin, onQuickPrompt }: SidebarPro
       {open && <div className="sidebar-overlay" onClick={() => setOpen(false)} />}
       <aside className={`app-sidebar ${open ? "open" : ""}`} aria-label={t("sidebar.mainMenu")}>
         <div className="sidebar-top">
-          <p className="sidebar-logo">CJ WORKOUT</p>
+          <p className="sidebar-logo">CJ FOOD</p>
           <button className="sidebar-close-btn" aria-label={t("sidebar.closeMenu")} onClick={() => setOpen(false)}>✕</button>
         </div>
         <nav className="sidebar-nav">
@@ -38,6 +38,7 @@ export default function Sidebar({ userName, isAdmin, onQuickPrompt }: SidebarPro
               <button className="sidebar-item" onClick={() => { onQuickPrompt("شنو آكل هسه؟"); setOpen(false); }}>{t("sidebar.whatToEat")}</button>
             </>
           )}
+          <Link className="sidebar-item" to="/chat" onClick={() => setOpen(false)}>{t("sidebar.chat")}</Link>
           <Link className="sidebar-item" to="/recipes" onClick={() => setOpen(false)}>{t("sidebar.recipes")}</Link>
           <Link className="sidebar-item" to="/daily" onClick={() => setOpen(false)}>{t("sidebar.daily")}</Link>
           <Link className="sidebar-item" to="/progress/weight" onClick={() => setOpen(false)}>{t("sidebar.weight")}</Link>

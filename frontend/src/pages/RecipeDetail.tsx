@@ -9,7 +9,7 @@ import { DIFFICULTY_LABELS } from "../i18n/translations";
 export default function RecipeDetail() {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
-  const { t, dir, language } = useI18n();
+  const { t, dir } = useI18n();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [data, setData] = useState<RecipeDetailResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -134,7 +134,7 @@ export default function RecipeDetail() {
                 <span>{servings ?? recipe.servings} {t("recipe.servingsUnit")}</span>
                 <button type="button" onClick={() => changeServings((servings ?? recipe.servings) + 1)} disabled={scaling} aria-label={t("recipe.increaseServings")}>+</button>
               </span>
-              <span>📊 {DIFFICULTY_LABELS[language][recipe.difficulty as "easy" | "medium" | "hard"] ?? recipe.difficulty}</span>
+              <span>📊 {DIFFICULTY_LABELS[recipe.difficulty as "easy" | "medium" | "hard"] ?? recipe.difficulty}</span>
             </div>
 
             <div className="recipe-macro-grid">
