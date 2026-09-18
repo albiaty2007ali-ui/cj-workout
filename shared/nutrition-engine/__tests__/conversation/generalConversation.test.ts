@@ -65,4 +65,15 @@ describe("عقد 'صفر اختراع' بنص التعليمات — يذكر ا
     expect(CONVERSATION_SYSTEM_INSTRUCTION).toContain("لا تخترع");
     expect(CONVERSATION_SYSTEM_INSTRUCTION).toContain("recipe_id");
   });
+
+  // Bug حقيقي مُكتشَف بتحقق حي مع المستخدم: "تغديت مسكوف" -> سؤال كمية (صفر استدعاء أداة) ->
+  // "400 غرام" -> رجعت حسابات "بيضة" (طعام قديم انذكر ببداية نفس المحادثة، لأن active_food ما
+  // تحدّث بدون استدعاء أداة). القاعدة 13 تجبر search_food عند سؤال الكمية لطعام جديد تحديدًا
+  // لسد هذي الفجوة — راجع geminiConversationProvider.ts's buildContextText (يحقن "آخر طعام
+  // مطروح" بالسياق حرفيًا، فلو بقي قديم يضلل Gemini صراحة).
+  it("يحتوي قاعدة استدعاء search_food عند سؤال الكمية لطعام جديد (يمنع التباس مع طعام قديم بالمحادثة)", async () => {
+    const { CONVERSATION_SYSTEM_INSTRUCTION } = await import("../../conversation/systemInstruction.js");
+    expect(CONVERSATION_SYSTEM_INSTRUCTION).toContain("آخر طعام مطروح بالمحادثة");
+    expect(CONVERSATION_SYSTEM_INSTRUCTION).toContain("search_food");
+  });
 });
