@@ -1,6 +1,10 @@
 /**
  * GET /api/progress/daily?date=YYYY-MM-DD — يعادل progress_bp.py's /daily. اليوم الحالي
  * افتراضيًا (بتوقيت بغداد)؛ الأيام الماضية للقراءة فقط، بدون ميزانية توزيع (نفس قرار الأصل).
+ *
+ * POST /api/progress/daily?action=update|delete|add — مدير وجبات اليوم (نفس نمط
+ * WeightProgress.tsx's ?action=delete الموجود أصلًا). الثلاثة مقيَّدة لوجبات اليوم الحالي فقط
+ * (orchestrator.ts's findTodayMealLogForUser الداخلية).
  */
 import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
@@ -12,12 +16,74 @@ import * as mealBudget from "../../shared/nutrition-engine/mealBudget.js";
 import { nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
 import { getSettings } from "../../shared/nutrition-engine/notifications/engine.js";
 import { currentPeriodForUser, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
+import { logMealManually, updateMealLogTotals, deleteMealLogById } from "../../shared/nutrition-engine/orchestrator.js";
+
+async function handlePost(req: Request, claims: { sub: string }): Promise<Response> {
+  const url = new URL(req.url);
+  const action = url.searchParams.get("action");
+  const repo = new FirestoreRepository();
+  const user = await repo.findUser(claims.sub);
+  if (!user) return jsonError(404, "USER_NOT_FOUND", "الحساب غير موجود.");
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return jsonError(400, "INVALID_JSON", "جسم الطلب غير صالح.");
+  }
+
+  if (action === "delete") {
+    const id = typeof body.id === "string" ? body.id : "";
+    if (!id) return jsonError(400, "VALIDATION_ERROR", "id مطلوب.");
+    const result = await deleteMealLogById(repo, user, id);
+    if (!result.ok) return jsonError(404, "NOT_FOUND", "الوجبة غير موجودة أو خارج نطاق اليوم.");
+    return jsonOk({ deleted: true });
+  }
+
+  if (action === "update") {
+    const id = typeof body.id === "string" ? body.id : "";
+    const nums = ["total_calories", "total_protein", "total_carbs", "total_fat"] as const;
+    if (!id || nums.some((k) => typeof body[k] !== "number" || (body[k] as number) < 0)) {
+      return jsonError(400, "VALIDATION_ERROR", "أرقام غير صالحة.");
+    }
+    const patch = Object.fromEntries(nums.map((k) => [k, body[k] as number])) as Record<(typeof nums)[number], number>;
+    const result = await updateMealLogTotals(repo, user, id, patch);
+    if (!result.ok) return jsonError(404, "NOT_FOUND", "الوجبة غير موجودة أو خارج نطاق اليوم.");
+    return jsonOk({ updated: true });
+  }
+
+  if (action === "add") {
+    const mealType = typeof body.meal_type === "string" ? body.meal_type : "";
+    const foodId = typeof body.food_id === "number" ? body.food_id : NaN;
+    const foodName = typeof body.food_name === "string" ? body.food_name : "";
+    const grams = typeof body.grams === "number" ? body.grams : NaN;
+    if (!["breakfast", "lunch", "dinner", "snack"].includes(mealType) || !foodId || !foodName || !(grams > 0)) {
+      return jsonError(400, "VALIDATION_ERROR", "بيانات الوجبة غير صالحة.");
+    }
+    const result = await logMealManually(repo, user, mealType, foodId, foodName, grams);
+    if ((result as { premium_required?: boolean }).premium_required) {
+      return jsonError(402, "TRIAL_EXHAUSTED", "خلصت وجباتك المجانية. تحتاج اشتراك لتكملة التسجيل.");
+    }
+    return jsonOk(result);
+  }
+
+  return jsonError(400, "VALIDATION_ERROR", "action غير معروف.");
+}
 
 export default async (req: Request, _context: Context): Promise<Response> => {
-  if (req.method !== "GET") return jsonError(405, "METHOD_NOT_ALLOWED", "استخدم GET فقط.");
-
   const claims = authenticateRequest(req);
   if (!claims) return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
+
+  if (req.method === "POST") {
+    try {
+      return await handlePost(req, claims);
+    } catch (err) {
+      console.error("progress-daily POST error:", err);
+      return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
+    }
+  }
+
+  if (req.method !== "GET") return jsonError(405, "METHOD_NOT_ALLOWED", "استخدم GET أو POST فقط.");
 
   const url = new URL(req.url);
   const dateParam = url.searchParams.get("date");

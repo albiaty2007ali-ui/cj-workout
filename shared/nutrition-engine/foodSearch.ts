@@ -229,6 +229,33 @@ export async function getAllAliasesDicts(): Promise<AliasRow[]> {
   return getAllAliasesRows(db);
 }
 
+export interface FoodSearchHit {
+  food_id: number;
+  food_name: string;
+}
+
+/**
+ * بحث نصي حر بقاعدة الأطعمة (للإضافة اليدوية من واجهة "وجبات اليوم") — مطابقة substring على
+ * كل الـaliases (نفس فلسفة الملف كله)، مُبعثَرة حسب food_id (أول alias مطابق فقط لكل طعام)،
+ * الأقصر أولًا (alias أقصر = تطابق أدق عادةً). لا يخترع أي طعام غير موجود بقاعدة البيانات.
+ */
+export async function searchFoods(query: string, limit = 15): Promise<FoodSearchHit[]> {
+  const q = normalize(query).trim();
+  if (!q) return [];
+  const db = await getFoodDb();
+  const rows = getAllAliasesRows(db).slice().sort((a, b) => a.normalized_alias.length - b.normalized_alias.length);
+  const seen = new Set<number>();
+  const hits: FoodSearchHit[] = [];
+  for (const r of rows) {
+    if (seen.has(r.food_id)) continue;
+    if (!r.normalized_alias.includes(q)) continue;
+    seen.add(r.food_id);
+    hits.push({ food_id: r.food_id, food_name: r.food_name });
+    if (hits.length >= limit) break;
+  }
+  return hits;
+}
+
 export async function getPortionsFor(foodId: number): Promise<SqlRow[]> {
   const db = await getFoodDb();
   return queryAll(db, "SELECT * FROM food_portions WHERE food_id=?", [foodId]);

@@ -363,6 +363,10 @@ export class FirestoreRepository implements Repository {
     return { id, ...(d as Omit<MealLogRecord, "id" | "created_at">), created_at: toDate(d.created_at) };
   }
 
+  async updateMealLog(id: string, patch: Partial<Pick<MealLogInput, "total_calories" | "total_protein" | "total_carbs" | "total_fat">>): Promise<void> {
+    await this.db.collection("meal_logs").doc(id).set(patch, { merge: true });
+  }
+
   async deleteMealLog(id: string): Promise<void> {
     await this.db.collection("meal_logs").doc(id).delete();
   }

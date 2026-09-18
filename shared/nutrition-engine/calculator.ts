@@ -73,7 +73,7 @@ export async function todayWaterMl(repo: Repository, userId: string, now: Date =
 export type MealBucket =
   | { status: "NOT_STARTED" }
   | {
-      status: "LOGGED"; calories: number; protein: number; carbs: number; fat: number;
+      status: "LOGGED"; id: string; calories: number; protein: number; carbs: number; fat: number;
       foods: string[]; logged_at: Date;
     };
 
@@ -103,7 +103,7 @@ export async function mealsByTypeForDay(
       foods = [];
     }
     return {
-      status: "LOGGED", calories: log.total_calories, protein: log.total_protein,
+      status: "LOGGED", id: log.id, calories: log.total_calories, protein: log.total_protein,
       carbs: log.total_carbs, fat: log.total_fat, foods, logged_at: log.created_at,
     };
   };

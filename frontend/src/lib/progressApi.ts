@@ -1,11 +1,22 @@
 export interface MealBucket {
   status: "NOT_STARTED" | "LOGGED";
+  id?: string;
   calories?: number;
   protein?: number;
   carbs?: number;
   fat?: number;
   foods?: string[];
   logged_at?: string;
+}
+
+export interface FoodSearchHit {
+  food_id: number;
+  food_name: string;
+}
+
+export interface FoodPortion {
+  portion_name: string;
+  grams: number;
 }
 
 export interface DailyResponse {

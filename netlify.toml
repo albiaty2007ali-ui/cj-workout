@@ -85,6 +85,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/foods-search"
+  to = "/.netlify/functions/foods-search"
+  status = 200
+
+[[redirects]]
   from = "/api/progress/weight"
   to = "/.netlify/functions/progress-weight"
   status = 200

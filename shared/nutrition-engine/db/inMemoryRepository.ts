@@ -157,6 +157,11 @@ export class InMemoryRepository implements Repository {
     return this.mealLogs.find((m) => m.id === id) ?? null;
   }
 
+  async updateMealLog(id: string, patch: Partial<Pick<MealLogInput, "total_calories" | "total_protein" | "total_carbs" | "total_fat">>): Promise<void> {
+    const row = this.mealLogs.find((m) => m.id === id);
+    if (row) Object.assign(row, patch);
+  }
+
   async deleteMealLog(id: string): Promise<void> {
     this.mealLogs = this.mealLogs.filter((m) => m.id !== id);
   }

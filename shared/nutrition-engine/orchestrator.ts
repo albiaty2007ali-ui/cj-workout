@@ -389,6 +389,88 @@ async function tryDirectLog(
   return finalizeMeal(repo, user, tempPending, target, "direct", now);
 }
 
+/**
+ * إضافة وجبة يدويًا من واجهة "مدير وجبات اليوم" (بعد بحث المستخدم باسم طعام حقيقي واختيار
+ * غرام) — نفس نمط tryDirectLog بالضبط (عنصر واحد محلول)، صفر منطق XP/عداد مجاني/ستريك مكرر:
+ * finalizeMeal الموجودة أصلًا تتكفّل بكل شي (بما فيها نافذة تراجع 5 دقائق كميزة إضافية مجانية،
+ * بما إن source="direct").
+ */
+export async function logMealManually(
+  repo: Repository, user: UserRecord, mealType: string,
+  foodId: number, foodName: string, grams: number, now: Date = new Date(),
+): Promise<DispatchResult> {
+  const tempPending = mealState.newPending(mealType, `[إضافة يدوية] ${foodName}`);
+  const n = await calculator.computeFood(foodId, grams);
+  addResolvedToPending(tempPending, { food_id: foodId, food_name: foodName, grams }, n);
+  const profile = await repo.findNutritionProfile(user.id);
+  const target = profile ? profile.calorie_target : 2000;
+  return finalizeMeal(repo, user, tempPending, target, "direct", now);
+}
+
+/** يتحقق إن سجل وجبة معيّن يخص المستخدم ويقع ضمن نطاق يوم بغداد الحالي — حارس مشترك لـ
+ * updateMealLogTotals/deleteMealLogById (كلاهما مسموح بهما لوجبات "اليوم" فقط). */
+async function findTodayMealLogForUser(repo: Repository, user: UserRecord, mealLogId: string, now: Date) {
+  const log = await repo.findMealLog(mealLogId);
+  if (!log || log.user_id !== user.id) return null;
+  const { year, month, day } = nowBaghdad(now);
+  const [start, end] = calculator.dayUtcRange(year, month, day);
+  if (log.created_at < start || log.created_at >= end) return null;
+  return log;
+}
+
+export interface MealLogPatch {
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+}
+
+/**
+ * تعديل يدوي لأرقام وجبة مسجَّلة اليوم (سعرات/بروتين/كارب/دهون فقط — لا توجد بيانات عناصر
+ * مفصَّلة محفوظة لإعادة حساب حقيقية من الكمية، راجع خطة "مدير وجبات اليوم"). لا يؤثر على XP
+ * (ثابتة 10 لكل وجبة بغض النظر عن قيمتها) ولا الستريك — فقط الأرقام + behavior_daily snapshot
+ * (حتى لا تبقى النقاط الشخصية/التحديات على أرقام قديمة بعد التعديل).
+ */
+export async function updateMealLogTotals(
+  repo: Repository, user: UserRecord, mealLogId: string, patch: MealLogPatch, now: Date = new Date(),
+): Promise<{ ok: boolean; error?: "NOT_FOUND" }> {
+  const log = await findTodayMealLogForUser(repo, user, mealLogId, now);
+  if (!log) return { ok: false, error: "NOT_FOUND" };
+  await repo.updateMealLog(mealLogId, patch);
+  const profile = await repo.findNutritionProfile(user.id);
+  await behaviorAggregator.recordDailyBehavior(repo, user.id, profile, now);
+  return { ok: true };
+}
+
+/**
+ * حذف وجبة مسجَّلة اليوم (أي وجبة، مو بس الأخيرة — بعكس directLog.undo()'s نافذة 5 دقائق).
+ * يرجّع XP الحقيقي المسجَّل فعليًا لهذي الوجبة تحديدًا (بحث بالـLedger بدل افتراض رقم ثابت)
+ * وعداد الوجبات المجانية (لو كانت وجبة مجانية). **قيد موثَّق عمدًا**: لا يلمس الستريك/
+ * ActiveDay/محطات الستريك إطلاقًا — استرجاعها الصحيح يحتاج معرفة هل هذي كانت أول نشاط باليوم
+ * وهل بقي نشاط ثاني بعد الحذف، وهذا غير قابل لإعادة البناء من سجل الوجبة وحده بعد فوات الأوان
+ * (directLog.ts يحلّها فقط عبر Snapshot لحظي غير موجود هنا). راجع القرار الموثَّق بالخطة.
+ */
+export async function deleteMealLogById(
+  repo: Repository, user: UserRecord, mealLogId: string, now: Date = new Date(),
+): Promise<{ ok: boolean; error?: "NOT_FOUND" }> {
+  const log = await findTodayMealLogForUser(repo, user, mealLogId, now);
+  if (!log) return { ok: false, error: "NOT_FOUND" };
+
+  await repo.deleteMealLog(mealLogId);
+
+  if (log.is_free_meal && user.free_meals_used > 0) {
+    user.free_meals_used -= 1;
+  }
+  const xpTxs = await repo.listXpTransactionsByReason(user.id, "meal_logged");
+  const originalXp = xpTxs.find((t) => t.source === mealLogId)?.amount ?? 0;
+  await xpEngine.reverseXp(repo, user, originalXp, "meal_logged", mealLogId);
+  await repo.saveUser(user);
+
+  const profile = await repo.findNutritionProfile(user.id);
+  await behaviorAggregator.recordDailyBehavior(repo, user.id, profile, now);
+  return { ok: true };
+}
+
 async function confirmPending(repo: Repository, user: UserRecord, pending: PendingMeal, target: number, now: Date): Promise<DispatchResult> {
   if (pending.pending_clarifications.length > 0) {
     return { reply: await clarificationPrompt(pending.pending_clarifications[0] as ClarificationItem), meal_logged: false };

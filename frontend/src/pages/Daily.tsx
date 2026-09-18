@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
-import type { DailyResponse, MealBucket } from "../lib/progressApi";
+import type { DailyResponse, MealBucket, FoodSearchHit, FoodPortion } from "../lib/progressApi";
 import AppShell from "../components/AppShell";
 import AdSlot from "../components/AdSlot";
 import { AD_SLOTS } from "../lib/adsConfig";
@@ -10,6 +10,8 @@ import { MEAL_LABELS } from "../i18n/translations";
 
 const MEAL_ICONS: Record<"breakfast" | "lunch" | "dinner", string> = { breakfast: "🍳", lunch: "🍗", dinner: "🌙" };
 const MEAL_KEYS: Array<"breakfast" | "lunch" | "dinner"> = ["breakfast", "lunch", "dinner"];
+type MealTypeKey = "breakfast" | "lunch" | "dinner" | "snack";
+type LoggedMeal = MealBucket & { status: "LOGGED" };
 
 /** يعتمد كليًا على data.budgets الحقيقية المحسوبة أصلًا (progress-daily.mts -> mealBudget.ts) —
  * "رتبلي باقي اليوم" هو تجميع/عرض لما هو موجود فعلاً، صفر توزيع جديد. */
@@ -32,6 +34,186 @@ function FixMyDayPlan({ data }: { data: DailyResponse }) {
   );
 }
 
+/** نموذج تعديل يدوي للأرقام الأربعة فقط — صفر إعادة حساب من كمية (MealLog لا يخزن غرام/food_id
+ * لكل عنصر بعد التسجيل، راجع توثيق قرار الخطة). */
+function EditMealForm({
+  meal, busy, onCancel, onSave,
+}: {
+  meal: LoggedMeal; busy: boolean; onCancel: () => void;
+  onSave: (v: { total_calories: number; total_protein: number; total_carbs: number; total_fat: number }) => void;
+}) {
+  const { t } = useI18n();
+  const [calories, setCalories] = useState(String(meal.calories ?? 0));
+  const [protein, setProtein] = useState(String(meal.protein ?? 0));
+  const [carbs, setCarbs] = useState(String(meal.carbs ?? 0));
+  const [fat, setFat] = useState(String(meal.fat ?? 0));
+
+  return (
+    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.caloriesLabel")}</label>
+          <input type="number" min={0} value={calories} onChange={(e) => setCalories(e.target.value)} />
+        </div>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.proteinLabel")}</label>
+          <input type="number" min={0} step="0.1" value={protein} onChange={(e) => setProtein(e.target.value)} />
+        </div>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.carbsLabel")}</label>
+          <input type="number" min={0} step="0.1" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
+        </div>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.fatLabel")}</label>
+          <input type="number" min={0} step="0.1" value={fat} onChange={(e) => setFat(e.target.value)} />
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          className="btn btn-moss" type="button" disabled={busy}
+          onClick={() => onSave({
+            total_calories: Number(calories) || 0, total_protein: Number(protein) || 0,
+            total_carbs: Number(carbs) || 0, total_fat: Number(fat) || 0,
+          })}
+        >
+          {t("daily.saveButton")}
+        </button>
+        <button className="btn btn-outline-dark" type="button" disabled={busy} onClick={onCancel}>{t("daily.cancelButton")}</button>
+      </div>
+    </div>
+  );
+}
+
+/** صندوق بحث (Debounce 300ms، نفس نمط RecipesList.tsx) + اختيار حصة/غرام لإضافة وجبة يدويًا
+ * من قاعدة الأطعمة الحقيقية — صفر طعام مخترَع، نفس مسار التسجيل الموثوق (orchestrator.ts's
+ * logMealManually -> finalizeMeal). */
+function AddMealForm({ mealType, onAdded, onCancel }: { mealType: MealTypeKey; onAdded: () => void; onCancel: () => void }) {
+  const { t } = useI18n();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<FoodSearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<FoodSearchHit | null>(null);
+  const [portions, setPortions] = useState<FoodPortion[]>([]);
+  const [selectedPortion, setSelectedPortion] = useState<FoodPortion | null>(null);
+  const [customGrams, setCustomGrams] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function onQueryChange(v: string) {
+    setQuery(v);
+    setSelected(null);
+    setResults([]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (v.trim().length < 2) return;
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      const res = await api.get<{ results: FoodSearchHit[] }>(`/foods-search?q=${encodeURIComponent(v)}`);
+      setResults(res.success && res.data ? res.data.results : []);
+      setSearching(false);
+    }, 300);
+  }
+
+  async function selectFood(hit: FoodSearchHit) {
+    setSelected(hit);
+    setResults([]);
+    setQuery(hit.food_name);
+    const res = await api.get<{ portions: FoodPortion[] }>(`/foods-search?food_id=${hit.food_id}`);
+    setPortions(res.success && res.data ? res.data.portions : []);
+    setSelectedPortion(null);
+    setCustomGrams("");
+  }
+
+  async function submit() {
+    if (!selected) return;
+    const grams = selectedPortion ? selectedPortion.grams : Number(customGrams);
+    if (!grams || grams <= 0) { setError(t("daily.actionError")); return; }
+    setBusy(true);
+    setError(null);
+    const res = await api.post<{ premium_required?: boolean }>("/progress/daily?action=add", {
+      meal_type: mealType, food_id: selected.food_id, food_name: selected.food_name, grams,
+    });
+    setBusy(false);
+    if (!res.success) {
+      setError(res.error?.code === "TRIAL_EXHAUSTED" ? t("daily.trialExhaustedError") : t("daily.actionError"));
+      return;
+    }
+    onAdded();
+  }
+
+  return (
+    <div className="notice-box" style={{ marginTop: 10 }}>
+      <div className="field">
+        <label>{t("daily.searchFoodPlaceholder")}</label>
+        <input value={query} onChange={(e) => onQueryChange(e.target.value)} placeholder={t("daily.searchFoodPlaceholder")} autoComplete="off" />
+      </div>
+      {searching && <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{t("common.loading")}</p>}
+      {!selected && !searching && query.trim().length >= 2 && results.length === 0 && (
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{t("daily.searchNoResults")}</p>
+      )}
+      {!selected && results.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {results.map((r) => (
+            <button type="button" key={r.food_id} className="btn btn-outline-dark" style={{ textAlign: "start" }} onClick={() => selectFood(r)}>
+              {r.food_name}
+            </button>
+          ))}
+        </div>
+      )}
+      {selected && (
+        <>
+          {portions.length > 0 && (
+            <div className="field">
+              <label>{t("daily.portionLabel")}</label>
+              <select
+                value={selectedPortion ? selectedPortion.portion_name : ""}
+                onChange={(e) => setSelectedPortion(portions.find((p) => p.portion_name === e.target.value) ?? null)}
+              >
+                <option value="">—</option>
+                {portions.map((p) => (
+                  <option key={p.portion_name} value={p.portion_name}>{p.portion_name} ({p.grams}غ)</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="field">
+            <label>{t("daily.customGramsLabel")}</label>
+            <input type="number" min={1} value={customGrams} onChange={(e) => { setCustomGrams(e.target.value); setSelectedPortion(null); }} />
+          </div>
+          {error && <p className="field-error">{error}</p>}
+          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+            <button className="btn btn-moss" type="button" disabled={busy} onClick={submit}>{t("daily.addButton")}</button>
+            <button className="btn btn-outline-dark" type="button" disabled={busy} onClick={onCancel}>{t("daily.cancelButton")}</button>
+          </div>
+        </>
+      )}
+      {!selected && (
+        <button className="btn btn-outline-dark" type="button" style={{ marginTop: 8 }} onClick={onCancel}>{t("daily.cancelButton")}</button>
+      )}
+    </div>
+  );
+}
+
+/** أزرار تعديل/حذف + نموذج التعديل المضمَّن لوجبة مسجَّلة واحدة — تُستخدم لكل من فتحات
+ * breakfast/lunch/dinner وكل عنصر بمصفوفة السناك، صفر تكرار منطق. */
+function LoggedMealControls({
+  meal, editing, busy, onEdit, onCancelEdit, onSave, onDelete,
+}: {
+  meal: LoggedMeal; editing: boolean; busy: boolean;
+  onEdit: () => void; onCancelEdit: () => void;
+  onSave: (v: { total_calories: number; total_protein: number; total_carbs: number; total_fat: number }) => void;
+  onDelete: () => void;
+}) {
+  const { t } = useI18n();
+  if (editing) return <EditMealForm meal={meal} busy={busy} onCancel={onCancelEdit} onSave={onSave} />;
+  return (
+    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <button type="button" className="btn btn-outline-dark" disabled={busy} onClick={onEdit}>{t("daily.editButton")}</button>
+      <button type="button" className="btn btn-outline-dark" disabled={busy} onClick={onDelete}>{t("daily.deleteButton")}</button>
+    </div>
+  );
+}
+
 function shiftDate(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
@@ -45,6 +227,10 @@ export default function Daily() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [data, setData] = useState<DailyResponse | null>(null);
   const [showFixPlan, setShowFixPlan] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addingMealType, setAddingMealType] = useState<MealTypeKey | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const dateParam = params.get("date") ?? "";
 
   useEffect(() => {
@@ -54,17 +240,46 @@ export default function Daily() {
     });
   }, [navigate]);
 
-  useEffect(() => {
+  async function reload() {
     const qs = dateParam ? `?date=${dateParam}` : "";
-    api.get<DailyResponse>(`/progress/daily${qs}`).then((res) => {
-      if (res.success && res.data) setData(res.data);
-    });
+    const res = await api.get<DailyResponse>(`/progress/daily${qs}`);
+    if (res.success && res.data) setData(res.data);
+  }
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateParam]);
 
   if (!me) return null;
 
   function goToDate(iso: string) {
     setParams(iso ? { date: iso } : {});
+  }
+
+  async function handleSaveEdit(id: string, values: { total_calories: number; total_protein: number; total_carbs: number; total_fat: number }) {
+    setBusyId(id);
+    setActionError(null);
+    const res = await api.post(`/progress/daily?action=update`, { id, ...values });
+    setBusyId(null);
+    if (!res.success) { setActionError(t("daily.actionError")); return; }
+    setEditingId(null);
+    await reload();
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm(t("daily.deleteConfirm"))) return;
+    setBusyId(id);
+    setActionError(null);
+    const res = await api.post(`/progress/daily?action=delete`, { id });
+    setBusyId(null);
+    if (!res.success) { setActionError(t("daily.actionError")); return; }
+    await reload();
+  }
+
+  async function handleAdded() {
+    setAddingMealType(null);
+    await reload();
   }
 
   return (
@@ -113,6 +328,8 @@ export default function Daily() {
               </div>
             )}
 
+            {actionError && <p className="field-error" style={{ marginTop: 12 }}>{actionError}</p>}
+
             <div style={{ marginTop: 24 }}>
               {MEAL_KEYS.map((key) => {
                 const meal: MealBucket = data.meals![key];
@@ -129,6 +346,13 @@ export default function Daily() {
                           {t("daily.proteinLabel")} {meal.protein?.toFixed(1)}غ · {t("daily.carbsLabel")} {meal.carbs?.toFixed(1)}غ · {t("daily.fatLabel")} {meal.fat?.toFixed(1)}غ
                         </p>
                         {meal.foods && meal.foods.length > 0 && <p className="meal-slot-foods">{meal.foods.join(" + ")}</p>}
+                        {data.is_today && meal.id && (
+                          <LoggedMealControls
+                            meal={meal as LoggedMeal} editing={editingId === meal.id} busy={busyId === meal.id}
+                            onEdit={() => setEditingId(meal.id!)} onCancelEdit={() => setEditingId(null)}
+                            onSave={(v) => handleSaveEdit(meal.id!, v)} onDelete={() => handleDelete(meal.id!)}
+                          />
+                        )}
                       </>
                     ) : (
                       <>
@@ -136,6 +360,15 @@ export default function Daily() {
                         {data.is_today && budget ? <p className="meal-slot-budget">{t("daily.suggestedBudget")}{budget} kcal</p> : null}
                         {data.is_today && <Link to="/chat" className="btn btn-outline-dark" style={{ marginTop: 8, display: "inline-block" }}>{t("daily.whatToEatButton")}</Link>}
                       </>
+                    )}
+                    {data.is_today && (
+                      addingMealType === key ? (
+                        <AddMealForm mealType={key} onAdded={handleAdded} onCancel={() => setAddingMealType(null)} />
+                      ) : (
+                        <button type="button" className="btn btn-outline-dark" style={{ marginTop: 8 }} onClick={() => setAddingMealType(key)}>
+                          {t("daily.addMealManualButton")}
+                        </button>
+                      )
                     )}
                   </div>
                 );
@@ -145,12 +378,30 @@ export default function Daily() {
                 <p className="meal-slot-title">{t("daily.snackLabel")}</p>
                 {data.meals.snack.length > 0 ? (
                   data.meals.snack.map((s, i) => (
-                    <p className="meal-slot-status logged" key={i}>✅ {s.calories} kcal{s.foods && s.foods.length > 0 ? ` — ${s.foods.join(" + ")}` : ""}</p>
+                    <div key={s.id ?? i}>
+                      <p className="meal-slot-status logged">✅ {s.calories} kcal{s.foods && s.foods.length > 0 ? ` — ${s.foods.join(" + ")}` : ""}</p>
+                      {data.is_today && s.id && (
+                        <LoggedMealControls
+                          meal={s as LoggedMeal} editing={editingId === s.id} busy={busyId === s.id}
+                          onEdit={() => setEditingId(s.id!)} onCancelEdit={() => setEditingId(null)}
+                          onSave={(v) => handleSaveEdit(s.id!, v)} onDelete={() => handleDelete(s.id!)}
+                        />
+                      )}
+                    </div>
                   ))
                 ) : (
                   <p className="meal-slot-status">⏳ {t("daily.loggedStatus")}</p>
                 )}
                 {data.is_today && <Link to="/chat" className="btn btn-outline-dark" style={{ marginTop: 8, display: "inline-block" }}>{t("daily.addSnackButton")}</Link>}
+                {data.is_today && (
+                  addingMealType === "snack" ? (
+                    <AddMealForm mealType="snack" onAdded={handleAdded} onCancel={() => setAddingMealType(null)} />
+                  ) : (
+                    <button type="button" className="btn btn-outline-dark" style={{ marginTop: 8 }} onClick={() => setAddingMealType("snack")}>
+                      {t("daily.addMealManualButton")}
+                    </button>
+                  )
+                )}
               </div>
             </div>
 

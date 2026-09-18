@@ -132,6 +132,7 @@ export interface Repository {
   findFirstMealLogForUser(userId: string): Promise<MealLogRecord | null>;
   insertMealLog(row: MealLogInput): Promise<MealLogRecord>;
   findMealLog(id: string): Promise<MealLogRecord | null>;
+  updateMealLog(id: string, patch: Partial<Pick<MealLogInput, "total_calories" | "total_protein" | "total_carbs" | "total_fat">>): Promise<void>;
   deleteMealLog(id: string): Promise<void>;
   findMealLogsInRange(userId: string, startUtc: Date, endUtc: Date): Promise<MealLogRecord[]>;
   insertWaterLog(row: WaterLogInput): Promise<WaterLogRecord>;
