@@ -141,7 +141,7 @@ export default function Profile() {
               style={{
                 width: 72, height: 72, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: "var(--surface-alt, var(--surface))", fontSize: "2rem",
+                background: "var(--surface)", fontSize: "2rem",
               }}
             >
               {profile.photo_url ? (
@@ -165,7 +165,7 @@ export default function Profile() {
           {!editing ? (
             <>
               <p style={{ fontWeight: 700, fontSize: "1.1rem" }}>{profile.name}</p>
-              {profile.username && <p style={{ color: "var(--text-muted, var(--text-muted))" }}>@{profile.username}</p>}
+              {profile.username && <p style={{ color: "var(--text-muted)" }}>@{profile.username}</p>}
               {profile.bio && <p>{profile.bio}</p>}
               <button className="btn btn-outline-dark" onClick={() => setEditing(true)}>{t("profile.editButton")}</button>
             </>
@@ -297,7 +297,7 @@ export default function Profile() {
               <div className="calendar-legend">
                 <span><span className="dot" style={{ background: "var(--moss)" }} />{t("profile.legendGreen")}</span>
                 <span><span className="dot" style={{ background: "var(--gold)" }} />{t("profile.legendYellow")}</span>
-                <span><span className="dot" style={{ background: "#c97a3d" }} />{t("profile.legendOrange")}</span>
+                <span><span className="dot" style={{ background: "var(--status-orange)" }} />{t("profile.legendOrange")}</span>
                 <span><span className="dot" style={{ background: "var(--border)" }} />{t("profile.legendNone")}</span>
               </div>
               {selectedDate && (

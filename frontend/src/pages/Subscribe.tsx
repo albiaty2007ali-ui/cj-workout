@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { backArrow } from "../i18n/I18nContext";
 import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
 import AdSlot from "../components/AdSlot";
@@ -110,7 +111,7 @@ export default function Subscribe() {
             </form>
           </>
         )}
-        <p style={{ marginTop: 24 }}><Link to="/chat">→ رجوع للشات</Link></p>
+        <p style={{ marginTop: 24 }}><Link to="/chat">{backArrow()} رجوع للشات</Link></p>
       </main>
     </AppShell>
   );

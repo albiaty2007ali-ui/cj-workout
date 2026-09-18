@@ -72,4 +72,8 @@ export interface ChatReply {
   xp?: number;
   free_meals_used?: number;
   suggested_recipe?: SuggestedRecipe | null;
+  meal_calories?: number;
+  meal_protein?: number;
+  meal_carbs?: number;
+  meal_fat?: number;
 }

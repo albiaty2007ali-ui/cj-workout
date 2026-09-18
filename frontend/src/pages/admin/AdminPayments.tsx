@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { backArrow } from "../../i18n/I18nContext";
 import { api, type MeResponse } from "../../lib/api";
 import AppShell from "../../components/AppShell";
 
@@ -37,7 +38,7 @@ export default function AdminPayments() {
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin photoUrl={me.photo_url}>
       <main className="container" style={{ maxWidth: 760 }}>
-        <div className="topbar"><Link to="/admin">→ رجوع للوحة الإدارة</Link></div>
+        <div className="topbar"><Link to="/admin">{backArrow()} رجوع للوحة الإدارة</Link></div>
         <h1 className="font-display">مراجعة المدفوعات</h1>
         <p className="subtitle">{payments.length} عملية دفع بانتظار المراجعة</p>
 

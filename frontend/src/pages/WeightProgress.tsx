@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { backArrow } from "../i18n/I18nContext";
 import Chart from "chart.js/auto";
 import { api, type MeResponse } from "../lib/api";
 import type { WeightStatsResponse } from "../lib/progressApi";
@@ -96,7 +97,7 @@ export default function WeightProgress() {
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="container" style={{ maxWidth: 720 }}>
         <div className="topbar">
-          <Link to="/chat">→ رجوع للشات</Link>
+          <Link to="/chat">{backArrow()} رجوع للشات</Link>
           <Link to="/daily" style={{ color: "var(--text-muted)" }}>🍽️ يومي الغذائي</Link>
         </div>
 

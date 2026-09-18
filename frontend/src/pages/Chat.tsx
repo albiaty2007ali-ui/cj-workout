@@ -7,10 +7,18 @@ import type { DailySummaryResponse } from "../lib/intelligenceApi";
 import AppShell from "../components/AppShell";
 import { useI18n } from "../i18n/I18nContext";
 
+interface MealNutrition {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
 interface Message {
   role: "user" | "bot";
   text: string;
   recipeCard?: SuggestedRecipe;
+  mealCard?: MealNutrition;
 }
 
 /**
@@ -98,7 +106,16 @@ export default function Chat() {
         return;
       }
       const reply = res.data?.reply ?? "...";
-      setMessages((prev) => [...prev, { role: "bot", text: reply, recipeCard: res.data?.suggested_recipe ?? undefined }]);
+      const mealCard =
+        res.data?.meal_logged && typeof res.data.meal_calories === "number"
+          ? {
+              calories: res.data.meal_calories,
+              protein: res.data.meal_protein ?? 0,
+              carbs: res.data.meal_carbs ?? 0,
+              fat: res.data.meal_fat ?? 0,
+            }
+          : undefined;
+      setMessages((prev) => [...prev, { role: "bot", text: reply, recipeCard: res.data?.suggested_recipe ?? undefined, mealCard }]);
       if (typeof res.data?.remaining === "number") setRemaining(res.data.remaining);
       if (typeof res.data?.today_calories === "number" && daily) {
         setDaily({ ...daily, target_calories: daily.target_calories });
@@ -185,26 +202,51 @@ export default function Chat() {
             <>
               {justOnboarded && <div className="bubble bot">{t("chat.welcomeMessage")}</div>}
               {greeting?.text && <div className="bubble bot" style={{ whiteSpace: "pre-line" }}>{greeting.text}</div>}
-              {!greeting?.text && <p style={{ color: "#888", textAlign: "center" }}>{t("chat.emptyStatePrompt")}</p>}
+              {!greeting?.text && <p style={{ color: "var(--text-muted)", textAlign: "center" }}>{t("chat.emptyStatePrompt")}</p>}
             </>
           )}
-          {messages.map((m, i) => (
-            <div key={i}>
-              <div className={`bubble ${m.role}`}>{m.text}</div>
-              {m.recipeCard && (
-                <Link className="recipe-card chat-recipe-card" to={`/recipes/${encodeURIComponent(m.recipeCard.slug)}`}>
-                  <div className="recipe-card-img-placeholder">🍽️</div>
-                  <div className="recipe-card-body">
-                    <p className="recipe-card-name">{m.recipeCard.name}</p>
-                    <p className="recipe-card-macros">
-                      {m.recipeCard.calories} kcal · بروتين {m.recipeCard.protein}غ · كارب {m.recipeCard.carbs}غ · دهون {m.recipeCard.fat}غ
-                    </p>
-                    <span className="btn btn-outline-dark recipe-card-btn">{t("chat.viewRecipeButton")}</span>
+          {messages.map((m, i) => {
+            const newTurn = i === 0 || messages[i - 1].role !== m.role;
+            return (
+              <div key={i}>
+                <div className={`bubble ${m.role}${newTurn ? " bubble-new-turn" : ""}`}>{m.text}</div>
+                {m.mealCard && (
+                  <div className="nutrition-card">
+                    <div className="nutrition-card-grid">
+                      <div className="nutrition-card-cell">
+                        <p className="val">{m.mealCard.calories}</p>
+                        <p className="lbl">{t("chat.macroCalories")}</p>
+                      </div>
+                      <div className="nutrition-card-cell">
+                        <p className="val">{m.mealCard.protein}غ</p>
+                        <p className="lbl">{t("chat.macroProtein")}</p>
+                      </div>
+                      <div className="nutrition-card-cell">
+                        <p className="val">{m.mealCard.carbs}غ</p>
+                        <p className="lbl">{t("chat.macroCarbs")}</p>
+                      </div>
+                      <div className="nutrition-card-cell">
+                        <p className="val">{m.mealCard.fat}غ</p>
+                        <p className="lbl">{t("chat.macroFat")}</p>
+                      </div>
+                    </div>
                   </div>
-                </Link>
-              )}
-            </div>
-          ))}
+                )}
+                {m.recipeCard && (
+                  <Link className="recipe-card chat-recipe-card" to={`/recipes/${encodeURIComponent(m.recipeCard.slug)}`}>
+                    <div className="recipe-card-img-placeholder">🍽️</div>
+                    <div className="recipe-card-body">
+                      <p className="recipe-card-name">{m.recipeCard.name}</p>
+                      <p className="recipe-card-macros">
+                        {m.recipeCard.calories} kcal · بروتين {m.recipeCard.protein}غ · كارب {m.recipeCard.carbs}غ · دهون {m.recipeCard.fat}غ
+                      </p>
+                      <span className="btn btn-outline-dark recipe-card-btn">{t("chat.viewRecipeButton")}</span>
+                    </div>
+                  </Link>
+                )}
+              </div>
+            );
+          })}
           {sending && (
             <div className="bubble bot typing-bubble" aria-label={t("chat.typingLabel")}>
               <span className="typing-dot" />

@@ -371,6 +371,7 @@ async function finalizeMeal(
     reply, meal_logged: true, today_calories: dayTotals.calories,
     target_calories: target, remaining, xp: user.xp, free_meals_used: user.free_meals_used,
     new_milestones: streakSnapshot.new_milestones,
+    meal_calories: totals.calories, meal_protein: totals.protein, meal_carbs: totals.carbs, meal_fat: totals.fat,
   };
 }
 

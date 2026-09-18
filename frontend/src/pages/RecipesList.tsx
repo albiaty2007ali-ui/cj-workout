@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { backArrow } from "../i18n/I18nContext";
 import { api, type MeResponse } from "../lib/api";
 import type { RecipeCard, RecipeCategory } from "../lib/recipesApi";
 import AppShell from "../components/AppShell";
@@ -66,7 +67,7 @@ export default function RecipesList() {
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="container">
-        <div className="topbar"><Link to="/chat">→ رجوع للشات</Link></div>
+        <div className="topbar"><Link to="/chat">{backArrow()} رجوع للشات</Link></div>
         <h1 className="font-display">🍳 وصفات دايت</h1>
         <p className="subtitle">وصفات حقيقية بمكونات وخطوات وسعرات دقيقة — تقدر تسوي أي وحدة خطوة بخطوة.</p>
 
