@@ -8,6 +8,13 @@
   --gold: #b98d4a;
   --status-orange: #c97a3d;
 
+  /* مساحة أمان سفلية لعلامة Netlify الثابتة (Site badge — تُفعَّل من إعدادات الاستضافة، خارج
+     DOM تطبيقنا بالكامل، لا نحذفها ولا نتحايل عليها). البادج نفسه ثابت الحجم بكل الشاشات (مو
+     متجاوب أصلًا)، فقيمة ثابتة هنا صحيحة ومقصودة — الجزء المتجاوب فعليًا هو إضافة
+     env(safe-area-inset-bottom) لهذا الأساس عند الاستخدام (راجع .chat-input)، حتى تتكيّف
+     الأجهزة ذات الحواف/شريط الإيماءات (iPhone الحديثة وغيرها) فوق هذا الحد الأدنى المشترك. */
+  --bottom-safe-space: 56px;
+
   /* رموز محايدة تتبدّل مع المظهر — نفس قرار static/css/style.css الأصلي: Sidebar/Chat header/
      Hero تبقى بألوان الهوية الثابتة (forest/moss) بكلا الوضعين، والبقية (خلفيات/بطاقات/نصوص)
      تتبع هذي الرموز. */
@@ -423,7 +430,10 @@ body {
   display: flex;
   flex-shrink: 0;
   gap: 10px;
-  padding: 16px 20px max(16px, env(safe-area-inset-bottom)) 20px;
+  /* يرفع شريط الإدخال (وبالتالي الاقتراحات فوقه، بما إنهم بنفس عمود Flex) فوق أي عنصر ثابت
+     يظهر أسفل الصفحة (علامة الاستضافة)، بلا مساس بترتيب العناصر أو منطق الشات — .chat-messages
+     يملك flex:1 فيتكيّف تلقائيًا مع الارتفاع الجديد، صفر رسالة تختفي خلف الشريط. */
+  padding: 16px 20px calc(var(--bottom-safe-space) + env(safe-area-inset-bottom)) 20px;
   background: var(--surface-solid);
   border-top: 1px solid var(--border);
 }
