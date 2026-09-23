@@ -13,6 +13,9 @@ export interface ToolExecContext {
   rawText: string;
   ctxFlags: IntentContext;
   now: Date;
+  /** حالة المحادثة المحفوظة (active_food إلخ) — log_meal يستخدمها فقط كمسار احتياطي آمن لرد
+   *  تأكيد قصير ("ثبت"/"اي") بعد سؤال "أثبته؟"، راجع active_food's التوثيق بـtypes.ts. */
+  conversationState: ConversationState;
 }
 
 /** أداة واحدة يقدر Gemini يطلب تنفيذها — description/parameters تُرسَل لـGemini حرفيًا كـfunctionDeclaration. */
@@ -28,7 +31,17 @@ export interface CJTool<TArgs = Record<string, unknown>, TResult = unknown> {
 
 /** حالة محادثة مركّبة، تُحفَظ فعليًا بـUserRecord.conversation_state_json (المرحلة 5). */
 export interface ConversationState {
-  active_food: { food_id: number; food_name: string } | null;
+  /**
+   * آخر طعام مطروح بالمحادثة — food_id/food_name يتحدّثون من أي استدعاء ناجح لـget_food_nutrition
+   * (عرض فقط، صفر خطر). حقول التغذية (grams/calories/...) **تُملأ فقط** لو الاستدعاء نفسه مرّر
+   * for_logging:true (راجع tools.ts) — هذا بالضبط الفارق بين "استفسار معلوماتي" و"تحضير لتسجيل
+   * وجبة". log_meal يعتمد على وجود calories هنا كإذن احتياطي لرد تأكيد قصير فقط، صفر ثقة بأي
+   * ادّعاء آخر من Gemini — الأرقام نفسها محسوبة بـcalculator.ts الحقيقي دائمًا، لا تُخترَع هنا.
+   */
+  active_food: {
+    food_id: number; food_name: string;
+    grams?: number; calories?: number; protein?: number; carbs?: number; fat?: number;
+  } | null;
   active_intent: string | null;
   target_calories: number | null;
   awaiting: "quantity" | "confirmation" | "target_calories" | null;

@@ -38,6 +38,43 @@ describe("nextConversationState", () => {
     expect(next.last_tool_calls[0].tool).toBe("get_food_nutrition");
   });
 
+  it("for_logging:true + calories حقيقية -> active_food يحمل حقول التغذية الكاملة (جاهز للتأكيد)", () => {
+    const next = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "دولمة حبة", "870 سعرة، أثبته؟",
+      "get_food_nutrition", { food_id: 12, grams: 700, for_logging: true },
+      { found: true, food_id: 12, food_name: "دولمة", grams: 700, calories: 870, protein: 28, carbs: 119, fat: 45.5 },
+    );
+    expect(next.active_food).toEqual({
+      food_id: 12, food_name: "دولمة", grams: 700, calories: 870, protein: 28, carbs: 119, fat: 45.5,
+    });
+  });
+
+  it("for_logging غير مضبوطة (استعلام معلوماتي بحت) -> active_food بلا حقول تغذية، صفر إذن تأكيد لاحق", () => {
+    // نفس سيناريو "شكد سعرات البيتزا؟" الحرج — يمنع "تمام" غير متعلق لاحقًا من التحول لتسجيل وجبة
+    const next = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "شكد سعرات البيتزا؟", "تقريبًا 250 سعرة لكل قطعة",
+      "get_food_nutrition", { food_id: 33, grams: 100 }, // صفر for_logging
+      { found: true, food_id: 33, food_name: "بيتزا لحم", grams: 100, calories: 273, protein: 12, carbs: 20, fat: 15 },
+    );
+    expect(next.active_food).toEqual({ food_id: 33, food_name: "بيتزا لحم" });
+    expect((next.active_food as { calories?: number })?.calories).toBeUndefined();
+  });
+
+  it("log_meal ناجح (ok:true) -> active_food يُمسح كليًا (يمنع تكرار تسجيل صدفة برد لاحق غير متعلق)", () => {
+    const staged = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "دولمة حبة", "870 سعرة، أثبته؟",
+      "get_food_nutrition", { food_id: 12, grams: 700, for_logging: true },
+      { found: true, food_id: 12, food_name: "دولمة", grams: 700, calories: 870 },
+    );
+    expect(staged.active_food).not.toBeNull();
+
+    const afterLog = nextConversationState(
+      staged, "ثبت", "عاشت إيدك، سجلتلك!",
+      "log_meal", {}, { ok: true, meal_logged: true, local_reply: "..." },
+    );
+    expect(afterLog.active_food).toBeNull();
+  });
+
   it("last_tool_calls يبقى محصورًا بآخر 3 كحد أقصى", () => {
     let state = EMPTY_CONVERSATION_STATE;
     for (let i = 0; i < 5; i++) {

@@ -4,7 +4,7 @@
  * الحقيقي مباشرة (python3) لنفس الرسائل — مو افتراض نظري.
  */
 import { describe, it, expect } from "vitest";
-import { matchMessage, computeNutrition } from "../foodSearch.js";
+import { matchMessage, computeNutrition, resolveQuantityForFood } from "../foodSearch.js";
 
 describe("matchMessage — تكافؤ حرفي مع food_search.py (قيم حقيقية من قاعدة foods.sqlite الفعلية)", () => {
   it("'اكلت بيضتين' -> بيضة، 100 غرام (مضاعف مثنى = 2 × 50غ)", async () => {
@@ -53,5 +53,29 @@ describe("computeNutrition — تكافؤ حرفي (قيم حقيقية للبي
   it("150 غرام -> نفس أرقام Python حرفيًا", async () => {
     const n = await computeNutrition(1, 150);
     expect(n).toEqual({ calories: 232, protein: 19.5, carbs: 1.7, fat: 16.5, fiber: 0.0 });
+  });
+});
+
+describe("resolveQuantityForFood — مرادف 'قطعة'/'قطعه' لـ'حبة' (دولمة، food_id=12، حصة وحيدة اسمها 'حبة' 60غ)", () => {
+  // Bug حقيقي مُكتشَف: "قطعة" بمفردها (بلا رقم، تعني ضمنيًا حبة وحدة) كانت تفشل حتميًا — لا تطابق
+  // نص "حبة" الحقيقي بقاعدة البيانات، والمسار الاحتياطي (رقم + حبة) يحتاج رقمًا صريحًا مو موجود هنا.
+  it("'قطعة' بمفردها (بلا رقم) -> تُفهَم كـحبة وحدة (60 غرام)، تمامًا متل 'حبة'", async () => {
+    const r = await resolveQuantityForFood(12, "قطعة");
+    expect(r).toEqual({ resolved: true, grams: 60, portion_name: "حبة" });
+  });
+
+  it("'قطعه' (بلا همزة/تاء مربوطة) -> نفس النتيجة", async () => {
+    const r = await resolveQuantityForFood(12, "قطعه");
+    expect(r).toEqual({ resolved: true, grams: 60, portion_name: "حبة" });
+  });
+
+  it("'حبة' بمفردها تبقى تشتغل كما هي (صفر كسر بالسلوك الموجود)", async () => {
+    const r = await resolveQuantityForFood(12, "حبة");
+    expect(r).toEqual({ resolved: true, grams: 60, portion_name: "حبة" });
+  });
+
+  it("'3 قطعة' (رقم + قطعة) -> 180 غرام (3×60)", async () => {
+    const r = await resolveQuantityForFood(12, "3 قطعة");
+    expect(r).toEqual({ resolved: true, grams: 180, portion_name: "حبة" });
   });
 });

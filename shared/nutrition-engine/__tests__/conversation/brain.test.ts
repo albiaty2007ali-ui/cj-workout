@@ -10,6 +10,7 @@ import { makeUser } from "../testHelpers.js";
 import { runConversationalTurn } from "../../conversation/brain.js";
 import { READ_ONLY_TOOLS } from "../../conversation/tools.js";
 import { logMeal, undoLastMeal } from "../../conversation/mutationTools.js";
+import { EMPTY_CONVERSATION_STATE } from "../../conversation/stateStore.js";
 import type {
   ConversationDecision, ConversationProvider, ConversationTurnContext, ToolExecContext, ConversationState, ToolCallDecision,
 } from "../../conversation/types.js";
@@ -28,7 +29,7 @@ async function freshUser(repo: InMemoryRepository, id: string, overrides: Partia
 }
 
 function execCtxFor(repo: InMemoryRepository, user: UserRecord, rawText: string): ToolExecContext {
-  return { repo, user, rawText, ctxFlags: {}, now: new Date() };
+  return { repo, user, rawText, ctxFlags: {}, now: new Date(), conversationState: EMPTY_CONVERSATION_STATE };
 }
 
 const EMPTY_STATE: ConversationState = { active_food: null, active_intent: null, target_calories: null, awaiting: null, last_tool_calls: [], recent_turns: [] };

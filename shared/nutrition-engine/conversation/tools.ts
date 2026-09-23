@@ -73,7 +73,14 @@ export const searchFood: CJTool<SearchFoodArgs, SearchFoodResult> = {
 // ---------------------------------------------------------------------------
 // get_food_nutrition
 // ---------------------------------------------------------------------------
-interface GetFoodNutritionArgs { food_id?: number; food_query?: string; grams: number }
+interface GetFoodNutritionArgs {
+  food_id?: number; food_query?: string; grams: number;
+  /** true فقط لو نيّتك تسأل المستخدم "أثبته؟" بعد هذا الاستدعاء مباشرة — يعلّم active_food
+   *  بالذاكرة كـ"جاهز للتأكيد"، فيصير رد تأكيد قصير لاحق ("ثبت"/"اي") كافي لتسجيله فعليًا عبر
+   *  log_meal بدون تكرار اسم الطعام. اتركها false/فارغة لأي استعلام معلوماتي بحت (مثل "شكد
+   *  سعرات البيتزا؟") — علامة صريحة تمنع تسجيل شي المستخدم بس سأل عنه، لم يصرّح بأكله. */
+  for_logging?: boolean;
+}
 interface GetFoodNutritionResult {
   found: boolean; food_id?: number; food_name?: string | null; grams?: number;
   calories?: number; protein?: number; carbs?: number; fat?: number; fiber?: number;
@@ -83,13 +90,16 @@ export const getFoodNutrition: CJTool<GetFoodNutritionArgs, GetFoodNutritionResu
   name: "get_food_nutrition",
   description:
     "يحسب السعرات/البروتين/الكارب/الدهون الحقيقية لوزن معيّن (بالغرام) من طعام معروف. مرّر " +
-    "food_id إذا متوفر (من search_food)، وإلا food_query وسيُحل تلقائيًا.",
+    "food_id إذا متوفر (من search_food)، وإلا food_query وسيُحل تلقائيًا. مرّر for_logging:true " +
+    "فقط لو راح تسأل المستخدم بعدها مباشرة \"أثبته؟\" (تحضير لتسجيل وجبة)، خله false/احذفه لأي " +
+    "سؤال معلوماتي بحت.",
   parameters: {
     type: "OBJECT",
     properties: {
       food_id: { type: "NUMBER", description: "معرّف الطعام الحقيقي" },
       food_query: { type: "STRING", description: "اسم الطعام إذا ما توفر food_id" },
       grams: { type: "NUMBER", description: "الوزن بالغرام" },
+      for_logging: { type: "BOOLEAN", description: "true فقط لو راح تسأل المستخدم يثبّتها كوجبة بعدها مباشرة" },
     },
     required: ["grams"],
   },
@@ -411,7 +421,7 @@ export const suggestSubstitution: CJTool<SuggestSubstitutionArgs, SuggestSubstit
 // صحيحة) من أصغر حصة حقيقية مسجّلة يدخل بالسعرات المتبقية، صفر مدى مخترَع.
 // ---------------------------------------------------------------------------
 interface CalculateAllowedPortionArgs { food_id?: number; food_query?: string; remaining_calories?: number }
-interface CalculateAllowedPortionResult { found: boolean; text?: string }
+interface CalculateAllowedPortionResult { found: boolean; text?: string; food_id?: number; food_name?: string }
 
 export const calculateAllowedPortion: CJTool<CalculateAllowedPortionArgs, CalculateAllowedPortionResult> = {
   name: "calculate_allowed_portion",
@@ -460,7 +470,12 @@ export const calculateAllowedPortion: CJTool<CalculateAllowedPortionArgs, Calcul
       remaining = budgets[targetMealType] ?? nutritionCtx.remaining_calories;
     }
     const text = await recommendationsMod.suggestPortionCountForRemaining(foodId, foodName, remaining);
-    return { found: true, text };
+    // food_id/food_name هنا يحدّثون "آخر طعام مطروح" بالذاكرة (عرض/سياق فقط — صفر for_logging،
+    // هذي الأداة صراحة لوجبة مخطَّطة لسا ما صارت، ما تجهّز شي للتسجيل أبدًا). بدونها، طعام قديم
+    // انذكر أول المحادثة كان يبقى عالق بالسياق ("آخر طعام مطروح") حتى بعد نقاش طعام جديد كليًا
+    // (Bug حقيقي مُكتشَف: "اليوم عشانه مسكوف" ما كانت تحدّث الذاكرة، فردود لاحقة ("حصة") كانت
+    // ترجع لطعام قديم من بداية المحادثة).
+    return { found: true, text, food_id: foodId, food_name: foodName };
   },
 };
 

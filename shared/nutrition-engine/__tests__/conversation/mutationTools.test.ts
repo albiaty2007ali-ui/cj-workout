@@ -9,8 +9,10 @@ import { describe, it, expect } from "vitest";
 import { InMemoryRepository } from "../../db/inMemoryRepository.js";
 import { makeUser } from "../testHelpers.js";
 import * as mealState from "../../mealState.js";
+import * as calculatorMod from "../../calculator.js";
 import { logMeal, logWater, undoLastMeal } from "../../conversation/mutationTools.js";
-import type { ToolExecContext } from "../../conversation/types.js";
+import { EMPTY_CONVERSATION_STATE } from "../../conversation/stateStore.js";
+import type { ConversationState, ToolExecContext } from "../../conversation/types.js";
 import type { NutritionProfileRecord, UserRecord } from "../../db/repository.js";
 
 const STANDARD_PROFILE: Omit<NutritionProfileRecord, "user_id"> = {
@@ -25,9 +27,12 @@ async function freshUser(repo: InMemoryRepository, id: string, overrides: Partia
   return user;
 }
 
-function ctxFor(repo: InMemoryRepository, user: UserRecord, rawText: string, now = new Date()): ToolExecContext {
+function ctxFor(
+  repo: InMemoryRepository, user: UserRecord, rawText: string, now = new Date(),
+  conversationState: ConversationState = EMPTY_CONVERSATION_STATE,
+): ToolExecContext {
   const pending = mealState.loadPending(user);
-  return { repo, user, rawText, ctxFlags: { has_pending: pending !== null }, now };
+  return { repo, user, rawText, ctxFlags: { has_pending: pending !== null }, now, conversationState };
 }
 
 const PIZZA_INCIDENT_MESSAGES = [
@@ -141,6 +146,65 @@ describe("log_meal — استمرارية pending (توضيح كمية ثم تأ
     const r = await logMeal.execute(ctxFor(repo, user, "شكد حجم البيتزا؟"), {});
     expect(r.ok).toBe(false);
     expect(r.rejection_reason).toBe("NOT_A_CONSUMPTION_STATEMENT");
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+});
+
+describe("log_meal — تأكيد قصير بعد ما Gemini يجهّز طعام صراحة (active_food.for_logging)", () => {
+  // Bug حقيقي مُكتشَف بتحقق حي: "أثبته؟" -> "ثبت" كانت تفشل دائمًا (rawText "ثبت" وحدها لا تحمل
+  // اسم طعام، فمحرك الاستخراج المحلي يفشل حتميًا حتى لو Gemini والمستخدم أصلًا اتفقوا على طعام
+  // محدد بردود سابقة). هذا المسار الاحتياطي يستخدم active_food المجهَّز صراحة (for_logging:true).
+  it("دولمة 700غ مجهَّزة صراحة (for_logging) + 'ثبت' -> MealLog حقيقي بأرقام صحيحة", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "confirm1");
+    const nutrition = await calculatorMod.computeFood(12, 700); // 12 = دولمة (food_id حقيقي)
+
+    const ctx = ctxFor(repo, user, "ثبت", new Date(), {
+      ...EMPTY_CONVERSATION_STATE,
+      active_food: { food_id: 12, food_name: "دولمة", grams: 700, calories: nutrition.calories, protein: nutrition.protein, carbs: nutrition.carbs, fat: nutrition.fat },
+    });
+    const r = await logMeal.execute(ctx, {});
+    expect(r.ok).toBe(true);
+    expect(r.meal_logged).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+    const [log] = await repo.findMealLogsInRange(user.id, new Date(0), new Date(Date.now() + 86400000));
+    expect(log.total_calories).toBe(nutrition.calories);
+    expect(JSON.parse(log.matched_foods_json!)).toEqual(["دولمة"]);
+  });
+
+  // نفس فئة "حادثة البيتزا" بالضبط: سؤال معلوماتي بحت ("شكد سعرات البيتزا؟") لا يجهّز for_logging،
+  // فـactive_food يبقى بلا أرقام تغذية — رد تأكيد لاحق غير متعلق ما يقدر يسجّل وجبة وهمية.
+  it("طعام مطروح لسؤال معلوماتي بحت (صفر for_logging) + 'تمام' -> يُرفض، صفر MealLog", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "confirm2");
+
+    const ctx = ctxFor(repo, user, "تمام", new Date(), {
+      ...EMPTY_CONVERSATION_STATE,
+      active_food: { food_id: 12, food_name: "دولمة" }, // صفر grams/calories — استعلام معلوماتي فقط
+    });
+    const r = await logMeal.execute(ctx, {});
+    expect(r.ok).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
+  it("طعام مجهَّز بالكامل لكن رد المستخدم مو كلمة تأكيد حقيقية -> يُرفض، صفر MealLog", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "confirm3");
+
+    const ctx = ctxFor(repo, user, "شنو رايك بالجو اليوم؟", new Date(), {
+      ...EMPTY_CONVERSATION_STATE,
+      active_food: { food_id: 12, food_name: "دولمة", grams: 700, calories: 700 },
+    });
+    const r = await logMeal.execute(ctx, {});
+    expect(r.ok).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
+  it("'ثبت' بدون أي active_food إطلاقًا -> يُرفض كما بالسابق (صفر تخفيف أمان)", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "confirm4");
+    const r = await logMeal.execute(ctxFor(repo, user, "ثبت"), {});
+    expect(r.ok).toBe(false);
     expect(await repo.countMealLogsForUser(user.id)).toBe(0);
   });
 });

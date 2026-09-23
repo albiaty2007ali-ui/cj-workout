@@ -59,7 +59,26 @@ export function nextConversationState(
     // أي أداة رجّعت food_id+food_name حقيقيين (get_food_nutrition, search_food أول نتيجة عبر
     // find_recipes...) تحدّث "آخر طعام مطروح" — هذا ما يخلي "وإذا ثنتين؟" مفهومة بدون تكرار الاسم.
     if (typeof tr.food_id === "number" && typeof tr.food_name === "string") {
-      next.active_food = { food_id: tr.food_id, food_name: tr.food_name };
+      // حقول التغذية (وبالتالي إذن التأكيد القصير الاحتياطي بـlog_meal) تُملأ فقط لو الاستدعاء
+      // نفسه علّم for_logging:true صراحة — يمنع سؤال معلوماتي بحت ("شكد سعرات البيتزا؟") من
+      // تحويل رد تأكيد لاحق غير متعلق ("تمام") لتسجيل وجبة لم يصرّح المستخدم بأكلها إطلاقًا
+      // (نفس فئة خطر "حادثة البيتزا"، راجع mutationTools.ts's logMeal لاستخدام هذا الحقل).
+      const forLogging = toolArgs?.for_logging === true && typeof tr.calories === "number";
+      next.active_food = {
+        food_id: tr.food_id, food_name: tr.food_name,
+        ...(forLogging ? {
+          grams: typeof tr.grams === "number" ? tr.grams : undefined,
+          calories: tr.calories as number,
+          protein: typeof tr.protein === "number" ? tr.protein : undefined,
+          carbs: typeof tr.carbs === "number" ? tr.carbs : undefined,
+          fat: typeof tr.fat === "number" ? tr.fat : undefined,
+        } : {}),
+      };
+    }
+    // تسجيل وجبة ناجح ينهي موضوع "آخر طعام مطروح" — يمنع رد تأكيد لاحق غير متعلق من إعادة
+    // تسجيل نفس الوجبة صدفة عبر نفس مسار الإذن الاحتياطي (راجع mutationTools.ts).
+    if (toolUsed === "log_meal" && tr.ok === true) {
+      next.active_food = null;
     }
     next.last_tool_calls = [
       ...prev.last_tool_calls,

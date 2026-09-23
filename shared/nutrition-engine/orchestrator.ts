@@ -995,7 +995,7 @@ export async function handleMessage(repo: Repository, user: UserRecord, text: st
   const nutritionCtx = await context.build(repo, user.id, profile, now);
 
   const conversationState = stateStore.loadConversationState(user);
-  const execCtx: conversationTypes.ToolExecContext = { repo, user, rawText: textNorm, ctxFlags, now };
+  const execCtx: conversationTypes.ToolExecContext = { repo, user, rawText: textNorm, ctxFlags, now, conversationState };
   const turnCtx: conversationTypes.ConversationTurnContext = {
     current_time_iraq: getCurrentPeriod(now),
     remaining_calories: profile ? nutritionCtx.remaining_calories : null,

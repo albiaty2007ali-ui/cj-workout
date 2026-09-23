@@ -10,6 +10,7 @@ import { makeUser } from "../testHelpers.js";
 import { resolveIngredientName } from "../../ingredientResolver.js";
 import * as tools from "../../conversation/tools.js";
 import type { ToolExecContext } from "../../conversation/types.js";
+import { EMPTY_CONVERSATION_STATE } from "../../conversation/stateStore.js";
 import type { NutritionProfileRecord, RecipeRecord, UserRecord } from "../../db/repository.js";
 
 const STANDARD_PROFILE: Omit<NutritionProfileRecord, "user_id"> = {
@@ -30,7 +31,7 @@ function makeRecipe(overrides: Partial<RecipeRecord>): RecipeRecord {
 async function buildCtx(repo: InMemoryRepository, user: UserRecord): Promise<ToolExecContext> {
   repo.nutritionProfiles.set(user.id, { user_id: user.id, ...STANDARD_PROFILE });
   await repo.saveUser(user);
-  return { repo, user, rawText: "", ctxFlags: {}, now: new Date("2026-01-01T09:00:00Z") };
+  return { repo, user, rawText: "", ctxFlags: {}, now: new Date("2026-01-01T09:00:00Z"), conversationState: EMPTY_CONVERSATION_STATE };
 }
 
 let riceId: number;
