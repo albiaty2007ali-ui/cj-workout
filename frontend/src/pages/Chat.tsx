@@ -5,6 +5,7 @@ import type { GreetingResponse } from "../lib/greetingApi";
 import type { DailyResponse, WeightStatsResponse } from "../lib/progressApi";
 import type { DailySummaryResponse } from "../lib/intelligenceApi";
 import AppShell from "../components/AppShell";
+import ConsultModal from "../components/ConsultModal";
 import { useI18n } from "../i18n/I18nContext";
 
 interface MealNutrition {
@@ -19,6 +20,7 @@ interface Message {
   text: string;
   recipeCard?: SuggestedRecipe;
   mealCard?: MealNutrition;
+  nudgeActions?: ChatReply["nudge_actions"];
 }
 
 /**
@@ -34,8 +36,9 @@ const STATIC_PROMPTS: Array<{ labelKey: "chat.quickPromptWhatToEat" | "chat.quic
 
 export default function Chat() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const justOnboarded = params.get("welcome") === "1";
+  const sentFromUrlRef = useRef(false);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
   const [daily, setDaily] = useState<DailyResponse | null>(null);
@@ -46,6 +49,7 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [showConsult, setShowConsult] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { t } = useI18n();
 
@@ -86,13 +90,15 @@ export default function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
-  async function sendMessage(e: FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || sending) return;
+  /**
+   * نقطة الإرسال الفعلية الوحيدة — تستدعيها كل من: نموذج الكتابة (sendMessage)، أزرار الشات
+   * السريعة (STATIC_PROMPTS/greeting.prompts)، القائمة الجانبية، مساعد CJ (عبر ?send=)، وأزرار
+   * nudge_actions. كل هذي المصادر ترسل فعليًا الآن (لا تكتفي بتعبئة مربع الكتابة).
+   */
+  async function dispatchMessage(text: string) {
+    if (!text.trim() || sending) return;
 
     setMessages((prev) => [...prev, { role: "user", text }]);
-    setInput("");
     setSending(true);
 
     try {
@@ -115,7 +121,10 @@ export default function Chat() {
               fat: res.data.meal_fat ?? 0,
             }
           : undefined;
-      setMessages((prev) => [...prev, { role: "bot", text: reply, recipeCard: res.data?.suggested_recipe ?? undefined, mealCard }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: reply, recipeCard: res.data?.suggested_recipe ?? undefined, mealCard, nudgeActions: res.data?.nudge_actions },
+      ]);
       if (typeof res.data?.remaining === "number") setRemaining(res.data.remaining);
       if (typeof res.data?.today_calories === "number" && daily) {
         setDaily({ ...daily, target_calories: daily.target_calories });
@@ -129,8 +138,34 @@ export default function Chat() {
     }
   }
 
-  function quickPrompt(prompt: string) {
-    setInput(prompt);
+  async function sendMessage(e: FormEvent) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || sending) return;
+    setInput("");
+    await dispatchMessage(text);
+  }
+
+  // ?send=<نص> يسمح لأي صفحة بالتطبيق (مساعد CJ، غيرها) بفتح الشات وإرسال رسالة فعلية فورًا —
+  // مرة وحدة فقط (sentFromUrlRef يمنع تكرار الإرسال لو أعاد المكوّن render، والباراميتر يُحذَف
+  // من الرابط بعد الإرسال حتى Refresh/رجوع لا يعيد إرسالها).
+  useEffect(() => {
+    const toSend = params.get("send");
+    if (!toSend || sentFromUrlRef.current) return;
+    sentFromUrlRef.current = true;
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("send");
+      return next;
+    }, { replace: true });
+    dispatchMessage(decodeURIComponent(toSend));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
+  function handleNudgeAction(action: NonNullable<ChatReply["nudge_actions"]>[number]) {
+    if (action.kind === "navigate" && action.target) navigate(action.target);
+    else if (action.kind === "chat" && action.prompt) dispatchMessage(action.prompt);
+    else if (action.kind === "consult") setShowConsult(true);
   }
 
   if (!me) return null; // بانتظار /api/me — لا نعرض القائمة الجانبية بدون اسم مستخدم حقيقي
@@ -145,7 +180,7 @@ export default function Chat() {
   ];
 
   return (
-    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url} onQuickPrompt={quickPrompt}>
+    <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url} onQuickPrompt={dispatchMessage}>
       <div className="chat-page">
         <div className="chat-header">
           <strong>{t("chat.appName")}</strong>
@@ -244,6 +279,15 @@ export default function Chat() {
                     </div>
                   </Link>
                 )}
+                {m.nudgeActions && m.nudgeActions.length > 0 && (
+                  <div className="quick-prompts nudge-actions">
+                    {m.nudgeActions.map((a, ai) => (
+                      <button type="button" key={ai} className="qp-btn nudge-action-btn" onClick={() => handleNudgeAction(a)}>
+                        {a.icon} {a.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -260,7 +304,7 @@ export default function Chat() {
         {allPrompts.length > 0 && (
           <div className="quick-prompts">
             {allPrompts.map((p, i) => (
-              <button type="button" key={i} className="qp-btn" onClick={() => quickPrompt(p.prompt)}>{p.label}</button>
+              <button type="button" key={i} className="qp-btn" onClick={() => dispatchMessage(p.prompt)}>{p.label}</button>
             ))}
           </div>
         )}
@@ -275,6 +319,7 @@ export default function Chat() {
           <button type="submit" disabled={sending}>{t("chat.sendButton")}</button>
         </form>
       </div>
+      {showConsult && <ConsultModal onClose={() => setShowConsult(false)} />}
     </AppShell>
   );
 }

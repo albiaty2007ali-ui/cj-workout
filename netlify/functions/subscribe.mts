@@ -8,14 +8,13 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseApp, genId, getUserDisplayFields } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
+import { buildWhatsappLink } from "../../shared/nutrition-engine/whatsapp.js";
 
 function whatsappLink(name: string, reference: string): string {
-  const number = process.env.SUPPORT_WHATSAPP_NUMBER;
-  if (!number) return "";
   let msg = `هلا، أنا ${name}. أرسلت تحويل اشتراك CJ FOOD.`;
   if (reference) msg += ` الرقم المرجعي: ${reference}`;
   msg += " (هذا الإثبات مرفق بالصورة)";
-  return `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
+  return buildWhatsappLink(process.env.SUPPORT_WHATSAPP_NUMBER, msg);
 }
 
 export default async (req: Request, _context: Context): Promise<Response> => {

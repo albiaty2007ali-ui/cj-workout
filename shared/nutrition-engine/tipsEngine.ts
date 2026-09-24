@@ -9,6 +9,7 @@ import type { NutritionContext } from "./context.js";
 
 export function chooseCategoryForContext(ctx: NutritionContext, mealType: string | null = null): string {
   if (ctx.over_target) return "high_calorie_meal";
+  if (ctx.under_target) return "under_eating";
 
   const target = ctx.target_calories || 0;
   const remaining = ctx.remaining_calories || 0;

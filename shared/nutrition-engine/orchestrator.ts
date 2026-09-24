@@ -407,6 +407,28 @@ export async function logMealManually(
   return finalizeMeal(repo, user, tempPending, target, "direct", now);
 }
 
+/**
+ * إضافة "سعرات يدوية حرة" من واجهة "مدير وجبات اليوم" — لطعام غير موجود بقاعدة foods.sqlite
+ * (مثلاً وجبة من مطعم/خارج البيت). **استثناء صريح وموثَّق** لقاعدة "الأرقام من قاعدة البيانات
+ * فقط": هذي أرقام يُبلّغ عنها المستخدم بنفسه عن شي أكله فعلاً، تمامًا كما يسمح EditMealForm
+ * الموجود أصلًا بالواجهة بتعديل الأرقام الأربعة لوجبة مسجَّلة بدون أي قيد DB — نفس السابقة
+ * المقبولة أصلًا بالمشروع، تُطبَّق هنا على "إضافة" جديدة بدل "تعديل" وجبة موجودة فقط.
+ * food_id=-1 (Sentinel، أبدًا رقم DB حقيقي) — عنصر PendingItem مؤقّت يُستهلَك فقط داخل
+ * finalizeMeal بهذا الاستدعاء ثم يُهمَل، صفر تخزين food_id لكل عنصر أصلاً (matched_foods_json
+ * أسماء نصية فقط، راجع توثيق finalizeMeal). نفس نمط logMealManually تمامًا — صفر تكرار منطق
+ * XP/عداد مجاني/ستريك/نافذة تراجع 5 دقائق (finalizeMeal تتكفّل بكل شي، source="direct").
+ */
+export async function logManualCalorieEntry(
+  repo: Repository, user: UserRecord, mealType: string, foodName: string,
+  calories: number, protein = 0, carbs = 0, fat = 0, now: Date = new Date(),
+): Promise<DispatchResult> {
+  const tempPending = mealState.newPending(mealType, `[إضافة يدوية] ${foodName}`);
+  tempPending.items.push({ food_id: -1, food_name: foodName, grams: 0, calories, protein, carbs, fat });
+  const profile = await repo.findNutritionProfile(user.id);
+  const target = profile ? profile.calorie_target : 2000;
+  return finalizeMeal(repo, user, tempPending, target, "direct", now);
+}
+
 /** يتحقق إن سجل وجبة معيّن يخص المستخدم ويقع ضمن نطاق يوم بغداد الحالي — حارس مشترك لـ
  * updateMealLogTotals/deleteMealLogById (كلاهما مسموح بهما لوجبات "اليوم" فقط). */
 async function findTodayMealLogForUser(repo: Repository, user: UserRecord, mealLogId: string, now: Date) {
@@ -975,7 +997,62 @@ function assembleActiveResult(outcome: brain.ConversationalTurnOutcome): Dispatc
   return { reply, meal_logged: false, suggested_recipe, _composed_by_gemini };
 }
 
+// نية حديث عام/بروتوكولي بحت — لا معنى لإلحاق تنبيه سعرات فوقها (رد "هلا"/"تسلم" بتنبيه صحي
+// غير مرتبط نهائيًا ليس "واضح وهادئ"، هذا بالضبط عكس المطلوب). كل نية ثانية غير مدرجة هنا
+// (ASK_REMAINING/END_DAY/ASK_RECOMMENDATION/LOG_MEAL/...) مرتبطة بأكل/سعرات بشكل معقول، فتُسمَح.
+const UNDER_EATING_NUDGE_EXCLUDED_INTENTS = new Set([
+  intents.GREETING, intents.FAREWELL, intents.THANKS, intents.ACKNOWLEDGEMENT,
+  intents.OFFTOPIC, intents.MEDICAL, intents.UNKNOWN, intents.CONFIRM, intents.CANCEL,
+  intents.NOT_YET, intents.CORRECTION,
+]);
+
+/**
+ * نقطة تجميع مركزية واحدة لتنبيه "أكل قليل جدًا" — تُفحَص بعد أي رد نهائي بغض النظر عن المسار
+ * (محلي/SHADOW/ACTIVE عبر Gemini)، صفر تكرار لهذا المنطق بأي مكان ثانٍ (بعكس compensationMessage
+ * الحالية، مُكرَّرة عمدًا بـ3 مواضع لأسباب تاريخية غير مرتبطة بهذا التغيير). لا تُطبَّق فوق ردّ
+ * فاضي/رفض عضوية مجانية، ولا فوق ردّ عنده nudge_actions أصلًا (مسار ACTIVE قد يمرّ هنا مرتين
+ * بحالة !outcome.handled -> runLocalPipeline -> handleMessage، فهذا الحارس يمنع تكرار الإلحاق)،
+ * ولا فوق رسالة حديث عام بحت (تصنيف محلي تقريبي بـdetectIntent — فحص لطيف لتجربة المستخدم فقط،
+ * مو حارس أمان حرج، فما يحتاج دقة IntentContextFlags الكاملة).
+ */
+async function attachUnderEatingNudge(
+  repo: Repository, user: UserRecord, text: string, result: DispatchResult, now: Date,
+): Promise<DispatchResult> {
+  if (!result.reply || result.premium_required || result.nudge_actions) return result;
+  const profile = await repo.findNutritionProfile(user.id);
+  if (!profile) return result;
+  const ctx = await context.build(repo, user.id, profile, now);
+  if (!ctx.under_target) return result;
+
+  if (!result.meal_logged) {
+    const pending = mealState.loadPending(user);
+    const localIntent = intents.detectIntent(text.trim(), {
+      has_pending: pending !== null,
+      has_recipe: user.current_recipe_id !== null,
+      has_undoable_log: false,
+      has_pending_recipe: user.pending_recipe_confirmation_id !== null,
+      has_pending_food_topic: user.pending_food_topic_json !== null,
+    });
+    if (UNDER_EATING_NUDGE_EXCLUDED_INTENTS.has(localIntent)) return result;
+  }
+
+  return {
+    ...result,
+    reply: `${result.reply}${responses.underEatingNudge()}`,
+    nudge_actions: [
+      { icon: "🍽️", label: "أضف وجبة", kind: "navigate", target: "/daily" },
+      { icon: "🥗", label: "اقترحلي وجبة مناسبة", kind: "chat", prompt: "اقترحلي وجبة مناسبة" },
+      { icon: "👨‍⚕️", label: "استشارة مختص", kind: "consult" },
+    ],
+  };
+}
+
 export async function handleMessage(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
+  const result = await handleMessageCore(repo, user, text, now);
+  return attachUnderEatingNudge(repo, user, text, result, now);
+}
+
+async function handleMessageCore(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
   const mode = conversationConfig.getConversationalMode();
   if (mode === "OFF") return runLocalPipeline(repo, user, text, now);
 

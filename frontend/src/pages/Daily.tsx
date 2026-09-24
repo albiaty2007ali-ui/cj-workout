@@ -84,11 +84,76 @@ function EditMealForm({
   );
 }
 
+/** نموذج "سعرات يدوية حرة" — لطعام غير موجود بقاعدة foods.sqlite (مطعم/خارج البيت). اسم+سعرات
+ * فقط إلزامي، بروتين/كارب/دهون اختياري — يرسل لنفس progress-daily?action=add لكن بدون food_id
+ * (orchestrator.ts's logManualCalorieEntry، استثناء موثَّق لقاعدة "الأرقام من DB فقط"). */
+function ManualCalorieForm({ mealType, onAdded, onCancel }: { mealType: MealTypeKey; onAdded: () => void; onCancel: () => void }) {
+  const { t } = useI18n();
+  const [foodName, setFoodName] = useState("");
+  const [calories, setCalories] = useState("");
+  const [protein, setProtein] = useState("");
+  const [carbs, setCarbs] = useState("");
+  const [fat, setFat] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    const cal = Number(calories);
+    if (!foodName.trim() || !cal || cal <= 0) { setError(t("daily.actionError")); return; }
+    setBusy(true);
+    setError(null);
+    const res = await api.post<{ premium_required?: boolean }>("/progress/daily?action=add", {
+      meal_type: mealType, food_name: foodName.trim(), calories: cal,
+      protein: Number(protein) || 0, carbs: Number(carbs) || 0, fat: Number(fat) || 0,
+    });
+    setBusy(false);
+    if (!res.success) {
+      setError(res.error?.code === "TRIAL_EXHAUSTED" ? t("daily.trialExhaustedError") : t("daily.actionError"));
+      return;
+    }
+    onAdded();
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="field">
+        <label>{t("daily.manualFoodNameLabel")}</label>
+        <input value={foodName} onChange={(e) => setFoodName(e.target.value)} placeholder={t("daily.manualFoodNamePlaceholder")} />
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.caloriesLabel")}</label>
+          <input type="number" min={1} value={calories} onChange={(e) => setCalories(e.target.value)} />
+        </div>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.proteinLabel")}</label>
+          <input type="number" min={0} step="0.1" value={protein} onChange={(e) => setProtein(e.target.value)} />
+        </div>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.carbsLabel")}</label>
+          <input type="number" min={0} step="0.1" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
+        </div>
+        <div className="field" style={{ flex: 1, minWidth: 90 }}>
+          <label>{t("daily.fatLabel")}</label>
+          <input type="number" min={0} step="0.1" value={fat} onChange={(e) => setFat(e.target.value)} />
+        </div>
+      </div>
+      {error && <p className="field-error">{error}</p>}
+      <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+        <button className="btn btn-moss" type="button" disabled={busy} onClick={submit}>{t("daily.addButton")}</button>
+        <button className="btn btn-outline-dark" type="button" disabled={busy} onClick={onCancel}>{t("daily.cancelButton")}</button>
+      </div>
+    </div>
+  );
+}
+
 /** صندوق بحث (Debounce 300ms، نفس نمط RecipesList.tsx) + اختيار حصة/غرام لإضافة وجبة يدويًا
  * من قاعدة الأطعمة الحقيقية — صفر طعام مخترَع، نفس مسار التسجيل الموثوق (orchestrator.ts's
- * logMealManually -> finalizeMeal). */
+ * logMealManually -> finalizeMeal). زر "سعرات حرة" يبدّل لـManualCalorieForm أعلاه لطعام غير
+ * موجود بالقاعدة (مطعم مثلاً) — مسار ثانٍ إضافي، صفر تغيير على هذا المسار الأصلي. */
 function AddMealForm({ mealType, onAdded, onCancel }: { mealType: MealTypeKey; onAdded: () => void; onCancel: () => void }) {
   const { t } = useI18n();
+  const [mode, setMode] = useState<"search" | "manual">("search");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FoodSearchHit[]>([]);
   const [searching, setSearching] = useState(false);
@@ -143,6 +208,19 @@ function AddMealForm({ mealType, onAdded, onCancel }: { mealType: MealTypeKey; o
 
   return (
     <div className="notice-box" style={{ marginTop: 10 }}>
+      <div className="add-meal-mode-toggle">
+        <button type="button" className={`add-meal-mode-btn${mode === "search" ? " active" : ""}`} onClick={() => setMode("search")}>
+          {t("daily.modeSearch")}
+        </button>
+        <button type="button" className={`add-meal-mode-btn${mode === "manual" ? " active" : ""}`} onClick={() => setMode("manual")}>
+          {t("daily.modeManual")}
+        </button>
+      </div>
+
+      {mode === "manual" && <ManualCalorieForm mealType={mealType} onAdded={onAdded} onCancel={onCancel} />}
+
+      {mode === "search" && (
+        <>
       <div className="field">
         <label>{t("daily.searchFoodPlaceholder")}</label>
         <input value={query} onChange={(e) => onQueryChange(e.target.value)} placeholder={t("daily.searchFoodPlaceholder")} autoComplete="off" />
@@ -189,6 +267,8 @@ function AddMealForm({ mealType, onAdded, onCancel }: { mealType: MealTypeKey; o
       )}
       {!selected && (
         <button className="btn btn-outline-dark" type="button" style={{ marginTop: 8 }} onClick={onCancel}>{t("daily.cancelButton")}</button>
+      )}
+        </>
       )}
     </div>
   );

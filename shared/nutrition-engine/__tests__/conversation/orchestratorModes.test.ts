@@ -125,7 +125,8 @@ describe("handleMessage — وضع ACTIVE", () => {
     const user = await freshUser(repo, "active1");
     setConversationalModeForTesting("ACTIVE");
     setConversationProviderForTesting(new ScriptedProvider({ kind: "text", text: "هلا بيك، شلونك اليوم؟" }));
-    const r = await handleMessage(repo, user, "هلا");
+    // noonBaghdad — يمنع نتيجة under_target (context.ts) من التداخل مع تطابق نص حرفي غير مرتبط
+    const r = await handleMessage(repo, user, "هلا", new Date("2026-01-01T09:00:00Z"));
     expect(r.reply).toBe("هلا بيك، شلونك اليوم؟");
     expect(r.meal_logged).toBe(false);
   });
@@ -138,7 +139,7 @@ describe("handleMessage — وضع ACTIVE", () => {
       { kind: "tool_call", toolName: "get_daily_summary", toolArgs: {} },
       "باقيلك سعرات هواية اليوم 🌱",
     ));
-    const r = await handleMessage(repo, user, "باقيلي شكد؟");
+    const r = await handleMessage(repo, user, "باقيلي شكد؟", new Date("2026-01-01T09:00:00Z"));
     expect(r.reply).toBe("باقيلك سعرات هواية اليوم 🌱");
     expect(r.meal_logged).toBe(false);
   });

@@ -7,7 +7,8 @@
 import { describe, it, expect } from "vitest";
 import { InMemoryRepository } from "../db/inMemoryRepository.js";
 import { makeUser } from "./testHelpers.js";
-import { logMealManually, updateMealLogTotals, deleteMealLogById } from "../orchestrator.js";
+import { logMealManually, logManualCalorieEntry, updateMealLogTotals, deleteMealLogById } from "../orchestrator.js";
+import * as responses from "../responses.js";
 import type { NutritionProfileRecord } from "../db/repository.js";
 
 const STANDARD_PROFILE: Omit<NutritionProfileRecord, "user_id"> = {
@@ -39,6 +40,62 @@ describe("logMealManually — إضافة وجبة يدويًا عبر بحث ا�
 
     expect(user.free_meals_used).toBe(1);
     expect(user.xp).toBe(10);
+  });
+});
+
+describe("logManualCalorieEntry — سعرات حرة يدوية (طعام غير موجود بقاعدة foods.sqlite)", () => {
+  it("اسم+سعرات فقط -> MealLog حقيقي بالأرقام المُدخَلة حرفيًا، XP وعداد مجاني كالمسار العادي", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo);
+    const now = new Date("2026-09-08T18:00:00Z");
+    repo.now = now;
+
+    const result = await logManualCalorieEntry(repo, user, "dinner", "وجبة من الخارج", 500, 0, 0, 0, now);
+    expect(result.meal_logged).toBe(true);
+
+    const logs = await repo.findMealLogsInRange(user.id, new Date("2026-09-08T00:00:00Z"), new Date("2026-09-09T00:00:00Z"));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ total_calories: 500, total_protein: 0, total_carbs: 0, total_fat: 0, is_free_meal: true });
+    expect(JSON.parse(logs[0].matched_foods_json!)).toEqual(["وجبة من الخارج"]);
+
+    expect(user.free_meals_used).toBe(1);
+    expect(user.xp).toBe(10);
+  });
+
+  it("مع بروتين/كارب/دهون اختيارية -> تُخزَّن كما أُدخِلت حرفيًا، صفر اختراع رقم", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo);
+    const now = new Date("2026-09-08T18:00:00Z");
+    repo.now = now;
+
+    await logManualCalorieEntry(repo, user, "lunch", "برگر مطعم", 650, 25, 55, 30, now);
+    const [log] = await repo.findMealLogsInRange(user.id, new Date("2026-09-08T00:00:00Z"), new Date("2026-09-09T00:00:00Z"));
+    expect(log).toMatchObject({ total_calories: 650, total_protein: 25, total_carbs: 55, total_fat: 30 });
+  });
+
+  it("تجاوز سقف الوجبات المجانية -> premium_required:true، صفر MealLog", async () => {
+    const repo = new InMemoryRepository();
+    const user = makeUser({ id: "capped", is_premium: false, free_meals_used: 6 }); // 6 = FREE_MEALS_CAP
+    repo.nutritionProfiles.set("capped", { user_id: "capped", ...STANDARD_PROFILE });
+    await repo.saveUser(user);
+    const now = new Date("2026-09-08T18:00:00Z");
+    repo.now = now;
+
+    const result = await logManualCalorieEntry(repo, user, "dinner", "وجبة من الخارج", 500, 0, 0, 0, now);
+    expect((result as { premium_required?: boolean }).premium_required).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
+  it("نافذة تراجع 5 دقائق تعمل (source=\"direct\" كأي إضافة يدوية أخرى)، صفر استدعاء Gemini إطلاقًا", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo);
+    const now = new Date("2026-09-08T18:00:00Z");
+    repo.now = now;
+
+    // استدعاء backend مباشر — يثبت العملية Atomic بالكامل بدون أي مسار شات/Gemini
+    const result = await logManualCalorieEntry(repo, user, "dinner", "وجبة من الخارج", 500, 0, 0, 0, now);
+    expect(responses.DIRECT_LOG_UNDO_HINT_TEMPLATES.some((t) => result.reply!.includes(t))).toBe(true);
+    expect(user.last_direct_log_json).toBeTruthy(); // snapshot تراجع 5 دقائق، نفس مسار logMealManually
   });
 });
 

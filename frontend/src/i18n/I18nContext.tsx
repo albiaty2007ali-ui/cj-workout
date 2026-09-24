@@ -2,7 +2,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import { translations } from "./translations";
 
 type NestedKeyOf<T> = { [K in keyof T & string]: T[K] extends string ? K : `${K}.${NestedKeyOf<T[K]>}` }[keyof T & string];
-type TranslationKey = NestedKeyOf<typeof translations.ar>;
+export type TranslationKey = NestedKeyOf<typeof translations.ar>;
 
 interface I18nContextValue {
   dir: "rtl";

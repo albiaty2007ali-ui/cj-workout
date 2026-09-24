@@ -39,22 +39,27 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
     repo = setupRepo();
   });
 
+  // noonBaghdad (بغداد ظهرًا) بكل الاختبارات أدناه غير المتعلقة أصلاً بميزة "أكل قليل جدًا" —
+  // يمنع نتيجة under_target (context.ts، مساء/ليل فقط) من التداخل مع تطابق نص حرفي غير مرتبط،
+  // ويزيل اعتماد الاختبار على "الآن" الحقيقي وقت التشغيل (كان يفشل بالمصادفة لو شُغِّل مساءً).
+  const noonBaghdad = new Date("2026-01-01T09:00:00Z");
+
   it("'هلا' -> GREETING (رد من ضمن GREETING_TEMPLATES، صفر تسجيل)", async () => {
     const user = await freshUser(repo, "g1");
-    const r = await handleMessage(repo, user, "هلا");
+    const r = await handleMessage(repo, user, "هلا", noonBaghdad);
     expect(r.meal_logged).toBe(false);
     expect(responses.GREETING_TEMPLATES).toContain(r.reply);
   });
 
   it("'شكد باقيلي' بيوم فاضي -> 2249 من أصل 2249 حرفيًا", async () => {
     const user = await freshUser(repo, "g2");
-    const r = await handleMessage(repo, user, "شكد باقيلي");
+    const r = await handleMessage(repo, user, "شكد باقيلي", noonBaghdad);
     expect(r.reply).toBe("باقيلك تقريبًا 2249 سعرة من أصل 2249 kcal اليوم. تحب أقترحلك وجبة ضمنها؟");
   });
 
   it("'شنو فايدة البروتين' -> جواب من ضمن قوالب GENERAL_NUTRITION['protein']", async () => {
     const user = await freshUser(repo, "g3");
-    const r = await handleMessage(repo, user, "شنو فايدة البروتين");
+    const r = await handleMessage(repo, user, "شنو فايدة البروتين", noonBaghdad);
     expect(responses.GENERAL_NUTRITION_TEMPLATES.protein).toContain(r.reply);
   });
 
@@ -96,7 +101,7 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
 
   it("'راح انام' (END_DAY) بيوم فاضي -> ملخص حرفي كامل", async () => {
     const user = await freshUser(repo, "g8");
-    const r = await handleMessage(repo, user, "راح انام");
+    const r = await handleMessage(repo, user, "راح انام", noonBaghdad);
     expect(r.reply).toBe(
       "ملخص يومك 📋\n🔥 السعرات: 0 / 2249 kcal\n" +
       "🍗 بروتين: 0غ | 🍞 كارب: 0غ | 🥑 دهون: 0غ\n" +
@@ -108,7 +113,7 @@ describe("orchestrator.handleMessage — تكافؤ حرفي مع nutrition_engi
 
   it("'مشتهي دولمة' (EXPRESS_CRAVING) -> رد من ضمن قوالب craving مع اسم الطعام الحقيقي", async () => {
     const user = await freshUser(repo, "g9");
-    const r = await handleMessage(repo, user, "مشتهي دولمة");
+    const r = await handleMessage(repo, user, "مشتهي دولمة", noonBaghdad);
     const expectedOptions = responses.CRAVING_ACK_WITH_FOOD_TEMPLATES.map((t) => t.replace("{food}", "دولمة"));
     expect(expectedOptions).toContain(r.reply);
   });

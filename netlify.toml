@@ -90,6 +90,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/consult"
+  to = "/.netlify/functions/consult"
+  status = 200
+
+[[redirects]]
   from = "/api/progress/weight"
   to = "/.netlify/functions/progress-weight"
   status = 200

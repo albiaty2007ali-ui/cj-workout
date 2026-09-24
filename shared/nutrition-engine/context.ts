@@ -5,6 +5,7 @@
 import * as calculator from "./calculator.js";
 import * as macros from "./macros.js";
 import * as iraqTime from "./iraqTime.js";
+import * as safety from "./safety.js";
 import type { Repository, NutritionProfileRecord } from "./db/repository.js";
 
 export interface NutritionContext {
@@ -21,6 +22,9 @@ export interface NutritionContext {
   goal: string;
   period: string;
   over_target: boolean;
+  /** أكل قليل جدًا مقارنة بالحد الآمن (safety.MIN_SAFE_CALORIES) — يُفحَص فقط مساءً/ليلاً
+   * (period) لمنع إنذار كاذب بالصباح الباكر، وقت طبيعي جدًا لاستهلاك منخفض لحد الآن. */
+  under_target: boolean;
 }
 
 export async function build(
@@ -36,6 +40,10 @@ export async function build(
 
   const macroTargets = profile ? macros.calculateTargets(target, profile.weight_kg, profile.goal) : {};
 
+  const period = iraqTime.getCurrentPeriod(now);
+  const isLateEnough = period === "evening" || period === "late_night";
+  const minSafe = safety.MIN_SAFE_CALORIES[profile?.sex ?? "female"] ?? safety.MIN_SAFE_CALORIES.female;
+
   return {
     target_calories: target,
     consumed_calories: totals.calories,
@@ -48,7 +56,8 @@ export async function build(
     water_target_ml: profile ? profile.water_target_ml : 2000,
     meals_logged_today: totals.logs.length,
     goal: profile ? profile.goal : "maintain",
-    period: iraqTime.getCurrentPeriod(now),
+    period,
     over_target: remaining < 0,
+    under_target: isLateEnough && totals.calories < minSafe,
   };
 }

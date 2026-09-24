@@ -17,7 +17,7 @@ function baseCtx(overrides: Partial<NutritionContext> = {}): NutritionContext {
     target_calories: 2000, consumed_calories: 0, remaining_calories: 1000,
     consumed_protein: 100, consumed_carbs: 0, consumed_fat: 0,
     macro_targets: { protein_g: 160 }, water_ml: 2000, water_target_ml: 2000,
-    meals_logged_today: 0, goal: "maintain", period: "noon", over_target: false,
+    meals_logged_today: 0, goal: "maintain", period: "noon", over_target: false, under_target: false,
     ...overrides,
   };
 }
@@ -41,6 +41,15 @@ describe("chooseCategoryForContext — تكافؤ حرفي مع tips_engine.py",
 
   it("goal=lose -> weight_loss", () => {
     expect(chooseCategoryForContext(baseCtx({ goal: "lose" }))).toBe("weight_loss");
+  });
+
+  it("under_target=true -> under_eating (وله أولوية أعلى من remaining/protein/water/goal)", () => {
+    expect(chooseCategoryForContext(baseCtx({ under_target: true }))).toBe("under_eating");
+    expect(chooseCategoryForContext(baseCtx({ under_target: true, goal: "lose", water_ml: 100 }))).toBe("under_eating");
+  });
+
+  it("over_target و under_target معًا (حالة غير طبيعية نظريًا) -> over_target يفوز دائمًا", () => {
+    expect(chooseCategoryForContext(baseCtx({ over_target: true, under_target: true }))).toBe("high_calorie_meal");
   });
 
   it("بدون أي إشارة خاصة + mealType=breakfast -> breakfast", () => {

@@ -63,6 +63,14 @@ export interface SuggestedRecipe {
   fat: number;
 }
 
+export interface NudgeAction {
+  icon: string;
+  label: string;
+  kind: "navigate" | "chat" | "consult";
+  target?: string;
+  prompt?: string;
+}
+
 export interface ChatReply {
   reply: string | null;
   meal_logged: boolean;
@@ -76,4 +84,5 @@ export interface ChatReply {
   meal_protein?: number;
   meal_carbs?: number;
   meal_fat?: number;
+  nudge_actions?: NudgeAction[];
 }

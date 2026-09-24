@@ -16,7 +16,7 @@ import * as mealBudget from "../../shared/nutrition-engine/mealBudget.js";
 import { nowBaghdad, todayBaghdadIso } from "../../shared/nutrition-engine/iraqTime.js";
 import { getSettings } from "../../shared/nutrition-engine/notifications/engine.js";
 import { currentPeriodForUser, type SleepSchedule } from "../../shared/nutrition-engine/mealTimingEngine.js";
-import { logMealManually, updateMealLogTotals, deleteMealLogById } from "../../shared/nutrition-engine/orchestrator.js";
+import { logMealManually, logManualCalorieEntry, updateMealLogTotals, deleteMealLogById } from "../../shared/nutrition-engine/orchestrator.js";
 
 async function handlePost(req: Request, claims: { sub: string }): Promise<Response> {
   const url = new URL(req.url);
@@ -54,13 +54,31 @@ async function handlePost(req: Request, claims: { sub: string }): Promise<Respon
 
   if (action === "add") {
     const mealType = typeof body.meal_type === "string" ? body.meal_type : "";
-    const foodId = typeof body.food_id === "number" ? body.food_id : NaN;
-    const foodName = typeof body.food_name === "string" ? body.food_name : "";
-    const grams = typeof body.grams === "number" ? body.grams : NaN;
-    if (!["breakfast", "lunch", "dinner", "snack"].includes(mealType) || !foodId || !foodName || !(grams > 0)) {
+    if (!["breakfast", "lunch", "dinner", "snack"].includes(mealType)) {
       return jsonError(400, "VALIDATION_ERROR", "بيانات الوجبة غير صالحة.");
     }
-    const result = await logMealManually(repo, user, mealType, foodId, foodName, grams);
+    const foodName = typeof body.food_name === "string" ? body.food_name : "";
+    const foodId = typeof body.food_id === "number" ? body.food_id : NaN;
+
+    let result;
+    if (foodId) {
+      // مسار بحث حقيقي بقاعدة الأطعمة (الموجود أصلاً) — food_id+grams
+      const grams = typeof body.grams === "number" ? body.grams : NaN;
+      if (!foodName || !(grams > 0)) return jsonError(400, "VALIDATION_ERROR", "بيانات الوجبة غير صالحة.");
+      result = await logMealManually(repo, user, mealType, foodId, foodName, grams);
+    } else {
+      // مسار سعرات حرة (جديد) — طعام غير موجود بقاعدة foods.sqlite، اسم+سعرات يُبلّغ عنهم
+      // المستخدم مباشرة (راجع توثيق logManualCalorieEntry)
+      const calories = typeof body.calories === "number" ? body.calories : NaN;
+      const protein = typeof body.protein === "number" ? body.protein : 0;
+      const carbs = typeof body.carbs === "number" ? body.carbs : 0;
+      const fat = typeof body.fat === "number" ? body.fat : 0;
+      if (!foodName || !(calories > 0) || protein < 0 || carbs < 0 || fat < 0) {
+        return jsonError(400, "VALIDATION_ERROR", "بيانات الوجبة غير صالحة.");
+      }
+      result = await logManualCalorieEntry(repo, user, mealType, foodName, calories, protein, carbs, fat);
+    }
+
     if ((result as { premium_required?: boolean }).premium_required) {
       return jsonError(402, "TRIAL_EXHAUSTED", "خلصت وجباتك المجانية. تحتاج اشتراك لتكملة التسجيل.");
     }
