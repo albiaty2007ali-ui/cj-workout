@@ -14,6 +14,9 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
   if (!claims) return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
 
-  const link = buildWhatsappLink(process.env.SUPPORT_WHATSAPP_NUMBER, "هلا، أحتاج استشارة غذائية من CJ FOOD.");
+  // قيمة احتياطية صريحة لو متغير البيئة غير مضبوط بلوحة Netlify (منفصل عن .env المحلي) — يمنع
+  // بقاء مودال الاستشارة على رسالة "غير متوفرة حاليًا" لو نُسي الإعداد بالإنتاج (نفس نمط subscribe.mts).
+  const number = process.env.SUPPORT_WHATSAPP_NUMBER || "9647808122983";
+  const link = buildWhatsappLink(number, "هلا، أحتاج استشارة غذائية من CJ FOOD.");
   return jsonOk({ whatsapp_link: link });
 };

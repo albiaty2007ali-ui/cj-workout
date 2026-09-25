@@ -9,9 +9,9 @@
  * بقصور أو تلاعب ادّعى ثقة كاملة بتسجيل وجبة من سؤال معلوماتي بريء.
  */
 import * as directLog from "../directLog.js";
-import { CONFIRM_PHRASES, isConsumptionAuthorized, isWaterLogAuthorized, matchesPhrase } from "../intents.js";
+import { CONFIRM_PHRASES, isConsumptionAuthorized, isManualCalorieLogAuthorized, isWaterLogAuthorized, matchesPhrase } from "../intents.js";
 import { findMealType } from "../mealTypeDetection.js";
-import { logMealManually, runMealLoggingPipeline, runWaterLoggingPipeline } from "../orchestrator.js";
+import { logMealManually, logManualCalorieEntry, runMealLoggingPipeline, runWaterLoggingPipeline } from "../orchestrator.js";
 import type { CJTool, ToolExecContext } from "./types.js";
 
 export interface LogMealToolResult {
@@ -102,6 +102,57 @@ export const logWater: CJTool<Record<string, never>, LogWaterToolResult> = {
   },
 };
 
+export interface LogManualCaloriesArgs {
+  calories: number;
+  label?: string;
+}
+
+export interface LogManualCaloriesToolResult {
+  ok: boolean;
+  meal_logged: boolean;
+  local_reply: string | null;
+  rejection_reason?: "NOT_AUTHORIZED";
+  [key: string]: unknown;
+}
+
+/**
+ * "ضيف 500 سعرة للريوك" — تسجيل سعرات إضافية مباشرة بدون طعام محدد من foods.sqlite. استثناء
+ * صريح وموثَّق لقاعدة "الأرقام من قاعدة البيانات فقط" (نفس سابقة orchestrator.ts's
+ * logManualCalorieEntry المستخدمة أصلاً بواجهة "يومي الغذائي" اليدوية) — هنا رقم يُبلّغ عنه
+ * المستخدم بنفسه بنفس رسالته، محروس بـintents.isManualCalorieLogAuthorized (فعل إضافة + كلمة
+ * سعرات + الرقم نفسه موجود حرفيًا بالنص الخام)، صفر ثقة برقم calories المُمرَّر من Gemini وحده.
+ */
+export const logManualCalories: CJTool<LogManualCaloriesArgs, LogManualCaloriesToolResult> = {
+  name: "log_manual_calories",
+  description:
+    "يسجّل سعرات إضافية مباشرة بدون طعام محدد من قاعدة البيانات — استخدمها فقط لما المستخدم يطلب " +
+    'صراحة إضافة رقم سعرات ذكره هو بنفسه صراحة بنفس رسالته (مثلاً "ضيف 500 سعرة"، "زيدلي 300 سعرة ' +
+    'للسناك") مع فعل إضافة واضح ("ضيف"/"زيد"/إلخ). calories يجب يطابق حرفيًا الرقم المذكور بالرسالة ' +
+    "— ممنوع تخترع أو تقرّب رقم غير مذكور، وإلا يُرفض الاستدعاء هيكليًا بغض النظر عن أي معامل. label " +
+    'اختياري (اسم مختصر لما ذكره المستخدم، مثلاً "ريوك") — لو ما ذكر اسمًا اتركه فاضيًا وسيُسمّى ' +
+    '"سعرات إضافية" تلقائيًا. لا تستدعِها لطعام حقيقي معروف بالاسم (استخدم log_meal بدلها) ولا لسؤال ' +
+    "أو نية مستقبلية.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      calories: { type: "NUMBER", description: "عدد السعرات بالضبط كما ذكره المستخدم حرفيًا بنص رسالته" },
+      label: { type: "STRING", description: "اسم مختصر اختياري لما ذكره المستخدم (فاضي لو ما ذكر شي)" },
+    },
+    required: ["calories"],
+  },
+  mutates: true,
+  async execute(ctx: ToolExecContext, args: LogManualCaloriesArgs): Promise<LogManualCaloriesToolResult> {
+    if (!isManualCalorieLogAuthorized(ctx.rawText, args?.calories)) {
+      return { ok: false, meal_logged: false, local_reply: null, rejection_reason: "NOT_AUTHORIZED" };
+    }
+    const mealType = findMealType("", ctx.now);
+    const label = args.label?.trim() || "سعرات إضافية";
+    const result = await logManualCalorieEntry(ctx.repo, ctx.user, mealType, label, args.calories, 0, 0, 0, ctx.now);
+    const { reply, meal_logged, ...rest } = result;
+    return { ok: meal_logged === true, meal_logged, local_reply: reply, ...rest };
+  },
+};
+
 export const undoLastMeal: CJTool<Record<string, never>, directLog.UndoResult> = {
   name: "undo_last_meal",
   description: "يتراجع عن آخر وجبة سُجّلت تلقائيًا خلال آخر 5 دقائق فقط — يرجع رسالة صريحة لو انتهت النافذة أو ماكو شي للتراجع.",
@@ -112,4 +163,4 @@ export const undoLastMeal: CJTool<Record<string, never>, directLog.UndoResult> =
   },
 };
 
-export const MUTATION_TOOLS: CJTool<any, any>[] = [logMeal, logWater, undoLastMeal];
+export const MUTATION_TOOLS: CJTool<any, any>[] = [logMeal, logWater, logManualCalories, undoLastMeal];

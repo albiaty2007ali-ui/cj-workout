@@ -21,8 +21,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
   if (!claims) return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
 
-  const cardNumber = process.env.MANUAL_PAYMENT_CARD_NUMBER ?? "";
-  const cardNetwork = process.env.MANUAL_PAYMENT_CARD_NETWORK ?? "";
+  // قيمة احتياطية صريحة لو متغير البيئة غير مضبوط بلوحة Netlify (منفصل عن .env المحلي) — يمنع
+  // بقاء رقم الكارد عالقًا على "..." بالواجهة (info.card_number فاضي = falsy) لو نُسي الإعداد.
+  const cardNumber = process.env.MANUAL_PAYMENT_CARD_NUMBER || "07808122983";
+  const cardNetwork = process.env.MANUAL_PAYMENT_CARD_NETWORK || "Mastercard";
   const price = Number(process.env.SUBSCRIPTION_PRICE_IQD ?? "10000");
 
   try {

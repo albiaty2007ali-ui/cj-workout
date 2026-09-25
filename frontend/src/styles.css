@@ -710,6 +710,25 @@ body {
 .nudge-actions { padding: 6px 0 0; margin: 0; }
 .nudge-action-btn { font-size: 0.8rem; }
 
+/* ---- "حول التطبيق والشروط" — إصدار/تغييرات/مطور/أسئلة شائعة/إخلاء مسؤولية/شروط/خصوصية ---- */
+.about-app-modal { max-width: 560px; }
+.about-app-version-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  color: var(--text-muted); font-size: 0.85rem; margin-top: -6px;
+}
+.about-changelog { margin: 10px 0 0; padding-inline-start: 20px; font-size: 0.85rem; color: var(--text); display: flex; flex-direction: column; gap: 4px; }
+.about-app-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.about-app-section-title { font-weight: 700; color: var(--heading); margin: 0 0 8px; font-size: 0.98rem; }
+.about-app-disclaimer { background: var(--surface); border-radius: 12px; padding: 12px; border-top: none; margin-top: 18px; }
+.about-faq { display: flex; flex-direction: column; gap: 6px; }
+.about-faq-item { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.about-faq-question {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: start;
+  background: var(--surface); border: none; color: var(--text); padding: 10px 12px; font-size: 0.87rem; cursor: pointer; font-weight: 600;
+}
+.about-faq-answer { margin: 0; padding: 0 12px 12px; font-size: 0.85rem; color: var(--text-muted); }
+.about-app-footer { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); text-align: center; font-size: 0.78rem; color: var(--text-muted); line-height: 1.6; }
+
 /* ---- مبدّل وضع إضافة وجبة (بحث/سعرات حرة) — نفس نمط .theme-segmented ---- */
 .add-meal-mode-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; margin-bottom: 10px; }
 .add-meal-mode-btn { border: none; background: transparent; color: var(--text-muted); border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; cursor: pointer; }

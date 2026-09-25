@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
 import ThemeToggle from "../components/ThemeToggle";
+import AboutAppModal from "../components/AboutAppModal";
 import { pushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from "../lib/push";
 import { useIntroSlides } from "./IntroTour";
 import { useI18n } from "../i18n/I18nContext";
@@ -32,6 +33,7 @@ export default function Settings() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [savedMsg, setSavedMsg] = useState("");
+  const [showAboutApp, setShowAboutApp] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -240,6 +242,9 @@ export default function Settings() {
           <button type="button" className="btn btn-outline-dark" style={{ marginTop: 14 }} onClick={() => navigate("/intro/replay")}>
             {t("settings.replayIntro")}
           </button>
+          <button type="button" className="btn btn-outline-dark" style={{ marginTop: 14, marginInlineStart: 10 }} onClick={() => setShowAboutApp(true)}>
+            ℹ️ حول التطبيق والشروط
+          </button>
         </div>
 
         {notif && (
@@ -445,6 +450,7 @@ export default function Settings() {
           )}
         </div>
       </main>
+      {showAboutApp && <AboutAppModal onClose={() => setShowAboutApp(false)} />}
     </AppShell>
   );
 }

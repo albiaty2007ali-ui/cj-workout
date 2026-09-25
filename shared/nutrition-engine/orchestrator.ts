@@ -973,6 +973,7 @@ export async function runWaterLoggingPipeline(
 
 const ALL_CONVERSATION_TOOLS: conversationTypes.CJTool<any, any>[] = [
   ...conversationTools.READ_ONLY_TOOLS, mutationTools.logMeal, mutationTools.undoLastMeal, mutationTools.logWater,
+  mutationTools.logManualCalories,
 ];
 
 /** يبني ChatReply من نتيجة أداة (لو موجودة) — الحقول العددية تجي حرفيًا من الأداة، Gemini يؤثر فقط على reply. */

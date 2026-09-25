@@ -22,6 +22,18 @@ export default function Subscribe() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState<{ whatsapp_link: string } | null>(null);
+  const [cardCopied, setCardCopied] = useState(false);
+
+  async function copyCardNumber(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCardCopied(true);
+      setTimeout(() => setCardCopied(false), 1800);
+    } catch {
+      // بعض المتصفحات/السياقات (http غير آمن، صلاحية مرفوضة) ترمي — تجاهل بأمان، الرقم يبقى
+      // ظاهرًا بالنص بشكل عادي للنسخ اليدوي حتى لو زر النسخ التلقائي فشل
+    }
+  }
 
   useEffect(() => {
     api.get<MeResponse>("/me").then((res) => {
@@ -84,7 +96,17 @@ export default function Subscribe() {
               </ol>
               <div style={{ background: "var(--surface)", borderRadius: 14, padding: 14, marginTop: 12 }}>
                 <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0 }}>رقم الكارد ({info?.card_network || "..."})</p>
-                <p style={{ fontSize: "1.3rem", fontWeight: 700, margin: "4px 0 0" }}>{info?.card_number || "..."}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                  <p style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>{info?.card_number || "..."}</p>
+                  {info?.card_number && (
+                    <button
+                      type="button" className="btn btn-outline-dark" style={{ height: 30, padding: "0 12px", fontSize: "0.8rem" }}
+                      onClick={() => copyCardNumber(info.card_number)}
+                    >
+                      {cardCopied ? "✅ انتسخ" : "📋 نسخ"}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 

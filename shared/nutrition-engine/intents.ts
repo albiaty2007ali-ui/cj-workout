@@ -452,3 +452,20 @@ export function isWaterLogAuthorized(rawText: string, ctx: IntentContext): { aut
   const localIntent = detectIntent(rawText.trim(), ctx);
   return { authorized: localIntent === WATER_LOG, localIntent };
 }
+
+/**
+ * تصريح أداة log_manual_calories (سعرات إضافية بدون طعام محدد من القاعدة، مثلاً "ضيف 500 سعرة").
+ * دفاع بعمق بنفس فلسفة isConsumptionAuthorized: لا يثق برقم calories اللي يمرّره Gemini إلا لو
+ * (1) رسالة المستخدم نفسها فيها فعل إضافة صريح (ADD_FOOD_PHRASES، نفس القائمة الموجودة أصلاً)،
+ * (2) فيها كلمة سعرة/سعرات/كالوري صراحة، (3) الرقم نفسه (calories) موجود حرفيًا بالنص الخام —
+ * يمنع Gemini من اختلاق أو تقريب رقم لم يذكره المستخدم إطلاقًا.
+ */
+export function isManualCalorieLogAuthorized(rawText: string, calories: unknown): boolean {
+  const cal = Number(calories);
+  if (!Number.isFinite(cal) || cal <= 0) return false;
+  const textNorm = normalize(rawText.trim());
+  const hasAddVerb = includesAny(textNorm, ADD_FOOD_PHRASES);
+  const hasCalorieWord = /سعر|كالور/.test(textNorm);
+  const numberInText = new RegExp(`(^|[^0-9])${cal}([^0-9]|$)`).test(textNorm);
+  return hasAddVerb && hasCalorieWord && numberInText;
+}

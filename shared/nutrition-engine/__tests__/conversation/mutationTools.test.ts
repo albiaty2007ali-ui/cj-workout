@@ -10,7 +10,7 @@ import { InMemoryRepository } from "../../db/inMemoryRepository.js";
 import { makeUser } from "../testHelpers.js";
 import * as mealState from "../../mealState.js";
 import * as calculatorMod from "../../calculator.js";
-import { logMeal, logWater, undoLastMeal } from "../../conversation/mutationTools.js";
+import { logMeal, logWater, logManualCalories, undoLastMeal } from "../../conversation/mutationTools.js";
 import { EMPTY_CONVERSATION_STATE } from "../../conversation/stateStore.js";
 import type { ConversationState, ToolExecContext } from "../../conversation/types.js";
 import type { NutritionProfileRecord, UserRecord } from "../../db/repository.js";
@@ -256,5 +256,54 @@ describe("log_water", () => {
     expect(r.ok).toBe(false);
     expect(await repo.countWaterLogsForUser(user.id)).toBe(0);
     expect(typeof r.local_reply).toBe("string");
+  });
+});
+
+describe("log_manual_calories — سعرات إضافية بدون طعام من القاعدة (\"ضيف 500 سعرة\")", () => {
+  it("'ضيف 500 سعرة للريوك' -> ok:true، MealLog حقيقي بـ500 سعرة وlabel من رسالة المستخدم", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "manual1");
+    const r = await logManualCalories.execute(ctxFor(repo, user, "ضيف 500 سعرة للريوك"), { calories: 500, label: "ريوك" });
+    expect(r.ok).toBe(true);
+    expect(r.meal_logged).toBe(true);
+    const logs = await repo.findMealLogsInRange(user.id, new Date(0), new Date(Date.now() + 86400000));
+    expect(logs).toHaveLength(1);
+    expect(logs[0].total_calories).toBe(500);
+    expect(JSON.parse(logs[0].matched_foods_json!)).toEqual(["ريوك"]);
+  });
+
+  it("بدون label -> يُسمّى 'سعرات إضافية' تلقائيًا", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "manual2");
+    const r = await logManualCalories.execute(ctxFor(repo, user, "ضيف 300 سعرة"), { calories: 300 });
+    expect(r.ok).toBe(true);
+    const logs = await repo.findMealLogsInRange(user.id, new Date(0), new Date(Date.now() + 86400000));
+    expect(JSON.parse(logs[0].matched_foods_json!)).toEqual(["سعرات إضافية"]);
+  });
+
+  it("Gemini يمرّر رقم لا يطابق النص الخام (اختلاق) -> ok:false، صفر MealLog", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "manual3");
+    // النص يذكر 500 لكن Gemini يمرّر 900 — يُرفض هيكليًا، صفر ثقة برقم الأداة وحده
+    const r = await logManualCalories.execute(ctxFor(repo, user, "ضيف 500 سعرة"), { calories: 900 });
+    expect(r.ok).toBe(false);
+    expect(r.rejection_reason).toBe("NOT_AUTHORIZED");
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
+  it.each(PIZZA_INCIDENT_MESSAGES)("'%s' مع calories:600 مختلَقة -> ok:false، صفر MealLog (نفس حادثة البيتزا)", async (msg) => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, `manual-pizza-${msg.length}-${Math.random()}`);
+    const r = await logManualCalories.execute(ctxFor(repo, user, msg), { calories: 600 });
+    expect(r.ok).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+
+  it("'شكد سعرات الشاورما اللي فيها 500 سعرة؟' (سؤال معلوماتي، الرقم موجود لكن صفر فعل إضافة) -> ok:false", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "manual4");
+    const r = await logManualCalories.execute(ctxFor(repo, user, "شكد سعرات الشاورما اللي فيها 500 سعرة؟"), { calories: 500 });
+    expect(r.ok).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
   });
 });
