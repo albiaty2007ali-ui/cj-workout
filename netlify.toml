@@ -140,6 +140,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/auth/verify-email"
+  to = "/.netlify/functions/auth-verify-email"
+  status = 200
+
+[[redirects]]
   from = "/api/admin/feedback"
   to = "/.netlify/functions/admin-feedback"
   status = 200

@@ -33,6 +33,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       onboarding_completed: profile !== null, profile,
       intro_completed: display?.intro_completed ?? false,
       language: display?.language ?? "ar",
+      email_verified: claims.email_verified === true,
+      email: claims.email,
       // إشارة حقيقية (مو شارة ثابتة دائمًا خضراء) — يعكس هل GEMINI_API_KEY مضبوط فعليًا وGEMINI_
       // CONVERSATIONAL_MODE ليس OFF. لا يستدعي Gemini حقيقيًا (صفر تكلفة/تأخير)، بس لا يخترع حالة.
       ai_status: getConversationalMode() !== "OFF" && Boolean(process.env.GEMINI_API_KEY) ? "ok" : "not_configured",

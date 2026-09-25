@@ -51,6 +51,21 @@ export async function sendWelcomeEmail(to: string, name: string): Promise<boolea
   return send(to, "أهلًا بيك بـ CJ FOOD 💪", html);
 }
 
+export async function sendVerificationEmail(to: string, name: string, code: string): Promise<boolean> {
+  const html = wrap(`
+    <h2 style="color:${BRAND_GREEN};margin-top:0;">أكّد بريدك الإلكتروني</h2>
+    <p>هلا ${name}، خطوة وحدة وحسابك جاهز — أدخل الكود هذا بالتطبيق حتى نأكد بريدك:</p>
+    <p style="text-align:center;margin:28px 0;">
+      <span style="background:#f4efe3;color:${BRAND_GREEN};font-size:32px;font-weight:800;
+         letter-spacing:8px;padding:16px 24px;border-radius:14px;display:inline-block;">${code}</span>
+    </p>
+    <p style="color:#7a7563;font-size:13px;">
+      هذا الكود صالح لمدة 15 دقيقة فقط. إذا ما سجّلت حساب بـ CJ FOOD، تجاهل هذي الرسالة.
+    </p>
+  `);
+  return send(to, `${code} — كود تأكيد بريدك بـ CJ FOOD`, html);
+}
+
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<boolean> {
   const html = wrap(`
     <h2 style="color:${BRAND_GREEN};margin-top:0;">إعادة تعيين كلمة المرور</h2>

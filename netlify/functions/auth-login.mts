@@ -30,7 +30,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonError(403, "ACCOUNT_DISABLED", "هذا الحساب معطّل، تواصل مع الإدارة");
     }
 
-    const token = signSession({ sub: user.id, role: user.role, email });
+    const token = signSession({ sub: user.id, role: user.role, email, email_verified: user.email_verified });
     return jsonOk({ user_id: user.id }, { headers: { "Set-Cookie": buildSessionCookie(token) } });
   } catch (err) {
     console.error("auth-login error:", err);

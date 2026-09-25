@@ -52,6 +52,8 @@ export interface MeResponse {
   language: "ar" | "en";
   profile: { calorie_target: number; water_target_ml: number } | null;
   ai_status: "ok" | "not_configured";
+  email_verified: boolean;
+  email: string;
 }
 
 export interface SuggestedRecipe {

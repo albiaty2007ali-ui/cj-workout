@@ -24,7 +24,7 @@ export default function Register() {
         setErrors(res.error?.details ?? { _: res.error?.message ?? "صار خطأ، جرب مرة ثانية" });
         return;
       }
-      navigate("/chat");
+      navigate("/verify-email");
     } finally {
       setLoading(false);
     }

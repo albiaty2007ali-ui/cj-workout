@@ -49,8 +49,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     if (existing) {
       if (existing.disabled) return jsonError(403, "ACCOUNT_DISABLED", "هذا الحساب معطّل، تواصل مع الإدارة");
-      await db.collection("users").doc(existing.id).set({ google_id: googleId }, { merge: true });
-      const token = signSession({ sub: existing.id, role: existing.role, email });
+      // Google تثبت ملكية البريد فعليًا بنفس لحظة الدخول — يفعّل حساب موجود ما زال غير مؤكَّد
+      // (سجّل سابقًا بكلمة مرور ولم يدخل كود التحقق) بدل إبقائه محظورًا بلا داعٍ
+      await db.collection("users").doc(existing.id).set({ google_id: googleId, email_verified: true }, { merge: true });
+      const token = signSession({ sub: existing.id, role: existing.role, email, email_verified: true });
       return jsonOk({ user_id: existing.id }, { headers: { "Set-Cookie": buildSessionCookie(token) } });
     }
 
@@ -60,7 +62,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     } catch (e) {
       console.warn("welcome email failed:", e);
     }
-    const token = signSession({ sub: id, role, email });
+    const token = signSession({ sub: id, role, email, email_verified: true });
     return jsonOk({ user_id: id }, { headers: { "Set-Cookie": buildSessionCookie(token) } });
   } catch (err) {
     console.error("auth-google error:", err);

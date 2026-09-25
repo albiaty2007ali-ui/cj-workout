@@ -34,6 +34,16 @@ export interface SessionClaims {
   sub: string; // user id
   role: string;
   email: string;
+  /** هل البريد مؤكَّد فعليًا (كود 6 أرقام عبر Resend) — يُضمَّن بالـJWT نفسه (نفس نمط role/email)
+   * فيتحدّث فقط بإعادة توقيع جلسة جديدة (auth-verify-email.mts عند نجاح التحقق) لا بقراءة DB
+   * بكل طلب. حسابات قديمة قبل هذي الميزة (undefined بالـDB) تُقرأ false افتراضيًا — تحتاج تحقق
+   * أيضًا (طلب صريح: الحسابات القديمة غير المؤكَّدة تُطالَب بالتأكيد عند أي دخول لاحق). */
+  email_verified: boolean;
+}
+
+/** إشارة تحقق مركزية — نفس فلسفة isAdminClaims (فحص من claims الموقَّعة، صفر قراءة DB إضافية). */
+export function isEmailVerified(claims: SessionClaims | null): boolean {
+  return !!claims && claims.email_verified === true;
 }
 
 /**
@@ -45,8 +55,13 @@ export interface SessionClaims {
  * هذي الدالة، صفر تكرار لمنطق "if user.email == ...".
  */
 export function isAdminClaims(claims: SessionClaims | null): boolean {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  return !!claims && !!adminEmail && claims.role === "admin" && claims.email.toLowerCase() === adminEmail.toLowerCase();
+  if (!claims || claims.role !== "admin") return false;
+  // ADMIN_EMAILS (قائمة مفصولة بفواصل) يدعم عدة حسابات إدارة — ADMIN_EMAIL المفرد يبقى يشتغل
+  // للتوافق الخلفي لو ADMIN_EMAILS غير مضبوط. نفس فلسفة "مصدر الحقيقة البيئة لا حقل role وحده"
+  // الموثَّقة أعلاه — قائمة بيضاء صريحة بالبيئة، صفر اعتماد كامل على role بقاعدة البيانات.
+  const list = (process.env.ADMIN_EMAILS ?? process.env.ADMIN_EMAIL ?? "")
+    .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return list.includes(claims.email.toLowerCase());
 }
 
 const SESSION_LIFETIME_SECONDS = 14 * 24 * 60 * 60; // 14 يوم — نفس PERMANENT_SESSION_LIFETIME الحالي
@@ -101,6 +116,7 @@ export interface UserCredentials {
   password_hash: string | null; // null = حساب أُنشئ عبر Google فقط، بدون كلمة مرور محلية
   disabled: boolean;
   role: string;
+  email_verified: boolean;
 }
 
 export async function findUserCredentialsByEmail(db: Firestore, email: string): Promise<UserCredentials | null> {
@@ -108,7 +124,10 @@ export async function findUserCredentialsByEmail(db: Firestore, email: string): 
   if (snap.empty) return null;
   const doc = snap.docs[0]!;
   const d = doc.data();
-  return { id: doc.id, password_hash: d.password_hash ?? null, disabled: d.disabled ?? false, role: d.role ?? "user" };
+  return {
+    id: doc.id, password_hash: d.password_hash ?? null, disabled: d.disabled ?? false, role: d.role ?? "user",
+    email_verified: d.email_verified === true, // undefined (حسابات قبل هذي الميزة) -> false عمدًا
+  };
 }
 
 export async function emailExists(db: Firestore, email: string): Promise<boolean> {
@@ -122,19 +141,97 @@ export interface NewUserInput {
   password: string;
 }
 
-/** ينشئ مستخدم جديد بكلمة مرور مشفَّرة — يرجّع (id, role) لبناء الجلسة فورًا بعد التسجيل. */
-export async function createUser(db: Firestore, input: NewUserInput): Promise<{ id: string; role: string }> {
+/** كود تحقق 6 أرقام — عشوائي تشفيريًا حقيقي (randomBytes)، مو Math.random(). */
+export function generateVerificationCode(): string {
+  const n = randomBytes(4).readUInt32BE(0) % 1000000;
+  return n.toString().padStart(6, "0");
+}
+
+export const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 دقيقة
+export const VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 ثانية
+
+/** ينشئ مستخدم جديد بكلمة مرور مشفَّرة، بحالة email_verified:false + كود تحقق أول — يرجّع
+ * (id, role, code) حتى auth-register.mts يرسل الكود عبر البريد فورًا. */
+export async function createUser(
+  db: Firestore, input: NewUserInput,
+): Promise<{ id: string; role: string; code: string }> {
   const id = randomUUID().replace(/-/g, "");
   const passwordHash = hashPassword(input.password);
+  const code = generateVerificationCode();
+  const now = new Date();
   await db.collection("users").doc(id).set({
     name: input.name, email: input.email, password_hash: passwordHash, role: "user", disabled: false,
     xp: 0, streak_days: 0, longest_streak: 0, streak_started_at: null, last_active_date: null,
     free_meals_used: 0, current_recipe_id: null, current_recipe_step: 0,
     pending_recipe_confirmation_id: null, pending_food_topic_json: null, pending_meal_json: null,
     last_direct_log_json: null, ai_response_style: "balanced", streak_freeze_balance: 0,
+    email_verified: false, email_verification_code: code,
+    email_verification_expires: new Date(now.getTime() + VERIFICATION_CODE_TTL_MS),
+    email_verification_sent_at: now,
     created_at: FieldValue.serverTimestamp(),
   });
-  return { id, role: "user" };
+  return { id, role: "user", code };
+}
+
+export interface VerifyEmailResult {
+  ok: boolean;
+  error?: "INVALID_CODE" | "EXPIRED" | "ALREADY_VERIFIED";
+}
+
+/** يتحقق كود التحقق المُدخَل مقابل المخزَّن فعليًا للمستخدم — يمسح الكود عند النجاح (استهلاك
+ * وحيد، صفر إعادة استخدام). */
+export async function verifyEmailCode(db: Firestore, userId: string, code: string): Promise<VerifyEmailResult> {
+  const ref = db.collection("users").doc(userId);
+  const doc = await ref.get();
+  if (!doc.exists) return { ok: false, error: "INVALID_CODE" };
+  const d = doc.data()!;
+  if (d.email_verified === true) return { ok: false, error: "ALREADY_VERIFIED" };
+
+  const expires = d.email_verification_expires?.toDate?.() ?? d.email_verification_expires;
+  if (!d.email_verification_code || !expires || new Date() > new Date(expires)) {
+    return { ok: false, error: "EXPIRED" };
+  }
+  if (d.email_verification_code !== code.trim()) return { ok: false, error: "INVALID_CODE" };
+
+  await ref.update({
+    email_verified: true, email_verification_code: null,
+    email_verification_expires: null, verified_at: FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+}
+
+export interface ResendResult {
+  ok: boolean;
+  error?: "TOO_SOON" | "ALREADY_VERIFIED";
+  code?: string;
+  retry_after_seconds?: number;
+}
+
+/** يولّد كود تحقق جديد ويستبدل القديم — محمي بفترة تهدئة 60 ثانية (صفر إساءة استخدام API إرسال
+ * البريد). يرجّع الكود الجديد حتى المستدعي (auth-verify-email.mts) يرسله فعليًا. */
+export async function resendVerificationCode(db: Firestore, userId: string): Promise<ResendResult> {
+  const ref = db.collection("users").doc(userId);
+  const doc = await ref.get();
+  if (!doc.exists) return { ok: false, error: "TOO_SOON" };
+  const d = doc.data()!;
+  if (d.email_verified === true) return { ok: false, error: "ALREADY_VERIFIED" };
+
+  const lastSent = d.email_verification_sent_at?.toDate?.() ?? d.email_verification_sent_at;
+  if (lastSent) {
+    const elapsedMs = Date.now() - new Date(lastSent).getTime();
+    if (elapsedMs < VERIFICATION_RESEND_COOLDOWN_MS) {
+      return { ok: false, error: "TOO_SOON", retry_after_seconds: Math.ceil((VERIFICATION_RESEND_COOLDOWN_MS - elapsedMs) / 1000) };
+    }
+  }
+
+  const code = generateVerificationCode();
+  const now = new Date();
+  await ref.update({
+    email_verification_code: code,
+    email_verification_expires: new Date(now.getTime() + VERIFICATION_CODE_TTL_MS),
+    email_verification_sent_at: now,
+  });
+  return { ok: true, code };
 }
 
 export interface NewGoogleUserInput {
@@ -144,7 +241,9 @@ export interface NewGoogleUserInput {
 }
 
 /** ينشئ مستخدم جديد عبر تسجيل دخول Google — بدون كلمة مرور محلية (password_hash: null)، نفس باقي
- *  حقول createUser الافتراضية تمامًا حتى لا يختلف سلوك حساب Google عن حساب بريد/كلمة مرور عاديّ. */
+ *  حقول createUser الافتراضية تمامًا حتى لا يختلف سلوك حساب Google عن حساب بريد/كلمة مرور عاديّ.
+ *  email_verified:true مباشرة — Google نفسها أثبتت ملكية البريد أصلًا ضمن تدفّق OAuth، تكرار
+ *  كود تحقق فوقها إجراء زائد بلا فائدة أمنية حقيقية. */
 export async function createUserFromGoogle(db: Firestore, input: NewGoogleUserInput): Promise<{ id: string; role: string }> {
   const id = randomUUID().replace(/-/g, "");
   await db.collection("users").doc(id).set({
@@ -153,6 +252,7 @@ export async function createUserFromGoogle(db: Firestore, input: NewGoogleUserIn
     free_meals_used: 0, current_recipe_id: null, current_recipe_step: 0,
     pending_recipe_confirmation_id: null, pending_food_topic_json: null, pending_meal_json: null,
     last_direct_log_json: null, ai_response_style: "balanced", streak_freeze_balance: 0,
+    email_verified: true,
     created_at: FieldValue.serverTimestamp(),
   });
   return { id, role: "user" };

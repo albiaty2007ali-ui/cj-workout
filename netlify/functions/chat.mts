@@ -7,7 +7,7 @@ import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreRepository, getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { handleMessage } from "../../shared/nutrition-engine/orchestrator.js";
-import { authenticateRequest } from "../../shared/nutrition-engine/auth.js";
+import { authenticateRequest, isEmailVerified } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import { sendNotification } from "../../shared/nutrition-engine/notifications/engine.js";
 import { getProvider } from "../../shared/nutrition-engine/provider.js";
@@ -22,6 +22,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
   if (!claims) {
     return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
+  }
+  // طلب أمني صريح: صفر وصول للشات (وبالتالي تسجيل الوجبات عبره) قبل تأكيد البريد
+  if (!isEmailVerified(claims)) {
+    return jsonError(403, "EMAIL_NOT_VERIFIED", "أكّد بريدك الإلكتروني أول حتى تگدر تستخدم الشات.");
   }
 
   let body: { message?: unknown };

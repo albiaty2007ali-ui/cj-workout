@@ -59,6 +59,10 @@ export default function Chat() {
         navigate("/login");
         return;
       }
+      if (!res.data.email_verified) {
+        navigate("/verify-email");
+        return;
+      }
       if (!res.data.intro_completed) {
         navigate("/intro");
         return;
