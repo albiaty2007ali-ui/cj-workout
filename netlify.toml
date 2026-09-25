@@ -130,6 +130,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/feedback"
+  to = "/.netlify/functions/feedback"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/feedback"
+  to = "/.netlify/functions/admin-feedback"
+  status = 200
+
+[[redirects]]
   from = "/api/admin/tips"
   to = "/.netlify/functions/admin-tips"
   status = 200

@@ -48,9 +48,12 @@ FOODS_SEED = [
     {
         "name": "صمون", "category": "خبز", "is_bulk": False,
         "nutrients_per_100g": {"calories": 275, "protein": 9, "carbs": 53, "fat": 2.5, "fiber": 2},
+        # حجري/كهربائي فرق بطريقة الخبز أكثر من فرق غذائي جوهري موثَّق — aliases لنفس الطعام،
+        # نفس فلسفة "كبة موصل/حلب/حامض" أعلاه، بدل اختراع بيانات غذائية منفصلة لكل نوع فرن
         "aliases": [
             {"text": "صمون", "multiplier": 1}, {"text": "صمونة", "multiplier": 1}, {"text": "خبز صمون", "multiplier": 1},
             {"text": "رغيف صمون", "multiplier": 1}, {"text": "صمونتين", "multiplier": 2},
+            {"text": "صمون حجري", "multiplier": 1}, {"text": "صمون كهربائي", "multiplier": 1},
         ],
         "portions": [{"name": "رغيف", "grams": 65}],
     },
@@ -60,6 +63,7 @@ FOODS_SEED = [
         "aliases": [
             {"text": "خبز عربي", "multiplier": 1}, {"text": "خبز", "multiplier": 1},
             {"text": "خبز تنور", "multiplier": 1}, {"text": "رغيف خبز", "multiplier": 1},
+            {"text": "خبز تانكي", "multiplier": 1},
         ],
         "portions": [{"name": "رغيف", "grams": 90}],
     },
@@ -150,8 +154,13 @@ FOODS_SEED = [
     {
         "name": "دجاج مشوي", "category": "لحوم", "is_bulk": True,
         "nutrients_per_100g": {"calories": 165, "protein": 31, "carbs": 0, "fat": 3.6, "fiber": 0},
-        "aliases": [{"text": "دجاج مشوي", "multiplier": 1}, {"text": "فرخة مشوية", "multiplier": 1}],
-        "portions": [{"name": "قطعة صغيرة", "grams": 100}, {"name": "قطعة متوسطة", "grams": 150}, {"name": "قطعة كبيرة", "grams": 200}],
+        # "قص دجاج" مصطلح محلات الشواء الشائع لنفس دجاج مشوي مبيوع بالقطعة — alias لنفس الطعام،
+        # جامبو/صغير أحجام قص حقيقية شائعة (مو اختراع)، بجانب قطعة صغيرة/متوسطة/كبيرة الموجودة
+        "aliases": [{"text": "دجاج مشوي", "multiplier": 1}, {"text": "فرخة مشوية", "multiplier": 1}, {"text": "قص دجاج", "multiplier": 1}],
+        "portions": [
+            {"name": "قطعة صغيرة", "grams": 100}, {"name": "قطعة متوسطة", "grams": 150}, {"name": "قطعة كبيرة", "grams": 200},
+            {"name": "صغير", "grams": 120}, {"name": "جامبو", "grams": 280},
+        ],
     },
     {
         "name": "دجاج مقلي", "category": "لحوم", "is_bulk": True,
@@ -162,14 +171,18 @@ FOODS_SEED = [
     {
         "name": "لحم مشوي", "category": "لحوم", "is_bulk": True,
         "nutrients_per_100g": {"calories": 250, "protein": 26, "carbs": 0, "fat": 16, "fiber": 0},
-        "aliases": [{"text": "لحم مشوي", "multiplier": 1}, {"text": "لحم", "multiplier": 1}],
-        "portions": [{"name": "قطعة صغيرة", "grams": 100}, {"name": "قطعة متوسطة", "grams": 150}],
+        # "قص لحم" نفس منطق "قص دجاج" أعلاه — مصطلح محلات شواء شائع، alias لنفس الطعام
+        "aliases": [{"text": "لحم مشوي", "multiplier": 1}, {"text": "لحم", "multiplier": 1}, {"text": "قص لحم", "multiplier": 1}],
+        "portions": [
+            {"name": "قطعة صغيرة", "grams": 100}, {"name": "قطعة متوسطة", "grams": 150},
+            {"name": "صغير", "grams": 120}, {"name": "جامبو", "grams": 280},
+        ],
     },
     {
         "name": "كباب", "category": "لحوم", "is_bulk": True,
         "nutrients_per_100g": {"calories": 215, "protein": 18, "carbs": 3, "fat": 15, "fiber": 0},
-        "aliases": [{"text": "كباب", "multiplier": 1}],
-        "portions": [{"name": "سيخ", "grams": 80}],
+        "aliases": [{"text": "كباب", "multiplier": 1}, {"text": "شيش كباب", "multiplier": 1}, {"text": "كباب عراقي", "multiplier": 1}],
+        "portions": [{"name": "سيخ", "grams": 80}, {"name": "شيش", "grams": 80}],
     },
     {
         "name": "تكة", "category": "لحوم", "is_bulk": True,
@@ -180,7 +193,11 @@ FOODS_SEED = [
     {
         "name": "مسكوف", "category": "أسماك", "is_bulk": True,
         "nutrients_per_100g": {"calories": 190, "protein": 22, "carbs": 0, "fat": 11, "fiber": 0},
-        "aliases": [{"text": "مسكوف", "multiplier": 1}, {"text": "سمك مسكوف", "multiplier": 1}],
+        # مسقوف/كاسبر صيغ/أنواع سمك شائعة لنفس طبق المسكوف المشوي — aliases لنفس الطعام
+        "aliases": [
+            {"text": "مسكوف", "multiplier": 1}, {"text": "سمك مسكوف", "multiplier": 1},
+            {"text": "مسقوف", "multiplier": 1}, {"text": "كاسبر", "multiplier": 1},
+        ],
         "portions": [{"name": "حصة", "grams": 250}],
     },
     {
@@ -415,5 +432,14 @@ FOODS_SEED = [
         "nutrients_per_100g": {"calories": 180, "protein": 2, "carbs": 38, "fat": 2, "fiber": 0.5},
         "aliases": [{"text": "زردة", "multiplier": 1}, {"text": "زرده", "multiplier": 1}],
         "portions": [{"name": "كاسة صغيرة", "grams": 100}, {"name": "كاسة كبيرة", "grams": 180}],
+    },
+
+    # ---------------- إضافات "ذكاء الأكل العراقي" (تُلحَق بآخر القائمة عمدًا، صفر إدراج وسط —
+    # إدراج بالمنتصف يزيح food_id لكل عنصر بعده، يكسر أي اختبار/كود يفترض رقمًا ثابتًا) ----------------
+    {
+        "name": "قيمة", "category": "أكلات عراقية", "is_bulk": True,
+        "nutrients_per_100g": {"calories": 175, "protein": 9, "carbs": 16, "fat": 8, "fiber": 2.5},
+        "aliases": [{"text": "قيمة", "multiplier": 1}, {"text": "قيمه", "multiplier": 1}],
+        "portions": [{"name": "صحن صغير", "grams": 250}, {"name": "صحن متوسط", "grams": 350}],
     },
 ]

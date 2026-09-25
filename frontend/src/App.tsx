@@ -22,6 +22,7 @@ import AdminRecipes from "./pages/admin/AdminRecipes";
 import AdminRecipeEdit from "./pages/admin/AdminRecipeEdit";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminPayments from "./pages/admin/AdminPayments";
+import AdminFeedback from "./pages/admin/AdminFeedback";
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
       <Route path="/admin/recipes/:id" element={<AdminRecipeEdit />} />
       <Route path="/admin/notifications" element={<AdminNotifications />} />
       <Route path="/admin/payments" element={<AdminPayments />} />
+      <Route path="/admin/feedback" element={<AdminFeedback />} />
       <Route path="*" element={<Navigate to="/chat" replace />} />
     </Routes>
   );

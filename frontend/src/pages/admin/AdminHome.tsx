@@ -10,6 +10,7 @@ const LINKS = [
   { to: "/admin/recipes", label: "🍳 الوصفات", desc: "وصفات ومكوّنات وخطوات الطبخ" },
   { to: "/admin/notifications", label: "🔔 قوالب الإشعارات", desc: "نصوص الإشعارات (بدون تسليم Push بعد)" },
   { to: "/admin/payments", label: "💳 مراجعة الدفعات", desc: "تفعيل/رفض عمليات الاشتراك اليدوية" },
+  { to: "/admin/feedback", label: "📝 مقترحات وبلاغات", desc: "ملاحظات المستخدمين من داخل التطبيق" },
 ];
 
 export default function AdminHome() {

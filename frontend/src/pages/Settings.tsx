@@ -45,6 +45,12 @@ export default function Settings() {
   const [deleteError, setDeleteError] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  const [feedbackType, setFeedbackType] = useState<"bug" | "suggestion" | "other">("suggestion");
+  const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+
   const [notif, setNotif] = useState<NotificationSettingsData | null>(null);
   const [notifError, setNotifError] = useState("");
   const [notifBusy, setNotifBusy] = useState(false);
@@ -185,6 +191,19 @@ export default function Settings() {
     }
   }
 
+  async function submitFeedback(e: FormEvent) {
+    e.preventDefault();
+    setFeedbackError("");
+    if (feedbackMsg.trim().length < 5) { setFeedbackError("اكتب رسالة أوضح شوي (5 أحرف على الأقل)."); return; }
+    setFeedbackBusy(true);
+    const res = await api.post("/feedback", { type: feedbackType, message: feedbackMsg.trim() });
+    setFeedbackBusy(false);
+    if (!res.success) { setFeedbackError(res.error?.message ?? "صار خطأ"); return; }
+    setFeedbackMsg("");
+    setFeedbackSent(true);
+    setTimeout(() => setFeedbackSent(false), 3000);
+  }
+
   async function exportData() {
     const res = await api.get("/settings?action=export");
     if (!res.success) return;
@@ -210,15 +229,41 @@ export default function Settings() {
 
   if (!me || !settings) return null;
 
+  async function shareApp() {
+    const url = "https://cjworkout.netlify.app/chat";
+    const text = "جرب تطبيق CJ FOOD لحساب السعرات وتنظيم التغذية بالذكاء الاصطناعي!";
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "CJ FOOD", text, url });
+      } catch {
+        // المستخدم ألغى نافذة المشاركة — تجاهل بأمان، صفر خطأ يظهر له
+      }
+      return;
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <AppShell userName={me.name || "حسابي"} isAdmin={me.role === "admin"} photoUrl={me.photo_url}>
       <main className="page-container">
         <h1 className="font-display">⚙️ الإعدادات</h1>
+        {/* إشارة حقيقية من /me's ai_status — مو شارة مزيّفة دائمًا خضراء بغض النظر عن الحالة الفعلية */}
+        <p className={`ai-status-badge ${me.ai_status === "ok" ? "ok" : "warn"}`}>
+          {me.ai_status === "ok" ? "🟢 مساعد Captain CJ الذكي شغّال" : "🟡 مساعد Captain CJ الذكي غير مفعّل حاليًا"}
+        </p>
         {savedMsg && <div className="notice-box" style={{ background: "rgba(76, 122, 94, 0.15)", borderColor: "var(--moss)" }}>{savedMsg}</div>}
 
         <div className="notice-box">
           <h3 style={{ marginTop: 0 }}>المظهر</h3>
           <ThemeToggle />
+        </div>
+
+        <div className="notice-box">
+          <h3 style={{ marginTop: 0 }}>🔗 المشاركة والمجتمع</h3>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button type="button" className="btn btn-moss" onClick={shareApp}>📤 شارك التطبيق مع أصدقائك</button>
+            <a href="https://instagram.com/tfxo1" target="_blank" rel="noopener noreferrer" className="btn btn-outline-dark">📷 تابعنا على إنستغرام</a>
+          </div>
         </div>
 
         <div className="notice-box">
@@ -402,6 +447,35 @@ export default function Settings() {
               خاص
             </button>
           </div>
+        </div>
+
+        <div className="notice-box">
+          <h3 style={{ marginTop: 0 }}>📝 اقتراح أو بلاغ</h3>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: -6 }}>
+            لاحظت مشكلة تقنية أو عندك اقتراح يحسّن التطبيق؟ خبرنا مباشرة من هني.
+          </p>
+          <form onSubmit={submitFeedback} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[["suggestion", "💡 مقترح"], ["bug", "🐞 بلاغ مشكلة"], ["other", "📝 أخرى"]].map(([value, label]) => (
+                <button
+                  key={value} type="button"
+                  className={`btn ${feedbackType === value ? "btn-moss" : "btn-outline-dark"}`}
+                  onClick={() => setFeedbackType(value as typeof feedbackType)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={3} placeholder="اكتب رسالتك هني..." required minLength={5}
+              value={feedbackMsg} onChange={(e) => setFeedbackMsg(e.target.value)}
+            />
+            {feedbackError && <p className="field-error">{feedbackError}</p>}
+            {feedbackSent && <p style={{ color: "var(--moss)", fontSize: "0.85rem" }}>تم الإرسال، تسلم! ✓</p>}
+            <button type="submit" className="btn btn-moss" disabled={feedbackBusy} style={{ alignSelf: "flex-start" }}>
+              {feedbackBusy ? "..." : "إرسال"}
+            </button>
+          </form>
         </div>
 
         <div className="notice-box">
