@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import AssistantMenu from "./AssistantMenu";
 import ConsultModal from "./ConsultModal";
+import TournamentModal from "./TournamentModal";
 import type { AssistantAction } from "../lib/assistantActions";
 
 interface AppShellProps {
@@ -23,6 +24,7 @@ export default function AppShell({ userName, isAdmin, photoUrl, onQuickPrompt, c
   const location = useLocation();
   const [showAssistant, setShowAssistant] = useState(false);
   const [showConsult, setShowConsult] = useState(false);
+  const [showTournament, setShowTournament] = useState(false);
 
   function handleAssistantAction(action: AssistantAction) {
     if (action.kind === "navigate" && action.to) {
@@ -40,10 +42,12 @@ export default function AppShell({ userName, isAdmin, photoUrl, onQuickPrompt, c
       <Sidebar
         userName={userName} isAdmin={isAdmin} photoUrl={photoUrl}
         onOpenAssistant={() => setShowAssistant(true)} onOpenConsult={() => setShowConsult(true)}
+        onOpenTournament={() => setShowTournament(true)}
       />
       <div className="app-main">{children}</div>
       {showAssistant && <AssistantMenu onAction={handleAssistantAction} onClose={() => setShowAssistant(false)} />}
       {showConsult && <ConsultModal onClose={() => setShowConsult(false)} />}
+      {showTournament && <TournamentModal onClose={() => setShowTournament(false)} />}
     </div>
   );
 }

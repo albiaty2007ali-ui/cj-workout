@@ -266,6 +266,15 @@ export async function getPortionsFor(foodId: number): Promise<SqlRow[]> {
   return queryAll(db, "SELECT * FROM food_portions WHERE food_id=?", [foodId]);
 }
 
+/** هل هذا الطعام "bulk" (وجبة/طبق تحتاج حجم حصة، بعكس عنصر منفصل مثل بيضة/تمرة). يُستخدَم
+ * لتحديد هل التوضيح الغامض بسبب "أي حجم حصة" (bulk — آمن نفترضه بالمتوسط) أو "أي عدد وحدات"
+ * (غير bulk، مثل "تمرات" بلا رقم — لسا يحتاج رقمًا حقيقيًا من المستخدم، مو افتراض). */
+export async function isFoodBulk(foodId: number): Promise<boolean> {
+  const db = await getFoodDb();
+  const rows = queryAll(db, "SELECT is_bulk FROM foods WHERE id=?", [foodId]);
+  return rows.length > 0 && Boolean(rows[0].is_bulk);
+}
+
 export interface QuantityResolution {
   resolved: boolean;
   grams?: number;

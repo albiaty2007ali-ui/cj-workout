@@ -135,6 +135,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/tournament-mode"
+  to = "/.netlify/functions/tournament-mode"
+  status = 200
+
+[[redirects]]
   from = "/api/admin/feedback"
   to = "/.netlify/functions/admin-feedback"
   status = 200

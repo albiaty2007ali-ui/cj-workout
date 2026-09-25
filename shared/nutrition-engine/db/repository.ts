@@ -83,6 +83,13 @@ export interface NutritionProfileRecord {
   calorie_target: number;
   water_target_ml: number;
   goal_weight: number | null;
+  /** "عندي بطولة" (Tournament Deficit Mode) — عجز مؤقت -1000 سعرة عن الهدف الحقيقي، بحد أدنى
+   * آمن (safety.MIN_SAFE_CALORIES)، يرجع تلقائيًا للهدف الأصلي بعد انتهاء الأيام المحدَّدة.
+   * راجع tournamentMode.ts — النقطة المركزية الوحيدة اللي تقرأ/تكتب هذين الحقلين. اختياريان
+   * (مو إلزاميان) عمدًا — بروفايلات موجودة قبل هذي الميزة ماعندها هذي الحقول إطلاقًا بـFirestore
+   * (schemaless)، صفر migration مطلوب؛ تعامل معهم كـ"undefined = غير مفعَّل" دايمًا بالقراءة. */
+  tournament_deficit_until?: string | null; // "YYYY-MM-DD" بتوقيت بغداد، غير مفعَّل لو فاضي
+  tournament_original_target?: number | null; // الهدف الحقيقي قبل الخصم، لاسترجاعه لاحقًا
 }
 
 export interface WeightHistoryInput {

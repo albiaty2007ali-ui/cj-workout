@@ -28,13 +28,24 @@ FOODS_SEED = [
     {
         "name": "لبن", "category": "بيض وألبان", "is_bulk": False,
         "nutrients_per_100g": {"calories": 60, "protein": 3.5, "carbs": 4.7, "fat": 3.3, "fiber": 0},
-        "aliases": [{"text": "لبن", "multiplier": 1}, {"text": "زبادي", "multiplier": 1}, {"text": "روب", "multiplier": 1}],
+        # أسماء إقليمية/تجارية شائعة لنفس منتج اللبن/الزبادي — aliases لنفس الطعام، نفس فلسفة
+        # "كبة موصل/حلب" أعلاه، بدل اختراع بيانات غذائية منفصلة لكل اسم محلي/ماركة
+        "aliases": [
+            {"text": "لبن", "multiplier": 1}, {"text": "زبادي", "multiplier": 1}, {"text": "روب", "multiplier": 1},
+            {"text": "لبن أربيل", "multiplier": 1}, {"text": "لبن خاثر", "multiplier": 1}, {"text": "لبن كالي", "multiplier": 1},
+            {"text": "زبادي المراعي", "multiplier": 1},
+        ],
         "portions": [{"name": "كوب", "grams": 200}],
     },
     {
         "name": "حليب", "category": "بيض وألبان", "is_bulk": False,
         "nutrients_per_100g": {"calories": 60, "protein": 3.2, "carbs": 4.8, "fat": 3.2, "fiber": 0},
-        "aliases": [{"text": "حليب", "multiplier": 1}],
+        # حليب باودر (نيدو/أبو القوس) بعد إذابته بالماء (الاستخدام الفعلي الشائع) نفس تركيز
+        # الحليب السائل تقريبًا — alias لنفس الطعام بدل اختراع رقم حليب بودرة جاف منفصل
+        "aliases": [
+            {"text": "حليب", "multiplier": 1}, {"text": "نيدو", "multiplier": 1},
+            {"text": "حليب باودر", "multiplier": 1}, {"text": "أبو القوس", "multiplier": 1}, {"text": "حليب نيدو", "multiplier": 1},
+        ],
         "portions": [{"name": "كوب", "grams": 240}],
     },
     {
@@ -441,5 +452,40 @@ FOODS_SEED = [
         "nutrients_per_100g": {"calories": 175, "protein": 9, "carbs": 16, "fat": 8, "fiber": 2.5},
         "aliases": [{"text": "قيمة", "multiplier": 1}, {"text": "قيمه", "multiplier": 1}],
         "portions": [{"name": "صحن صغير", "grams": 250}, {"name": "صحن متوسط", "grams": 350}],
+    },
+    {
+        "name": "أندومي", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 456, "protein": 8, "carbs": 65, "fat": 17, "fiber": 2},
+        "aliases": [
+            {"text": "أندومي", "multiplier": 1}, {"text": "اندومي", "multiplier": 1}, {"text": "إندومي", "multiplier": 1},
+            {"text": "نودلز", "multiplier": 1}, {"text": "معكرونة سريعة", "multiplier": 1},
+        ],
+        "portions": [{"name": "كيس", "grams": 80}],
+    },
+    {
+        "name": "عيران", "category": "بيض وألبان", "is_bulk": False,
+        # مخفَّف بالماء/الملح عمدًا (بعكس اللبن/الزبادي العادي) — فرق غذائي حقيقي موثَّق، مو
+        # اسم بديل لنفس المنتج، لهذا طعام منفصل هنا وليس alias لـ"لبن"
+        "nutrients_per_100g": {"calories": 35, "protein": 1.5, "carbs": 2.5, "fat": 1.8, "fiber": 0},
+        "aliases": [{"text": "عيران", "multiplier": 1}],
+        "portions": [{"name": "كوب", "grams": 200}],
+    },
+    {
+        "name": "شوفان", "category": "نشويات", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 375, "protein": 13, "carbs": 66, "fat": 7, "fiber": 10},
+        "aliases": [{"text": "شوفان", "multiplier": 1}, {"text": "شوفان سريع التحضير", "multiplier": 1}, {"text": "شوفان حبة كاملة", "multiplier": 1}],
+        "portions": [{"name": "حصة", "grams": 40}],
+    },
+    {
+        "name": "كاهي", "category": "إفطار عراقي", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 450, "protein": 6, "carbs": 55, "fat": 22, "fiber": 1},
+        "aliases": [{"text": "كاهي", "multiplier": 1}, {"text": "كاهي وقيمر", "multiplier": 1}],
+        "portions": [{"name": "قطعة", "grams": 60}],
+    },
+    {
+        "name": "شاي بالسكر", "category": "مشروبات", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 32, "protein": 0, "carbs": 8, "fat": 0, "fiber": 0},
+        "aliases": [{"text": "شاي بالسكر", "multiplier": 1}, {"text": "چاي بالسكر", "multiplier": 1}, {"text": "چاي حلو", "multiplier": 1}],
+        "portions": [{"name": "استكان", "grams": 100}],
     },
 ]

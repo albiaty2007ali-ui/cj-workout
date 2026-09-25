@@ -5,7 +5,7 @@
 import * as calculator from "./calculator.js";
 import * as macros from "./macros.js";
 import * as iraqTime from "./iraqTime.js";
-import * as safety from "./safety.js";
+import * as tournamentMode from "./tournamentMode.js";
 import type { Repository, NutritionProfileRecord } from "./db/repository.js";
 
 export interface NutritionContext {
@@ -22,8 +22,8 @@ export interface NutritionContext {
   goal: string;
   period: string;
   over_target: boolean;
-  /** أكل قليل جدًا مقارنة بالحد الآمن (safety.MIN_SAFE_CALORIES) — يُفحَص فقط مساءً/ليلاً
-   * (period) لمنع إنذار كاذب بالصباح الباكر، وقت طبيعي جدًا لاستهلاك منخفض لحد الآن. */
+  /** أكل قليل جدًا اليوم — يُفحَص فقط ≥21:00 بتوقيت بغداد (طلب صريح: منع إنذار كاذب أي وقت
+   * أبكر) وباستهلاك أقل من 40% من الهدف اليومي (نسبة صريحة، مو حد سعرات مطلق). */
   under_target: boolean;
 }
 
@@ -33,6 +33,11 @@ export async function build(
   profile: NutritionProfileRecord | null,
   now: Date = new Date(),
 ): Promise<NutritionContext> {
+  // انتهاء نافذة "عندي بطولة" (لو فعّالة) يُفحَص هنا — نقطة تجميع مركزية واحدة (نفس فلسفة
+  // attachUnderEatingNudge) بدل تكرار الفحص بكل Endpoint يقرأ الهدف اليومي. يرجّع البروفايل
+  // بعد أي تصحيح فعلي (استرجاع الهدف الأصلي) حتى هذا الاستدعاء نفسه يشوف الرقم الصحيح فورًا.
+  profile = profile ? await tournamentMode.checkAndRevertIfExpired(repo, profile, now) : profile;
+
   const target = profile ? profile.calorie_target : 2000;
   const totals = await calculator.todayTotals(repo, userId, now);
   const remaining = target - totals.calories;
@@ -41,8 +46,9 @@ export async function build(
   const macroTargets = profile ? macros.calculateTargets(target, profile.weight_kg, profile.goal) : {};
 
   const period = iraqTime.getCurrentPeriod(now);
-  const isLateEnough = period === "evening" || period === "late_night";
-  const minSafe = safety.MIN_SAFE_CALORIES[profile?.sex ?? "female"] ?? safety.MIN_SAFE_CALORIES.female;
+  // طلب صريح: ≥21:00 بتوقيت بغداد بالضبط (مو دلو period evening/late_night العام) + أقل من
+  // 40% من الهدف اليومي (نسبة صريحة، بديل عن الحد المطلق المستخدَم سابقًا)
+  const isLateEnough = iraqTime.nowBaghdad(now).hour >= 21;
 
   return {
     target_calories: target,
@@ -58,6 +64,6 @@ export async function build(
     goal: profile ? profile.goal : "maintain",
     period,
     over_target: remaining < 0,
-    under_target: isLateEnough && totals.calories < minSafe,
+    under_target: isLateEnough && totals.calories < target * 0.4,
   };
 }

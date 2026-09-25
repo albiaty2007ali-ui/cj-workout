@@ -109,28 +109,45 @@ describe("log_meal — رسائل استهلاك فعلي حقيقية تُسج�
   });
 });
 
-describe("log_meal — استمرارية pending (توضيح كمية ثم تأكيد) لا تُسجّل مرتين", () => {
-  it("توضيح كمية ('300 غرام') ثم تأكيد صريح ('اي') -> MealLog واحد فقط عند التأكيد", async () => {
+describe("log_meal — طعام Bulk بلا وزن محدد يُحل تلقائيًا بالحصة المتوسطة (طلب صريح، لا ينتظر تأكيد)", () => {
+  it("'اكلت رز' (بلا وزن) -> MealLog واحد فوري بالحصة المتوسطة الحقيقية (250غ)، صفر انتظار تأكيد", async () => {
     const repo = new InMemoryRepository();
     const user = await freshUser(repo, "flow1");
+    const r = await logMeal.execute(ctxFor(repo, user, "اكلت رز"), {});
+    expect(r.ok).toBe(true);
+    expect(r.meal_logged).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+    const [log] = await repo.findMealLogsInRange(user.id, new Date(0), new Date(Date.now() + 86400000));
+    // 250غ (صحن متوسط) × 130 سعرة/100غ (تمن) = 325 سعرة حرفيًا
+    expect(log.total_calories).toBe(325);
+    expect(r.local_reply).toContain("حصة متوسطة معيارية");
+  });
+});
 
-    // رسالة أولى: طعام Bulk يحتاج توضيح كمية (نفس آلية extractFoodEntities الحقيقية)
-    const first = await logMeal.execute(ctxFor(repo, user, "اكلت رز"), {});
-    expect(first.meal_logged).toBe(false); // إما توضيح كمية أو ملخص بانتظار تأكيد
+describe("log_meal — استمرارية pending (توضيح هوية طعام ثم تأكيد) لا تُسجّل مرتين", () => {
+  it("توضيح هوية (confirm_match حقيقي، خطأ إملائي) ثم تأكيد صريح ('اي') -> MealLog واحد فقط عند التأكيد", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "flow1b");
+
+    // "بيظتين" (خطأ إملائي حقيقي) -> confirm_match حقيقي لـ"بيضتين" (entities.parity.test.ts) —
+    // توضيح هوية، مو كمية (auto-resolve الجديد لا يمس هذا النوع إطلاقًا)، يبقى يحتاج جواب حقيقي
+    const first = await logMeal.execute(ctxFor(repo, user, "اكلت بيظتين"), {});
+    expect(first.meal_logged).toBe(false);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+    expect(mealState.loadPending(user)).not.toBeNull();
+
+    // "اي" الأولى تؤكد هوية الطعام (بيضتين) بس تبقى الوجبة pending تحتاج تأكيد صريح ثانٍ —
+    // نفس القيد الموثَّق: أي pending، حتى لحظي لتوضيح هوية فقط، يحتاج تأكيد كامل صريح دائمًا
+    const identityConfirmCtx = ctxFor(repo, user, "اي");
+    expect(identityConfirmCtx.ctxFlags.has_pending).toBe(true);
+    const afterIdentity = await logMeal.execute(identityConfirmCtx, {});
+    expect(afterIdentity.meal_logged).toBe(false);
     expect(await repo.countMealLogsForUser(user.id)).toBe(0);
 
-    // لو انتظر توضيح كمية، جاوب عليه أولًا
-    const pendingAfterFirst = mealState.loadPending(user);
-    if (pendingAfterFirst?.pending_clarifications?.length) {
-      const second = await logMeal.execute(ctxFor(repo, user, "300 غرام"), {});
-      expect(second.meal_logged).toBe(false);
-      expect(await repo.countMealLogsForUser(user.id)).toBe(0);
-    }
-
-    // التأكيد الصريح النهائي -> الآن فقط يُسجَّل
-    const confirmCtx = ctxFor(repo, user, "اي");
-    expect(confirmCtx.ctxFlags.has_pending).toBe(true);
-    const finalResult = await logMeal.execute(confirmCtx, {});
+    // "اي" الثانية تؤكد الوجبة نفسها -> الآن فقط يُسجَّل
+    const finalCtx = ctxFor(repo, user, "اي");
+    expect(finalCtx.ctxFlags.has_pending).toBe(true);
+    const finalResult = await logMeal.execute(finalCtx, {});
     expect(finalResult.ok).toBe(true);
     expect(finalResult.meal_logged).toBe(true);
     expect(await repo.countMealLogsForUser(user.id)).toBe(1);
@@ -139,7 +156,7 @@ describe("log_meal — استمرارية pending (توضيح كمية ثم تأ
   it("سؤال معلوماتي أثناء وجود pending (نفس حادثة البيتزا) -> يُرفض، صفر تسجيل، pending يبقى كما هو", async () => {
     const repo = new InMemoryRepository();
     const user = await freshUser(repo, "flow2");
-    await logMeal.execute(ctxFor(repo, user, "اكلت رز"), {}); // يبدأ pending (بحاجة توضيح غالبًا)
+    await logMeal.execute(ctxFor(repo, user, "اكلت بيظتين"), {}); // يبدأ pending (توضيح هوية حقيقي)
     const hadPendingBefore = mealState.loadPending(user) !== null;
     expect(hadPendingBefore).toBe(true);
 

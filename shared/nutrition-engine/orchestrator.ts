@@ -29,7 +29,7 @@ import * as streaks from "./streaks.js";
 import * as tipsEngine from "./tipsEngine.js";
 import * as weightOps from "./weightOps.js";
 import * as xpEngine from "./xpEngine.js";
-import { getPortionsFor } from "./foodSearch.js";
+import { getPortionsFor, isFoodBulk } from "./foodSearch.js";
 import { getCurrentPeriod, nowBaghdad, todayBaghdadIso } from "./iraqTime.js";
 import * as mealBudget from "./mealBudget.js";
 import { explicitMealTypeKeyword, findMealType } from "./mealTypeDetection.js";
@@ -278,12 +278,19 @@ async function handleMealMessage(
     return tryDirectLog(repo, user, mealType, textNorm, result.resolved, now);
   }
 
+  // طلب صريح: جرّب تحل توضيحات الكمية تلقائيًا بالحصة المتوسطة الحقيقية بدل سؤال المستخدم —
+  // لو كل التوضيحات كانت من نوع "quantity" وانحلت، الرسالة تصير مؤهَّلة لنفس DIRECT_LOG العادي
+  const auto = await autoResolveQuantityClarifications(result.clarifications as ClarificationItem[]);
+  if (auto.remaining.length === 0) {
+    return tryDirectLog(repo, user, mealType, textNorm, [...result.resolved, ...auto.resolved], now, auto.assumedAny);
+  }
+
   const newPending = mealState.newPending(mealType, textNorm);
-  for (const hit of result.resolved) {
+  for (const hit of [...result.resolved, ...auto.resolved]) {
     const n = await calculator.computeFood(hit.food_id, hit.grams ?? 0);
     addResolvedToPending(newPending, hit, n);
   }
-  newPending.pending_clarifications = result.clarifications as unknown as PendingMeal["pending_clarifications"];
+  newPending.pending_clarifications = auto.remaining as unknown as PendingMeal["pending_clarifications"];
   await mealState.savePending(repo, user, newPending);
   return { reply: await clarificationPrompt(newPending.pending_clarifications[0] as ClarificationItem), meal_logged: false };
 }
@@ -377,7 +384,8 @@ async function finalizeMeal(
 
 async function tryDirectLog(
   repo: Repository, user: UserRecord, mealType: string, rawText: string,
-  resolvedHits: Awaited<ReturnType<typeof extractFoodEntities>>["resolved"], now: Date,
+  resolvedHits: { food_id: number; food_name: string; grams?: number; quantity?: number; unit_grams?: number; portion_name?: string }[],
+  now: Date, assumedMediumPortion = false,
 ): Promise<DispatchResult> {
   const tempPending = mealState.newPending(mealType, rawText);
   for (const hit of resolvedHits) {
@@ -386,7 +394,46 @@ async function tryDirectLog(
   }
   const profile = await repo.findNutritionProfile(user.id);
   const target = profile ? profile.calorie_target : 2000;
-  return finalizeMeal(repo, user, tempPending, target, "direct", now);
+  const result = await finalizeMeal(repo, user, tempPending, target, "direct", now);
+  // طلب صريح: تسجيل تلقائي بالحصة المتوسطة الحقيقية بدل انتظار تأكيد — يبقى الرقم من القاعدة
+  // دائمًا، بس لازم نفصح دائمًا إنها حصة مُفترَضة وقابلة للتعديل (راجع autoResolveQuantity
+  // Clarifications أدناه لمصدر assumedMediumPortion)
+  if (assumedMediumPortion && result.reply) {
+    result.reply += "\n\nسجلتلك حصة متوسطة معيارية، إذا كانت الكمية مختلفة تكدر تعدلها بأي وقت!";
+  }
+  return result;
+}
+
+/**
+ * طلب صريح من المستخدم (بعد نقاش تعارض مع "لا تفترض الكمية"): بدل سؤال المستخدم عن حجم حصة
+ * طعام bulk بلا وزن محدد بنفس الرسالة، افترض "الحصة المتوسطة" الحقيقية من قاعدة foods.sqlite
+ * وسجّلها مباشرة — الرقم يبقى 100% حقيقي من القاعدة (صفر تخمين AI)، فقط "أي حصة" تُفترَض بدل
+ * تُسأل، وتُفصَح دائمًا بالرد (tryDirectLog أعلاه). لا يمس identity ambiguity (confirm_match/
+ * ambiguous_match) — تلك لسا تحتاج جواب حقيقي، هذا فقط لتوضيحات الكمية (kind:"quantity").
+ */
+async function autoResolveQuantityClarifications(clarifications: ClarificationItem[]): Promise<{
+  resolved: { food_id: number; food_name: string; grams: number; portion_name?: string }[];
+  remaining: ClarificationItem[];
+  assumedAny: boolean;
+}> {
+  const resolved: { food_id: number; food_name: string; grams: number; portion_name?: string }[] = [];
+  const remaining: ClarificationItem[] = [];
+  let assumedAny = false;
+
+  for (const item of clarifications) {
+    if (item.kind !== "quantity") { remaining.push(item); continue; }
+    // محصور بأطعمة bulk (وجبات/أطباق تحتاج "أي حجم حصة" — تمن/قيمة/باجة، نفس أمثلة الطلب
+    // الأصلي) — طعام منفصل غير bulk بجمع بلا رقم ("تمرات") الغموض فيه "أي عدد وحدات"، افتراض
+    // عدد وحدات محدَّد (مثلاً حبة وحدة) تخمين كمية أكبر خطورة من افتراض حجم صحن قياسي، فيبقى
+    // يُسأل عادي — راجع نقاش الجلسة، القرار محصور بمعنى "الحصة المتوسطة" الحرفي المطلوب.
+    if (!(await isFoodBulk(item.food_id))) { remaining.push(item); continue; }
+    const portions = await getPortionsFor(item.food_id);
+    if (portions.length === 0) { remaining.push(item); continue; }
+    const medium = portions.find((p) => String(p.portion_name).includes("متوسط")) ?? portions[0];
+    resolved.push({ food_id: item.food_id, food_name: item.food_name, grams: Number(medium.grams), portion_name: String(medium.portion_name) });
+    assumedAny = true;
+  }
+  return { resolved, remaining, assumedAny };
 }
 
 /**
@@ -1027,6 +1074,10 @@ async function attachUnderEatingNudge(
 
   if (!result.meal_logged) {
     const pending = mealState.loadPending(user);
+    // بگ حقيقي مُكتشَف من شكوى مستخدم ("أكلت تمن وقيمة" -> رد سؤال كمية ملحوق بتنبيه أكل قليل
+    // غير مرتبط، مربك): وجود pending (سؤال توضيح كمية/هوية جاري، جديد هالدورة أو مستمر) يعني
+    // الرد أصلاً سؤال متابعة — إلحاق تنبيه ثاني فوقه يربك، مهما كانت النية. تخطَّ دائمًا هنا.
+    if (pending !== null) return result;
     const localIntent = intents.detectIntent(text.trim(), {
       has_pending: pending !== null,
       has_recipe: user.current_recipe_id !== null,

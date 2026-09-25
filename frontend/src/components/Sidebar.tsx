@@ -9,6 +9,7 @@ interface SidebarProps {
   photoUrl?: string | null;
   onOpenAssistant?: () => void;
   onOpenConsult?: () => void;
+  onOpenTournament?: () => void;
 }
 
 interface NavGroup {
@@ -28,7 +29,7 @@ const NAV_GROUPS: NavGroup[] = [
   ] },
 ];
 
-export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, onOpenConsult }: SidebarProps) {
+export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, onOpenConsult, onOpenTournament }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -76,6 +77,9 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
             <>
               <p className="sidebar-group-title">{t("sidebar.groupAssistant")}</p>
               <button className="sidebar-item" onClick={() => { onOpenAssistant(); setOpen(false); }}>{t("sidebar.assistantMenuItem")}</button>
+              {onOpenTournament && (
+                <button className="sidebar-item" onClick={() => { onOpenTournament(); setOpen(false); }}>🏆 عندي بطولة</button>
+              )}
             </>
           )}
 
