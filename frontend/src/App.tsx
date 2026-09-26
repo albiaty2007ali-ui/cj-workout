@@ -16,6 +16,7 @@ import WeightProgress from "./pages/WeightProgress";
 import Intelligence from "./pages/Intelligence";
 import Subscribe from "./pages/Subscribe";
 import AdminHome from "./pages/admin/AdminHome";
+import AdminUsers from "./pages/admin/AdminUsers";
 import AdminTips from "./pages/admin/AdminTips";
 import AdminLevels from "./pages/admin/AdminLevels";
 import AdminStreakMilestones from "./pages/admin/AdminStreakMilestones";
@@ -47,6 +48,7 @@ export default function App() {
       <Route path="/intelligence" element={<Intelligence />} />
       <Route path="/subscribe" element={<Subscribe />} />
       <Route path="/admin" element={<AdminHome />} />
+      <Route path="/admin/users" element={<AdminUsers />} />
       <Route path="/admin/tips" element={<AdminTips />} />
       <Route path="/admin/levels" element={<AdminLevels />} />
       <Route path="/admin/streak-milestones" element={<AdminStreakMilestones />} />

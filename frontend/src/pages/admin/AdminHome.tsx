@@ -4,6 +4,7 @@ import { api, type MeResponse } from "../../lib/api";
 import AppShell from "../../components/AppShell";
 
 const LINKS = [
+  { to: "/admin/users", label: "👥 إدارة المستخدمين", desc: "بحث/فلترة، تفصيل كل مشترك، وأدوات الاشتراك" },
   { to: "/admin/tips", label: "💡 النصائح الغذائية", desc: "بنك النصائح المعروضة بالشات" },
   { to: "/admin/levels", label: "⭐ المستويات", desc: "منحنى XP والعناوين" },
   { to: "/admin/streak-milestones", label: "🔥 محطات الـStreak", desc: "مكافآت الاستمرارية" },

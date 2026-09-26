@@ -741,3 +741,36 @@ body {
 .add-meal-mode-btn { border: none; background: transparent; color: var(--text-muted); border-radius: 999px; padding: 7px 14px; font-size: 0.82rem; cursor: pointer; }
 .add-meal-mode-btn.active { background: var(--moss); color: #fff; }
 .switch input:checked + .switch-track::before { transform: translateX(18px); }
+
+/* ---- لوحة إدارة المستخدمين — بطاقات إحصاء + بحث/فلترة + صف مستخدم قابل للنقر ---- */
+.admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 20px 0; }
+.admin-stat-card { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 16px; padding: 18px; text-align: center; }
+.admin-stat-value { font-size: 1.7rem; font-weight: 800; color: var(--heading); }
+.admin-stat-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
+.admin-search-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.admin-search-row input[type="text"], .admin-search-row select {
+  border: 1px solid var(--border-input); background: var(--surface-solid); color: var(--text);
+  border-radius: 999px; padding: 0 14px; height: 38px; font-family: inherit; font-size: 0.9rem;
+}
+.admin-user-row { cursor: pointer; transition: border-color 0.15s ease; }
+.admin-user-row:hover { border-color: var(--moss); }
+.admin-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+.admin-badge-free { background: rgba(120, 120, 120, 0.15); color: var(--text-muted); }
+.admin-badge-paid { background: rgba(76, 122, 94, 0.15); color: var(--moss); }
+.admin-badge-tournament { background: rgba(201, 122, 61, 0.15); color: var(--status-orange); }
+.admin-badge-unverified { background: rgba(200, 60, 60, 0.15); color: var(--danger); }
+
+/* ---- درج/مودال تفصيل مستخدم — يمدّد .modal-card العام ---- */
+.modal-card-wide { max-width: 760px; }
+.admin-detail-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.admin-detail-section h3 { margin: 0 0 10px; font-size: 1rem; color: var(--heading); }
+.admin-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.admin-detail-item { background: var(--surface); border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; }
+.admin-detail-item .label { color: var(--text-muted); font-size: 0.72rem; display: block; }
+.admin-detail-item .value { font-weight: 700; color: var(--text); }
+.admin-day-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; margin-bottom: 4px; color: var(--text-muted); }
+.admin-day-bar-track { flex: 1; height: 8px; background: var(--surface); border-radius: 4px; overflow: hidden; }
+.admin-day-bar-fill { height: 100%; background: var(--moss); }
+.admin-feedback-mini { font-size: 0.82rem; border-bottom: 1px solid var(--border); padding: 8px 0; }
+.admin-feedback-mini:last-child { border-bottom: none; }

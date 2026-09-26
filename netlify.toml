@@ -180,6 +180,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/admin/users"
+  to = "/.netlify/functions/admin-users"
+  status = 200
+
+[[redirects]]
   from = "/api/push/subscribe"
   to = "/.netlify/functions/push-subscribe"
   status = 200
