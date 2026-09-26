@@ -152,6 +152,27 @@ describe("nextConversationState", () => {
     );
     expect(next.last_suggestion).toBeNull();
   });
+
+  it("record_food_like ناجحة -> تُضاف لـpreferred_foods (نفس فلسفة record_food_dislike بالاتجاه المعاكس)", () => {
+    const next = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "أحب الدجاج", "تمام، أرجّحه بالاقتراحات الجاية",
+      "record_food_like", { food_name: "دجاج" }, { ok: true, food_name: "دجاج" },
+    );
+    expect(next.preferred_foods).toEqual(["دجاج"]);
+    expect(next.disliked_foods).toEqual([]); // صفر تداخل بين القائمتين
+  });
+
+  it("preferred_foods يبقى محصورًا بآخر 15 عنصر كحد أقصى", () => {
+    let state = EMPTY_CONVERSATION_STATE;
+    for (let i = 0; i < 20; i++) {
+      state = nextConversationState(
+        state, `أحب طعام${i}`, "تمام", "record_food_like",
+        { food_name: `طعام${i}` }, { ok: true, food_name: `طعام${i}` },
+      );
+    }
+    expect(state.preferred_foods).toHaveLength(15);
+    expect(state.preferred_foods[state.preferred_foods.length - 1]).toBe("طعام19");
+  });
 });
 
 describe("saveConversationState + loadConversationState — تكامل حقيقي عبر InMemoryRepository", () => {

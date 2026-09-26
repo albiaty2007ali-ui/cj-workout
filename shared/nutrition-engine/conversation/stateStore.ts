@@ -7,12 +7,13 @@ import type { ConversationState } from "./types.js";
 
 export const EMPTY_CONVERSATION_STATE: ConversationState = {
   active_food: null, active_intent: null, target_calories: null, awaiting: null,
-  last_tool_calls: [], recent_turns: [], disliked_foods: [], last_suggestion: null,
+  last_tool_calls: [], recent_turns: [], disliked_foods: [], preferred_foods: [], last_suggestion: null,
 };
 
 const MAX_RECENT_TURNS = 3;
 const MAX_TOOL_CALLS_REMEMBERED = 3;
 const MAX_DISLIKED_FOODS = 15;
+const MAX_PREFERRED_FOODS = 15;
 
 export function loadConversationState(user: UserRecord): ConversationState {
   if (!user.conversation_state_json) return EMPTY_CONVERSATION_STATE;
@@ -26,6 +27,7 @@ export function loadConversationState(user: UserRecord): ConversationState {
       last_tool_calls: parsed.last_tool_calls ?? [],
       recent_turns: parsed.recent_turns ?? [],
       disliked_foods: parsed.disliked_foods ?? [],
+      preferred_foods: parsed.preferred_foods ?? [],
       last_suggestion: parsed.last_suggestion ?? null,
     };
   } catch {
@@ -89,6 +91,13 @@ export function nextConversationState(
       const name = tr.food_name.trim();
       if (!prev.disliked_foods.includes(name)) {
         next.disliked_foods = [...prev.disliked_foods, name].slice(-MAX_DISLIKED_FOODS);
+      }
+    }
+    // record_food_like ناجحة -> نفس فلسفة record_food_dislike بالاتجاه المعاكس (عرض/سياق فقط).
+    if (toolUsed === "record_food_like" && typeof tr.food_name === "string" && tr.food_name.trim()) {
+      const name = tr.food_name.trim();
+      if (!prev.preferred_foods.includes(name)) {
+        next.preferred_foods = [...prev.preferred_foods, name].slice(-MAX_PREFERRED_FOODS);
       }
     }
     // أي أداة اقتراح رجّعت قائمة recipes حقيقية (أسماء فقط، مو food_id/محتوى غذائي كامل — هذا

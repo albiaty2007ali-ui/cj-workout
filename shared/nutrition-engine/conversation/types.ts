@@ -55,6 +55,11 @@ export interface ConversationState {
    *  لأنه تفضيل شخصي نصي، لا رقم غذائي يحتاج تحقق من قاعدة البيانات. سقف 15 عنصر (نفس فلسفة
    *  last_tool_calls/recent_turns — ذاكرة قصيرة محدودة، صفر تراكم لا نهائي). */
   disliked_foods: string[];
+  /** أطعمة صرّح المستخدم إنه يحبها/يفضّلها بشكل عام — نفس فلسفة disliked_foods بالضبط لكن بالاتجاه
+   *  المعاكس (record_food_like). عرض/سياق فقط (Gemini يستخدمها لتحسين صياغة اقتراحاته)، صفر فلترة
+   *  هيكلية بـrecommendations.ts/recipeSearch.ts (بعكس disliked_foods اللي تُستبعَد فعليًا) — تفضيل
+   *  إيجابي أخف حساسية من استبعاد قسري، يكفي إظهاره لـGemini بالسياق النصي. */
+  preferred_foods: string[];
   /** آخر اقتراح فعلي (أطعمة/وصفات حقيقية) رجّعته أداة اقتراح — يُملأ فقط من نتيجة أداة حقيقية
    *  (recommend_foods/search_diet_meals/find_recipes_from_ingredients)، صفر اختراع. يخلي ردود
    *  مثل "زين وإذا آكل هذا؟"/"لا مو هذا" مفهومة بدون إعادة ذكر الاسم. */

@@ -231,3 +231,39 @@ describe("قبول شامل — تصنيف البيتزا (أنواع فعلية
     }
   });
 });
+
+describe("قبول شامل — تصحيح كمية بعد DIRECT_LOG عبر Gemini (update_meal) — Bug حقيقي حي مُصلَح: بدون هذي الأداة كان الرد نصيًا فقط بصفر أثر", () => {
+  it("'اكلت بيضتين' (log_meal) ثم 'لا خليها 3' (update_meal) عبر دورتين حقيقيتين -> MealLog واحد نهائي بالكمية المصحَّحة، صفر تسجيل مزدوج", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "correction-active-1");
+
+    activate(new ScriptedProvider(
+      { kind: "tool_call", toolName: "log_meal", toolArgs: {} },
+      (toolResult) => `تمام، سجّلتلك بـ${(toolResult as { today_calories?: number }).today_calories} سعرة`,
+    ));
+    const first = await handleMessage(repo, user, "اكلت بيضتين");
+    expect(first.meal_logged).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+
+    // دورة ثانية — Gemini هسه يقرر update_meal (مو رد نصي فقط) لأن السياق يذكر "آخر طعام مطروح"
+    activate(new ScriptedProvider(
+      { kind: "tool_call", toolName: "update_meal", toolArgs: {} },
+      (toolResult) => `تمام، ${(toolResult as { local_reply?: string }).local_reply ?? ""}`,
+    ));
+    const second = await handleMessage(repo, user, "لا خليها 3");
+    expect(second.meal_logged).toBe(false); // صفر تسجيل تلقائي — تبقى مسوّدة بانتظار تأكيد
+    // الوجبة الأصلية اتحذفت (reopen)، صفر MealLog جديد انسجّل تلقائيًا بعد
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+
+    // تأكيد صريح -> MealLog واحد نهائي فقط، بالكمية المصحَّحة (3 مو 2)
+    activate(new ScriptedProvider(
+      { kind: "tool_call", toolName: "log_meal", toolArgs: {} },
+      (toolResult) => `عاشت إيدك، ${(toolResult as { today_calories?: number }).today_calories} سعرة`,
+    ));
+    const third = await handleMessage(repo, user, "اي");
+    expect(third.meal_logged).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+    const log = await repo.findFirstMealLogForUser(user.id);
+    expect(JSON.parse(log!.matched_foods_json!)).toEqual(["بيضة"]);
+  });
+});

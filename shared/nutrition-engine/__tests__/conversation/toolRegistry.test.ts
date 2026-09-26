@@ -207,6 +207,20 @@ describe("conversation/tools.ts — أدوات القراءة فقط", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("record_food_like: اسم صالح -> ok:true بنفس الاسم", async () => {
+    const repo = new InMemoryRepository();
+    const ctx = await buildCtx(repo, makeUser({ id: "u15e" }));
+    const r = await tools.recordFoodLike.execute(ctx, { food_name: "دجاج" });
+    expect(r).toEqual({ ok: true, food_name: "دجاج" });
+  });
+
+  it("record_food_like: اسم فاضي -> ok:false", async () => {
+    const repo = new InMemoryRepository();
+    const ctx = await buildCtx(repo, makeUser({ id: "u15f" }));
+    const r = await tools.recordFoodLike.execute(ctx, { food_name: "" });
+    expect(r.ok).toBe(false);
+  });
+
   it("check_food_fit: طعام حقيقي -> نص حقيقي، food_id مخترع -> found:false", async () => {
     const repo = new InMemoryRepository();
     const ctx = await buildCtx(repo, makeUser({ id: "u16" }));

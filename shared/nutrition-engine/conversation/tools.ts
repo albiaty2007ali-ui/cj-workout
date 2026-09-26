@@ -390,8 +390,10 @@ export const recordFoodDislike: CJTool<RecordFoodDislikeArgs, RecordFoodDislikeR
   name: "record_food_dislike",
   description:
     "سجّل تفضيل غذائي دائم بذاكرة المحادثة (مو قاعدة بيانات دائمة) — استدعِها فقط لما المستخدم " +
-    "يقول صراحة إنه ما يحب/يرفض أكلة معيّنة بشكل عام (مثل \"ما أحب الدجاج\"، \"ما أريد طماطة\"). " +
-    "لا تستدعِها لرفض اقتراح واحد فقط بلحظته (\"لا مو هذا\"، \"بعدني\") — هذا رفض عابر لا تفضيل دائم.",
+    "يقول صراحة إنه ما يحب/يرفض أكلة معيّنة بشكل عام ودائم (مثل \"ما أحب الدجاج\"). لا تستدعِها " +
+    "بحالتين: (1) رفض اقتراح واحد بلحظته (\"لا مو هذا\"، \"بعدني\") — رفض عابر لا تفضيل دائم. " +
+    "(2) عدم رغبة اليوم تحديدًا (\"ما أريد دجاج اليوم\"، \"ما أريد دجاج هسه\") — وجود كلمة زمنية " +
+    "مع الرفض يعني مزاج اليوم فقط، ليس رفضًا دائمًا.",
   parameters: {
     type: "OBJECT",
     properties: { food_name: { type: "STRING", description: "اسم الطعام المرفوض كما ذكره المستخدم" } },
@@ -399,6 +401,32 @@ export const recordFoodDislike: CJTool<RecordFoodDislikeArgs, RecordFoodDislikeR
   },
   mutates: false,
   async execute(_ctx: ToolExecContext, args: RecordFoodDislikeArgs): Promise<RecordFoodDislikeResult> {
+    const foodName = String(args?.food_name ?? "").trim();
+    if (!foodName) return { ok: false };
+    return { ok: true, food_name: foodName };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// record_food_like — نفس فلسفة record_food_dislike بالاتجاه المعاكس، سياق/عرض فقط (صفر فلترة
+// هيكلية بـrecommend_foods بعكس disliked_foods، راجع types.ts's preferred_foods للتوثيق الكامل).
+// ---------------------------------------------------------------------------
+interface RecordFoodLikeArgs { food_name: string }
+interface RecordFoodLikeResult { ok: boolean; food_name?: string }
+
+export const recordFoodLike: CJTool<RecordFoodLikeArgs, RecordFoodLikeResult> = {
+  name: "record_food_like",
+  description:
+    "سجّل تفضيل غذائي إيجابي دائم بذاكرة المحادثة (مو قاعدة بيانات دائمة) — استدعِها فقط لما " +
+    "المستخدم يقول صراحة إنه يحب أكلة معيّنة بشكل عام ودائم (مثل \"أحب الدجاج\"). لا تستدعِها " +
+    "لمجرد موافقته على اقتراح واحد بلحظته أو رغبة عابرة اليوم بس.",
+  parameters: {
+    type: "OBJECT",
+    properties: { food_name: { type: "STRING", description: "اسم الطعام المفضَّل كما ذكره المستخدم" } },
+    required: ["food_name"],
+  },
+  mutates: false,
+  async execute(_ctx: ToolExecContext, args: RecordFoodLikeArgs): Promise<RecordFoodLikeResult> {
     const foodName = String(args?.food_name ?? "").trim();
     if (!foodName) return { ok: false };
     return { ok: true, food_name: foodName };
@@ -571,5 +599,5 @@ export const simulateWhatIf: CJTool<SimulateWhatIfArgs, SimulateWhatIfResult> = 
 export const READ_ONLY_TOOLS: CJTool<any, any>[] = [
   searchFood, getFoodNutrition, resolvePortion, calculateMealNutrition, getDailySummary,
   getUserProfile, searchDietMeals, getRecipe, findRecipesFromIngredients, recommendFoods,
-  checkFoodFit, suggestSubstitution, simulateWhatIf, calculateAllowedPortion, recordFoodDislike,
+  checkFoodFit, suggestSubstitution, simulateWhatIf, calculateAllowedPortion, recordFoodDislike, recordFoodLike,
 ];

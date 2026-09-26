@@ -10,7 +10,7 @@ import { InMemoryRepository } from "../../db/inMemoryRepository.js";
 import { makeUser } from "../testHelpers.js";
 import * as mealState from "../../mealState.js";
 import * as calculatorMod from "../../calculator.js";
-import { logMeal, logWater, logManualCalories, undoLastMeal } from "../../conversation/mutationTools.js";
+import { logMeal, logWater, logManualCalories, undoLastMeal, updateMeal } from "../../conversation/mutationTools.js";
 import { EMPTY_CONVERSATION_STATE } from "../../conversation/stateStore.js";
 import type { ConversationState, ToolExecContext } from "../../conversation/types.js";
 import type { NutritionProfileRecord, UserRecord } from "../../db/repository.js";
@@ -322,5 +322,66 @@ describe("log_manual_calories — سعرات إضافية بدون طعام من
     const r = await logManualCalories.execute(ctxFor(repo, user, "شكد سعرات الشاورما اللي فيها 500 سعرة؟"), { calories: 500 });
     expect(r.ok).toBe(false);
     expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+  });
+});
+
+describe("update_meal — يعالج الفجوة المكتشفة حيًا: تصحيح كمية بعد DIRECT_LOG كان بلا أي أثر حقيقي بوضع ACTIVE", () => {
+  it("DIRECT_LOG ('اكلت بيضتين') ثم 'لا خليها 3' -> MealLog القديم يُحذف، مسوّدة جديدة بكمية محدَّثة، صفر تسجيل تلقائي", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "upd1");
+
+    const logged = await logMeal.execute(ctxFor(repo, user, "اكلت بيضتين"), {});
+    expect(logged.ok).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+    const xpAfterLog = user.xp;
+    expect(xpAfterLog).toBeGreaterThan(0);
+
+    const r = await updateMeal.execute(ctxFor(repo, user, "لا خليها 3"), {});
+    expect(r.ok).toBe(true);
+    expect(r.requires_confirmation).toBe(true);
+
+    // الوجبة القديمة اتحذفت (DIRECT_LOG يُراجَع)، وصفر وجبة جديدة انسجّلت تلقائيًا بعد — تبقى pending
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+    expect(user.xp).toBeLessThan(xpAfterLog); // XP الوجبة القديمة ارتجعت
+
+    const pending = mealState.loadPending(user);
+    expect(pending).not.toBeNull();
+    expect(pending!.items[pending!.items.length - 1].quantity).toBe(3);
+
+    // تأكيد صريح لاحق -> الآن فقط تنسجّل، MealLog واحد فقط (صفر تسجيل مزدوج)
+    const confirmed = await logMeal.execute(ctxFor(repo, user, "اي"), {});
+    expect(confirmed.ok).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+  });
+
+  it("صفر وجبة سابقة (لا pending ولا DIRECT_LOG) -> ok:false، rejection_reason:NOTHING_TO_UPDATE", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "upd2");
+    const r = await updateMeal.execute(ctxFor(repo, user, "لا خليها 3"), {});
+    expect(r.ok).toBe(false);
+    expect(r.rejection_reason).toBe("NOTHING_TO_UPDATE");
+  });
+
+  it("وجبة سابقة موجودة لكن الرسالة بلا رقم واضح -> ok:false، NO_QUANTITY_FOUND، صفر تغيير", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "upd3");
+    await logMeal.execute(ctxFor(repo, user, "اكلت بيضتين"), {});
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+
+    const r = await updateMeal.execute(ctxFor(repo, user, "زين خلها هيچي"), {});
+    expect(r.ok).toBe(false);
+    expect(r.rejection_reason).toBe("NO_QUANTITY_FOUND");
+    // صفر أثر جانبي — الوجبة الأصلية تبقى كما هي (ما انحذفت بلا داعٍ)
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+  });
+
+  it("Gemini يمرّر args مختلَقة (مهملة كليًا، نفس فلسفة log_meal) — الرقم يُستخرَج من rawText فقط", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "upd4");
+    await logMeal.execute(ctxFor(repo, user, "اكلت بيضتين"), {});
+    const r = await updateMeal.execute(ctxFor(repo, user, "لا خليها 5") as ToolExecContext, { new_quantity: 999 } as never);
+    expect(r.ok).toBe(true);
+    const pending = mealState.loadPending(user);
+    expect(pending!.items[pending!.items.length - 1].quantity).toBe(5); // مو 999
   });
 });

@@ -37,6 +37,9 @@ function buildContextText(ctx: ConversationTurnContext): string {
     ctx.conversation_state.disliked_foods.length > 0
       ? `أطعمة صرّح المستخدم برفضها سابقًا (استبعدها من أي اقتراح تصوغه بنفسك بالرد): ${ctx.conversation_state.disliked_foods.join("، ")}`
       : null,
+    ctx.conversation_state.preferred_foods.length > 0
+      ? `أطعمة صرّح المستخدم بحبّها سابقًا (فضّلها إذا مناسبة بالاقتراحات): ${ctx.conversation_state.preferred_foods.join("، ")}`
+      : null,
     ctx.conversation_state.last_suggestion
       ? `آخر اقتراح فعلي عُرض عليه: ${ctx.conversation_state.last_suggestion.items.join("، ")}`
       : null,
