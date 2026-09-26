@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// توقيع الإصدار (release) — يقرأ من keystore.properties (خارج git عمدًا، راجع .gitignore).
+// لو الملف غير موجود (مثلاً بيئة CI بدون سر التوقيع)، البناء release يفشل بوضوح بدل توقيع خاطئ صامت.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "com.cjworkout.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -16,10 +24,21 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : null
         }
     }
 }

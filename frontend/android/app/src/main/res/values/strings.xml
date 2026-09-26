@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">CJ FOOD</string>
-    <string name="title_activity_main">CJ FOOD</string>
+    <string name="app_name">CJ Food</string>
+    <string name="title_activity_main">CJ Food</string>
     <string name="package_name">com.cjworkout.app</string>
     <string name="custom_url_scheme">com.cjworkout.app</string>
 </resources>
