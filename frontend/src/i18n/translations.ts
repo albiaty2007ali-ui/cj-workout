@@ -111,6 +111,7 @@ export const translations = {
       resend: "إعادة إرسال الكود",
       resendCooldown: "إعادة الإرسال",
       resendSuccess: "تم إرسال كود جديد ✓",
+      changeEmail: "📧 هذا مو بريدي — تغيير البريد الإلكتروني",
     },
     settings: {
       aboutTitle: "ℹ️ عن CJ FOOD",
