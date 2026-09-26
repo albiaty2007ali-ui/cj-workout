@@ -7,11 +7,12 @@ import type { ConversationState } from "./types.js";
 
 export const EMPTY_CONVERSATION_STATE: ConversationState = {
   active_food: null, active_intent: null, target_calories: null, awaiting: null,
-  last_tool_calls: [], recent_turns: [],
+  last_tool_calls: [], recent_turns: [], disliked_foods: [], last_suggestion: null,
 };
 
 const MAX_RECENT_TURNS = 3;
 const MAX_TOOL_CALLS_REMEMBERED = 3;
+const MAX_DISLIKED_FOODS = 15;
 
 export function loadConversationState(user: UserRecord): ConversationState {
   if (!user.conversation_state_json) return EMPTY_CONVERSATION_STATE;
@@ -24,6 +25,8 @@ export function loadConversationState(user: UserRecord): ConversationState {
       awaiting: parsed.awaiting ?? null,
       last_tool_calls: parsed.last_tool_calls ?? [],
       recent_turns: parsed.recent_turns ?? [],
+      disliked_foods: parsed.disliked_foods ?? [],
+      last_suggestion: parsed.last_suggestion ?? null,
     };
   } catch {
     return EMPTY_CONVERSATION_STATE; // JSON تالف — تجاهل بأمان، نفس تسامح بقية الكود مع pending_*_json
@@ -79,6 +82,23 @@ export function nextConversationState(
     // تسجيل نفس الوجبة صدفة عبر نفس مسار الإذن الاحتياطي (راجع mutationTools.ts).
     if (toolUsed === "log_meal" && tr.ok === true) {
       next.active_food = null;
+    }
+    // record_food_dislike ناجحة -> تُضاف لقائمة الأطعمة المرفوضة (دائمًا، لا رفض اقتراح واحد
+    // عابر) — تُستخدَم فعليًا لاستبعادها من اقتراحات لاحقة (راجع tools.ts's recommendFoods).
+    if (toolUsed === "record_food_dislike" && typeof tr.food_name === "string" && tr.food_name.trim()) {
+      const name = tr.food_name.trim();
+      if (!prev.disliked_foods.includes(name)) {
+        next.disliked_foods = [...prev.disliked_foods, name].slice(-MAX_DISLIKED_FOODS);
+      }
+    }
+    // أي أداة اقتراح رجّعت قائمة recipes حقيقية (أسماء فقط، مو food_id/محتوى غذائي كامل — هذا
+    // للسياق/إحالة الضمائر فقط، صفر استخدامه كمصدر أرقام) -> تُحفَظ كـ"آخر اقتراح" لإحالة لاحقة
+    // مثل "زين وإذا آكل هذا؟"/"لا مو هذا" بدون إعادة ذكر الاسم.
+    if (Array.isArray(tr.recipes) && tr.recipes.length > 0) {
+      const names = (tr.recipes as unknown[])
+        .map((r) => (r && typeof r === "object" && typeof (r as { name?: unknown }).name === "string" ? (r as { name: string }).name : null))
+        .filter((n): n is string => n !== null);
+      if (names.length > 0 && toolUsed) next.last_suggestion = { source_tool: toolUsed, items: names };
     }
     next.last_tool_calls = [
       ...prev.last_tool_calls,

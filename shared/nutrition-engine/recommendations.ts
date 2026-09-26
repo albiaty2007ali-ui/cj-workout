@@ -37,13 +37,19 @@ async function candidates(remainingCalories: number) {
   return out;
 }
 
-/** يقترح ضمن الباقي من السعرات، مرجّح لصالح البروتين إذا المستخدم ناقصه اليوم. */
-export async function suggestMealWithin(remainingCalories: number, proteinNeeded = 0): Promise<string> {
+/** يقترح ضمن الباقي من السعرات، مرجّح لصالح البروتين إذا المستخدم ناقصه اليوم. excludeNames
+ *  (اختياري) — أطعمة صرّح المستخدم برفضها بمحادثة سابقة (conversation/tools.ts's recommend_foods
+ *  يمرّرها من ConversationState.disliked_foods)، تُستبعَد فعليًا لا مجرد "تُتذكَّر" بلا أثر —
+ *  مطابقة substring بسيطة (مو exact) حتى "دجاج" يستبعد "دجاج مشوي" أيضًا. */
+export async function suggestMealWithin(remainingCalories: number, proteinNeeded = 0, excludeNames: string[] = []): Promise<string> {
   if (remainingCalories <= 0) {
     return "خلصت سعراتك اليوم، بس اذا لسا جوعان جرب سلطة أو خضار قليلة السعرات جدًا.";
   }
 
-  const list = await candidates(remainingCalories);
+  let list = await candidates(remainingCalories);
+  if (excludeNames.length > 0) {
+    list = list.filter((c) => !excludeNames.some((ex) => c.name.includes(ex)));
+  }
   if (list.length === 0) {
     return `باقيلك ${remainingCalories} سعرة تقريبًا — جرب وجبة خفيفة زي سلطة أو خضار.`;
   }

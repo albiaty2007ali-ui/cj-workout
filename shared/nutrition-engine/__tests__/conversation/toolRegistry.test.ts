@@ -180,6 +180,33 @@ describe("conversation/tools.ts — أدوات القراءة فقط", () => {
     expect(r.text.length).toBeGreaterThan(0);
   });
 
+  it("recommend_foods: يستبعد وصفة مذكورة بـconversationState.disliked_foods", async () => {
+    const repo = new InMemoryRepository();
+    repo.recipes = [
+      makeRecipe({ id: "light-1", name: "سلطة دجاج خفيفة", slug: "chicken-salad", active: true, calories: 150 }),
+      makeRecipe({ id: "light-2", name: "شوربة عدس", slug: "lentil-soup", active: true, calories: 140 }),
+    ];
+    const ctx = await buildCtx(repo, makeUser({ id: "u15b" }));
+    ctx.conversationState = { ...EMPTY_CONVERSATION_STATE, disliked_foods: ["دجاج"] };
+    const r = await tools.recommendFoods.execute(ctx, { remaining_calories: 500 });
+    expect(r.recipes.some((x) => x.name.includes("دجاج"))).toBe(false);
+    expect(r.recipes.some((x) => x.name === "شوربة عدس")).toBe(true);
+  });
+
+  it("record_food_dislike: اسم صالح -> ok:true بنفس الاسم", async () => {
+    const repo = new InMemoryRepository();
+    const ctx = await buildCtx(repo, makeUser({ id: "u15c" }));
+    const r = await tools.recordFoodDislike.execute(ctx, { food_name: "دجاج" });
+    expect(r).toEqual({ ok: true, food_name: "دجاج" });
+  });
+
+  it("record_food_dislike: اسم فاضي/مسافات فقط -> ok:false", async () => {
+    const repo = new InMemoryRepository();
+    const ctx = await buildCtx(repo, makeUser({ id: "u15d" }));
+    const r = await tools.recordFoodDislike.execute(ctx, { food_name: "   " });
+    expect(r.ok).toBe(false);
+  });
+
   it("check_food_fit: طعام حقيقي -> نص حقيقي، food_id مخترع -> found:false", async () => {
     const repo = new InMemoryRepository();
     const ctx = await buildCtx(repo, makeUser({ id: "u16" }));

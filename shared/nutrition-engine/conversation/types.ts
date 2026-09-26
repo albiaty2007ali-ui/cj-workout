@@ -49,6 +49,16 @@ export interface ConversationState {
   /** آخر 3 أدوار محادثة كحد أقصى (مستخدم+نموذج) — هذا ما يخلي متابعات قصيرة مثل "وإذا ثنتين؟"
    *  أو "500" (بعد "مشتهي دولمة") مفهومة لـGemini بدون إعادة سؤال المستخدم. */
   recent_turns: { role: "user" | "model"; text: string }[];
+  /** أطعمة صرّح المستخدم صراحة إنه يرفضها بشكل دائم (مثلاً "ما أحب الدجاج") — يُملأ فقط عبر أداة
+   *  record_food_dislike (راجع tools.ts)، يُستخدَم لاستبعادها فعليًا من recommend_foods القادمة
+   *  (راجع recommendations.ts's excludeNames)، لا مجرد "تذكّر" سلبي بلا أثر. أسماء حرة (مو food_id)
+   *  لأنه تفضيل شخصي نصي، لا رقم غذائي يحتاج تحقق من قاعدة البيانات. سقف 15 عنصر (نفس فلسفة
+   *  last_tool_calls/recent_turns — ذاكرة قصيرة محدودة، صفر تراكم لا نهائي). */
+  disliked_foods: string[];
+  /** آخر اقتراح فعلي (أطعمة/وصفات حقيقية) رجّعته أداة اقتراح — يُملأ فقط من نتيجة أداة حقيقية
+   *  (recommend_foods/search_diet_meals/find_recipes_from_ingredients)، صفر اختراع. يخلي ردود
+   *  مثل "زين وإذا آكل هذا؟"/"لا مو هذا" مفهومة بدون إعادة ذكر الاسم. */
+  last_suggestion: { source_tool: string; items: string[] } | null;
 }
 
 export type ConversationalMode = "OFF" | "SHADOW" | "ACTIVE";

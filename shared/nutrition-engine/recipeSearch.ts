@@ -81,12 +81,16 @@ export async function findRecipeByText(repo: Repository, text: string): Promise<
 
 /**
  * وصفات حقيقية ضمن السعرات المتبقية — تُستخدم لإثراء رد ASK_RECOMMENDATION بالشات. لا تخمين —
- * فاضية لو ماكو وصفة تناسب.
+ * فاضية لو ماكو وصفة تناسب. excludeNames (اختياري) — نفس استبعاد recommendations.ts's
+ * suggestMealWithin، أطعمة/وصفات صرّح المستخدم برفضها بمحادثة سابقة.
  */
-export async function suggestRecipesWithin(repo: Repository, remainingCalories: number, limit = 2): Promise<RecipeRecord[]> {
+export async function suggestRecipesWithin(repo: Repository, remainingCalories: number, limit = 2, excludeNames: string[] = []): Promise<RecipeRecord[]> {
   if (remainingCalories <= 0) return [];
   const all = await searchRecipes(repo);
-  const fitting = all.filter((r) => r.calories <= remainingCalories);
+  let fitting = all.filter((r) => r.calories <= remainingCalories);
+  if (excludeNames.length > 0) {
+    fitting = fitting.filter((r) => !excludeNames.some((ex) => r.name.includes(ex)));
+  }
   fitting.sort((a, b) => b.calories - a.calories);
   return fitting.slice(0, limit);
 }

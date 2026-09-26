@@ -603,6 +603,18 @@ async function handleExpressDesire(repo: Repository, user: UserRecord, textNorm:
   return { reply: responses.desireAck(false), meal_logged: false };
 }
 
+/** "ما أحب الدجاج" — صفر تسجيل وجبة دائمًا (راجع intents.ts's EXPRESS_DISLIKE لسبب وجودها،
+ *  Bug حقيقي حي أصلحته). صفر تخزين دائم بهذا المسار المحلي عمدًا — ذاكرة "الأطعمة المرفوضة"
+ *  الحقيقية (تُستخدَم فعليًا باستبعاد اقتراحات لاحقة) موجودة فقط بطبقة Gemini ACTIVE mode
+ *  (conversation/tools.ts's record_food_dislike + ConversationState.disliked_foods) — هذا
+ *  المسار الحتمي هدفه الوحيد منع التسجيل الوهمي، حتى بدون Gemini إطلاقًا (GEMINI_CONVERSATIONAL_
+ *  MODE=OFF أو فشل/سقوط Gemini)، لا تكرار نظام ذاكرة كامل هنا. */
+async function handleExpressDislike(textNorm: string): Promise<DispatchResult> {
+  const result = await extractFoodEntities(textNorm);
+  const hasFood = result.resolved.length > 0 || result.clarifications.length > 0;
+  return { reply: responses.dislikeAck(hasFood), meal_logged: false };
+}
+
 function askedMacro(textNorm: string): "protein" | "carb" | "fat" | null {
   if (intents.PROTEIN_WORDS.some((w) => textNorm.includes(w))) return "protein";
   if (intents.CARB_WORDS.some((w) => textNorm.includes(w))) return "carb";
@@ -1265,6 +1277,7 @@ async function dispatch(
     return { reply: "تمام، خبرني لما تاكل 🌱 أو گلي شنو تشتهي وأقترحلك شي مناسب لسعراتك المتبقية.", meal_logged: false };
   }
   if (intent === intents.EXPRESS_DESIRE) return handleExpressDesire(repo, user, textNorm, now);
+  if (intent === intents.EXPRESS_DISLIKE) return handleExpressDislike(textNorm);
   if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, foodLookupText, "craving", now);
   if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, foodLookupText, "plan", now);
   if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now, nluFoodQuery);

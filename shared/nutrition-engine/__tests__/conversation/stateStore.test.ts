@@ -97,6 +97,61 @@ describe("nextConversationState", () => {
     expect(next.last_tool_calls).toEqual([]);
     expect(next.recent_turns).toEqual([{ role: "user", text: "هلا" }, { role: "model", text: "هلا بيك 😄" }]);
   });
+
+  it("record_food_dislike ناجحة -> تُضاف لـdisliked_foods", () => {
+    const next = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "ما أحب الدجاج", "تمام، أتجنبه بالاقتراحات الجاية",
+      "record_food_dislike", { food_name: "دجاج" }, { ok: true, food_name: "دجاج" },
+    );
+    expect(next.disliked_foods).toEqual(["دجاج"]);
+  });
+
+  it("record_food_dislike بنفس الاسم مرتين -> صفر تكرار بالقائمة", () => {
+    const first = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "ما أحب الدجاج", "تمام",
+      "record_food_dislike", { food_name: "دجاج" }, { ok: true, food_name: "دجاج" },
+    );
+    const second = nextConversationState(
+      first, "بعد ما أحب الدجاج", "فهمتك",
+      "record_food_dislike", { food_name: "دجاج" }, { ok: true, food_name: "دجاج" },
+    );
+    expect(second.disliked_foods).toEqual(["دجاج"]);
+  });
+
+  it("record_food_dislike بـok:false (اسم فاضي) -> صفر إضافة", () => {
+    const next = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "...", "؟", "record_food_dislike", { food_name: "" }, { ok: false },
+    );
+    expect(next.disliked_foods).toEqual([]);
+  });
+
+  it("disliked_foods يبقى محصورًا بآخر 15 عنصر كحد أقصى", () => {
+    let state = EMPTY_CONVERSATION_STATE;
+    for (let i = 0; i < 20; i++) {
+      state = nextConversationState(
+        state, `ما أحب طعام${i}`, "تمام", "record_food_dislike",
+        { food_name: `طعام${i}` }, { ok: true, food_name: `طعام${i}` },
+      );
+    }
+    expect(state.disliked_foods).toHaveLength(15);
+    expect(state.disliked_foods[state.disliked_foods.length - 1]).toBe("طعام19");
+  });
+
+  it("recommend_foods رجّعت recipes حقيقية -> last_suggestion يتحدّث بأسمائها", () => {
+    const next = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "شنو آكل؟", "أقترحلك...",
+      "recommend_foods", {}, { text: "...", recipes: [{ name: "سلطة دجاج" }, { name: "شوربة عدس" }] },
+    );
+    expect(next.last_suggestion).toEqual({ source_tool: "recommend_foods", items: ["سلطة دجاج", "شوربة عدس"] });
+  });
+
+  it("أداة رجّعت recipes فاضية -> last_suggestion يبقى كما هو (صفر استبدال بلا فائدة)", () => {
+    const next = nextConversationState(
+      EMPTY_CONVERSATION_STATE, "شنو آكل؟", "ماكو خيار مناسب حاليًا",
+      "recommend_foods", {}, { text: "...", recipes: [] },
+    );
+    expect(next.last_suggestion).toBeNull();
+  });
 });
 
 describe("saveConversationState + loadConversationState — تكامل حقيقي عبر InMemoryRepository", () => {

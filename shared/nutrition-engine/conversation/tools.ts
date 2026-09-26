@@ -3,8 +3,9 @@
  * غلاف رقيق فوق دالة موجودة فعلًا (foodSearch.ts/calculator.ts/context.ts/recommendations.ts/
  * recipeSearch.ts/ingredientResolver.ts/recipeMatching.ts) — صفر منطق أعمال جديد يُخترع هنا.
  *
- * أدوات القراءة فقط (10) بهذا الملف — أدوات التحوّر (log_meal/undo_last_meal) بملف منفصل
- * conversation/mutationTools.ts (المرحلة 2) لفصل واضح بين "صفر مخاطر" و"يحتاج تحقق صارم".
+ * أدوات القراءة فقط (15، منها record_food_dislike اللي تكتب فقط لذاكرة المحادثة لا قاعدة بيانات
+ * حقيقية) بهذا الملف — أدوات التحوّر (log_meal/undo_last_meal) بملف منفصل conversation/mutationTools.ts
+ * (المرحلة 2) لفصل واضح بين "صفر مخاطر" و"يحتاج تحقق صارم".
  *
  * كل أداة تُحصر نتائجها (Top 5-10 كحد أقصى) — أبدًا لا تُرسَل قائمة كاملة (foods.sqlite/كل
  * الوصفات) لـGemini، سواء لتوفير التكلفة أو لأن نموذج اللغة لا يحتاج أكثر من بضع خيارات ليصوغ ردًا.
@@ -354,7 +355,10 @@ interface RecommendFoodsResult { text: string; recipes: RecipeSummary[] }
 
 export const recommendFoods: CJTool<RecommendFoodsArgs, RecommendFoodsResult> = {
   name: "recommend_foods",
-  description: "يقترح أطعمة/وجبات حقيقية تناسب السعرات المتبقية (ومرجّحة للبروتين إذا ناقص) — صفر اختراع.",
+  description:
+    "يقترح أطعمة/وجبات حقيقية تناسب السعرات المتبقية (ومرجّحة للبروتين إذا ناقص) — صفر اختراع. " +
+    "تستبعد تلقائيًا أي طعام سجّله المستخدم كمرفوض عبر record_food_dislike بمحادثة سابقة، صفر " +
+    "حاجة لتذكيرها هنا.",
   parameters: {
     type: "OBJECT",
     properties: {
@@ -366,9 +370,38 @@ export const recommendFoods: CJTool<RecommendFoodsArgs, RecommendFoodsResult> = 
   async execute(ctx: ToolExecContext, args: RecommendFoodsArgs): Promise<RecommendFoodsResult> {
     const remaining = clamp(Number(args?.remaining_calories) || 0, 0, 10000);
     const protein = clamp(Number(args?.protein_needed) || 0, 0, 500);
-    const text = await recommendationsMod.suggestMealWithin(remaining, protein);
-    const recipeAlts = await recipeSearchMod.suggestRecipesWithin(ctx.repo, remaining);
+    const excludeNames = ctx.conversationState.disliked_foods ?? [];
+    const text = await recommendationsMod.suggestMealWithin(remaining, protein, excludeNames);
+    const recipeAlts = await recipeSearchMod.suggestRecipesWithin(ctx.repo, remaining, 2, excludeNames);
     return { text, recipes: recipeAlts.map(toSummary) };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// record_food_dislike — أداة ذاكرة بحتة (صفر تأثير على قاعدة بيانات حقيقية/سعرات) — تُسجَّل فقط
+// بـConversationState.disliked_foods (راجع stateStore.ts's nextConversationState)، وتُستخدَم فعليًا
+// لاستبعاد الطعام من recommend_foods القادمة أعلاه. mutates:false لأنها لا تكتب لأي Repository —
+// نفس تصنيف بقية أدوات القراءة فقط.
+// ---------------------------------------------------------------------------
+interface RecordFoodDislikeArgs { food_name: string }
+interface RecordFoodDislikeResult { ok: boolean; food_name?: string }
+
+export const recordFoodDislike: CJTool<RecordFoodDislikeArgs, RecordFoodDislikeResult> = {
+  name: "record_food_dislike",
+  description:
+    "سجّل تفضيل غذائي دائم بذاكرة المحادثة (مو قاعدة بيانات دائمة) — استدعِها فقط لما المستخدم " +
+    "يقول صراحة إنه ما يحب/يرفض أكلة معيّنة بشكل عام (مثل \"ما أحب الدجاج\"، \"ما أريد طماطة\"). " +
+    "لا تستدعِها لرفض اقتراح واحد فقط بلحظته (\"لا مو هذا\"، \"بعدني\") — هذا رفض عابر لا تفضيل دائم.",
+  parameters: {
+    type: "OBJECT",
+    properties: { food_name: { type: "STRING", description: "اسم الطعام المرفوض كما ذكره المستخدم" } },
+    required: ["food_name"],
+  },
+  mutates: false,
+  async execute(_ctx: ToolExecContext, args: RecordFoodDislikeArgs): Promise<RecordFoodDislikeResult> {
+    const foodName = String(args?.food_name ?? "").trim();
+    if (!foodName) return { ok: false };
+    return { ok: true, food_name: foodName };
   },
 };
 
@@ -538,5 +571,5 @@ export const simulateWhatIf: CJTool<SimulateWhatIfArgs, SimulateWhatIfResult> = 
 export const READ_ONLY_TOOLS: CJTool<any, any>[] = [
   searchFood, getFoodNutrition, resolvePortion, calculateMealNutrition, getDailySummary,
   getUserProfile, searchDietMeals, getRecipe, findRecipesFromIngredients, recommendFoods,
-  checkFoodFit, suggestSubstitution, simulateWhatIf, calculateAllowedPortion,
+  checkFoodFit, suggestSubstitution, simulateWhatIf, calculateAllowedPortion, recordFoodDislike,
 ];

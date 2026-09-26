@@ -28,6 +28,15 @@ export const NOT_YET = "NOT_YET";
 export const EXPRESS_DESIRE = "EXPRESS_DESIRE";
 export const EXPRESS_CRAVING = "EXPRESS_CRAVING";
 export const PLAN_TO_EAT = "PLAN_TO_EAT";
+// رفض/عدم إعجاب دائم بطعام ("ما أحب الدجاج") — Bug حقيقي حي اكتُشف: هذي جملة تصريحية سلبية
+// (مو سؤال، فحارس looksLikeQuestion لا يمسكها) ومالها فعل استهلاك سلبي (hasNegatedConsumption
+// يتحقق فقط من نفي أفعال CONSUMPTION_VERB_HINTS مثل "ما اكلت"، مو نفي فعل حب/رغبة) — فكانت
+// تسقط للافتراضي LOG_MEAL وتُسجَّل كوجبة فعلية أُكلت (لأن "دجاج" يتطابق بثقة كاملة). يُفحص
+// بنفس أولوية DESIRE_MARKERS (قبل LOG_MEAL الافتراضي)، وقصدًا **لا** يُعاد استخدام EXPRESS_DESIRE
+// لأن ردودها (responses.desireAck) مصاغة لرغبة إيجابية ("خبرني لما تاكلها")، عكس قصد هذي الرسالة
+// تمامًا. راجع conversation/tools.ts's record_food_dislike للمقابل بطبقة Gemini ACTIVE mode —
+// هذا الإصلاح يضمن نفس الضمان بالمسار المحلي الحتمي أيضًا (يعمل حتى بدون Gemini إطلاقًا).
+export const EXPRESS_DISLIKE = "EXPRESS_DISLIKE";
 export const ASK_PORTION_FOR_FOOD = "ASK_PORTION_FOR_FOOD";
 export const ASK_CALORIES = "ASK_CALORIES";
 export const ASK_FOOD_SIZE = "ASK_FOOD_SIZE";
@@ -125,6 +134,15 @@ export const ASK_TIP_PHRASES = ["عطيني نصيحة", "نصيحة سريعة"
 export const DESIRE_MARKERS = [
   "أريد", "اريد", "ابي", "أبي", "ابغي", "أبغى", "يمكن", "ممكن اكل", "ممكن آكل",
   "أفكر", "افكر", "حاب اكل", "حاب آكل", "ودي اكل", "ودي آكل", "أحب أكل", "احب اكل",
+];
+
+// رفض/عدم إعجاب دائم بطعام معيّن — راجع EXPRESS_DISLIKE أعلاه لسبب وجودها ومَ لا تُدمَج مع
+// DESIRE_MARKERS. "ما أحب"/"ما أريد" هنا نفي تصريحي (مو نفي فعل استهلاك ماضٍ مثل "ما اكلت"،
+// ذاك مغطّى أصلاً بـhasNegatedConsumption لحالة مختلفة كليًا: "ما اكلت اليوم شي").
+export const DISLIKE_MARKERS = [
+  "ما أحب", "ما احب", "لا أحب", "لا احب", "مو حاب", "مو حابة",
+  "ما أريد", "ما اريد", "لا أريد", "لا اريد",
+  "أكره", "اكره", "ما يعجبني", "ما تعجبني",
 ];
 
 // اشتهاء طعام محدد بالاسم ("مشتهي دولمة") — يختلف عن DESIRE_MARKERS العامة بإنه غالبًا يستحق
@@ -407,6 +425,10 @@ export function detectIntent(rawText: string, ctx: IntentContext): string {
   if (!hasPending && !hasUndoableLog && isMostlyPhrase(textNorm, ACKNOWLEDGEMENT_PHRASES)) {
     return ACKNOWLEDGEMENT;
   }
+
+  // رفض/عدم إعجاب دائم بطعام ("ما أحب الدجاج") — يُفحص **قبل** DESIRE_MARKERS عمدًا (Bug حقيقي
+  // حي: كانت تسقط لـLOG_MEAL الافتراضي وتُسجَّل كوجبة فعلية، راجع EXPRESS_DISLIKE أعلاه).
+  if (includesAny(textNorm, DISLIKE_MARKERS)) return EXPRESS_DISLIKE;
 
   // رغبة/احتمال ("أريد بيض"، "يمكن آكل تمن") — مو استهلاك فعلي، لازم تُفحص قبل LOG_MEAL
   // الافتراضي، وإلا "أريد بيض" كانت راح تتسجل direct-log كبيضة وحدة فعلية

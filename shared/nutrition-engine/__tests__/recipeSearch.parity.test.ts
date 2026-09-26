@@ -106,4 +106,9 @@ describe("suggestRecipesWithin — تكافؤ حرفي", () => {
   it("صفر سعرات متبقية -> قائمة فاضية", async () => {
     expect(await suggestRecipesWithin(repo, 0)).toEqual([]);
   });
+
+  it("excludeNames يستبعد وصفة مرفوضة (ذاكرة محادثة)، الباقي يبقى كما هو", async () => {
+    const names = (await suggestRecipesWithin(repo, 400, 2, ["دجاج"])).map((r) => r.name);
+    expect(names).toEqual(["بيض بالطماطة", "شوربة عدس"]);
+  });
 });

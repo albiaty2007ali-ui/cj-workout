@@ -28,6 +28,18 @@ describe("suggestMealWithin — تكافؤ حرفي", () => {
     const reply = await suggestMealWithin(0);
     expect(reply).toBe("خلصت سعراتك اليوم، بس اذا لسا جوعان جرب سلطة أو خضار قليلة السعرات جدًا.");
   });
+
+  it("excludeNames يستبعد فعليًا طعامًا مرفوضًا (ذاكرة محادثة، راجع conversation/tools.ts's recommend_foods)", async () => {
+    const reply = await suggestMealWithin(300, 0, ["دجاج"]);
+    expect(reply).not.toContain("دجاج مشوي");
+    expect(reply).toContain("لحم مشوي");
+    expect(reply).toContain("تكة");
+  });
+
+  it("excludeNames فاضية (افتراضي) -> صفر تغيير بالسلوك الحالي", async () => {
+    const reply = await suggestMealWithin(300, 0, []);
+    expect(reply).toContain("دجاج مشوي");
+  });
 });
 
 describe("suggestMealNearTarget — تكافؤ حرفي", () => {

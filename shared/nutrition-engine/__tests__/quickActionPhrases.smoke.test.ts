@@ -37,3 +37,20 @@ describe("عبارات مساعد CJ — دخان على المسار المحل
     expect(r.reply!.length).toBeGreaterThan(0);
   });
 });
+
+describe("EXPRESS_DISLIKE عبر handleMessage الكامل — Bug حقيقي حي (هذي الجلسة): 'ما أحب الدجاج' كانت تُسجَّل كوجبة 'دجاج مقلي' فعلية 368 سعرة", () => {
+  it.each(["ما أحب الدجاج إطلاقًا", "ما أريد طماطة بأي وجبة", "أكره الباذنجان"])(
+    "'%s' -> meal_logged:false، صفر MealLog حقيقية بقاعدة البيانات",
+    async (msg) => {
+      const repo = new InMemoryRepository();
+      const id = `dislike-${Math.random().toString(16).slice(2)}`;
+      const user = makeUser({ id });
+      repo.nutritionProfiles.set(id, { user_id: id, ...STANDARD_PROFILE });
+      await repo.saveUser(user);
+
+      const r = await handleMessage(repo, user, msg, NOON);
+      expect(r.meal_logged).toBe(false);
+      expect(await repo.findMealLogsInRange(id, new Date(0), new Date(Date.now() + 1e12))).toHaveLength(0);
+    },
+  );
+});

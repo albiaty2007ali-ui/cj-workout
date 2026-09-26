@@ -46,6 +46,24 @@ describe("detectIntent — تكافؤ حرفي مع Python (قيم حقيقية 
     expect(detectIntent(norm("اريد بيض"), {})).toBe("EXPRESS_DESIRE");
   });
 
+  it("'ما أحب الدجاج إطلاقًا' -> EXPRESS_DISLIKE (مو LOG_MEAL — Bug حقيقي حي: كانت تُسجَّل كوجبة فعلية أُكلت)", () => {
+    expect(detectIntent(norm("ما أحب الدجاج إطلاقًا"), {})).toBe("EXPRESS_DISLIKE");
+  });
+
+  it("'ما أريد طماطة بأي وجبة' -> EXPRESS_DISLIKE (مو LOG_MEAL)", () => {
+    expect(detectIntent(norm("ما أريد طماطة بأي وجبة"), {})).toBe("EXPRESS_DISLIKE");
+  });
+
+  it("'أكره الباذنجان' -> EXPRESS_DISLIKE", () => {
+    expect(detectIntent(norm("أكره الباذنجان"), {})).toBe("EXPRESS_DISLIKE");
+  });
+
+  it("'ما اكلت شي اليوم' -> LOG_MEAL يبقى كما هو (نفي فعل استهلاك ماضٍ، حالة مختلفة عن EXPRESS_DISLIKE — صفر Regression)", () => {
+    // ملاحظة: هذي جملة "ما اكلت" (نفي استهلاك) وليست "ما أحب" (رفض تفضيل) — تبقى بمسارها
+    // الحالي (hasNegatedConsumption's النطاق الخاص)، هذا الاختبار يوثّق الحد الفاصل فقط.
+    expect(detectIntent(norm("ما اكلت شي اليوم"), {})).not.toBe("EXPRESS_DISLIKE");
+  });
+
   it("'شكد باقيلي' -> ASK_REMAINING", () => {
     expect(detectIntent(norm("شكد باقيلي"), {})).toBe("ASK_REMAINING");
   });

@@ -34,6 +34,12 @@ function buildContextText(ctx: ConversationTurnContext): string {
     ctx.conversation_state.active_food ? `آخر طعام مطروح بالمحادثة: ${ctx.conversation_state.active_food.food_name}` : null,
     ctx.conversation_state.target_calories !== null ? `هدف سعري مذكور بمحادثة سابقة: ${ctx.conversation_state.target_calories} kcal` : null,
     ctx.conversation_state.awaiting ? `المستخدم بانتظار جواب على: ${ctx.conversation_state.awaiting}` : null,
+    ctx.conversation_state.disliked_foods.length > 0
+      ? `أطعمة صرّح المستخدم برفضها سابقًا (استبعدها من أي اقتراح تصوغه بنفسك بالرد): ${ctx.conversation_state.disliked_foods.join("، ")}`
+      : null,
+    ctx.conversation_state.last_suggestion
+      ? `آخر اقتراح فعلي عُرض عليه: ${ctx.conversation_state.last_suggestion.items.join("، ")}`
+      : null,
   ].filter((l): l is string => l !== null);
   return lines.join("\n");
 }

@@ -79,6 +79,16 @@ export const DESIRE_ACK_WITH_FOOD_TEMPLATES = [
   "زين، فكرة حلوة 😋 وبس تصير حقيقة خبرني وأسجلها.", "تمام، محفوظة عندي. لما تاكلها فعليًا گلي وأحسبها.",
 ];
 
+export const DISLIKE_ACK_WITH_FOOD_TEMPLATES = [
+  "ولا يهمك كابتن، ما راح أقترحها عليك مرة ثانية 🌱", "تمام، أتجنبها بالاقتراحات الجاية.",
+  "زين، محفوظة عندي — ما تطلع بأي اقتراح بعد هسه.", "أوكي، فهمتك. نشوف خيارات ثانية تناسبك أكثر.",
+];
+
+export const DISLIKE_ACK_GENERIC_TEMPLATES = [
+  "تمام، أخذتها بعين الاعتبار.", "أوكي كابتن، فهمتك.",
+  "زين، خبرني إذا تحتاج اقتراح غيرها.", "ماكو مشكلة، نلاقيلك شي يناسبك أكثر.",
+];
+
 export const DESIRE_ACK_GENERIC_TEMPLATES = [
   "تمام، خبرني لما تاكل حتى أرتب حسابك.", "أوكي، وإذا تريد اقتراح هسه گلي.",
   "زين، أنا موجود أي وقت تحتاج شي.", "تمام كابتن، خذ راحتك وخبرني وقت تقرر.",
@@ -299,6 +309,7 @@ export const recipeFinishedPrompt = () => pick(RECIPE_FINISHED_TEMPLATES);
 export const recipeNotYetAck = () => pick(RECIPE_NOT_YET_TEMPLATES);
 export const recipeDeclinedAck = () => pick(RECIPE_DECLINED_TEMPLATES);
 export const desireAck = (hasFood: boolean) => pick(hasFood ? DESIRE_ACK_WITH_FOOD_TEMPLATES : DESIRE_ACK_GENERIC_TEMPLATES);
+export const dislikeAck = (hasFood: boolean) => pick(hasFood ? DISLIKE_ACK_WITH_FOOD_TEMPLATES : DISLIKE_ACK_GENERIC_TEMPLATES);
 
 export interface InlineItem {
   food_name: string;
