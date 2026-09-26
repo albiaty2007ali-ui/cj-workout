@@ -27,12 +27,29 @@ async function freshUser(repo: InMemoryRepository, id: string, overrides: Partia
   return user;
 }
 
+// فحص متزامن مطابق لـdirectLog.loadValid's منطق الصلاحية (بدون استدعاء النسخة async — تتجنّب
+// أثرها الجانبي بمسح Snapshot منتهي، وتُبقي ctxFor نفسها متزامنة كما هي، صفر تغيير بمئات استدعاءاتها
+// الحالية بهذا الملف). يطابق تمامًا ما يبنيه orchestrator.ts الحقيقي لـctxFlags.has_undoable_log.
+function hasValidDirectLogSnapshot(user: UserRecord, now: Date): boolean {
+  if (!user.last_direct_log_json) return false;
+  try {
+    const snap = JSON.parse(user.last_direct_log_json) as { expires_at: string };
+    return now < new Date(snap.expires_at);
+  } catch {
+    return false;
+  }
+}
+
 function ctxFor(
   repo: InMemoryRepository, user: UserRecord, rawText: string, now = new Date(),
   conversationState: ConversationState = EMPTY_CONVERSATION_STATE,
 ): ToolExecContext {
   const pending = mealState.loadPending(user);
-  return { repo, user, rawText, ctxFlags: { has_pending: pending !== null }, now, conversationState };
+  return {
+    repo, user, rawText,
+    ctxFlags: { has_pending: pending !== null, has_undoable_log: hasValidDirectLogSnapshot(user, now) },
+    now, conversationState,
+  };
 }
 
 const PIZZA_INCIDENT_MESSAGES = [
@@ -383,5 +400,46 @@ describe("update_meal — يعالج الفجوة المكتشفة حيًا: ت�
     expect(r.ok).toBe(true);
     const pending = mealState.loadPending(user);
     expect(pending!.items[pending!.items.length - 1].quantity).toBe(5); // مو 999
+  });
+});
+
+describe("log_meal — Correction Guard: Bug حقيقي حي اكتُشف بالاختبار المباشر ضد Gemini (هذي الجلسة)", () => {
+  it("Gemini يطلب log_meal بالغلط لرسالة تصحيح ('خلي البيض 3 حبات مو 2') بعد DIRECT_LOG -> يُعاد توجيهها لـupdate_meal، صفر وجبة مكرَّرة", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "guard1");
+
+    const logged = await logMeal.execute(ctxFor(repo, user, "اكلت بيضة"), {});
+    expect(logged.ok).toBe(true);
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+
+    // Gemini (بالغلط، هذا بالضبط اللي صار حيًا) يستدعي log_meal لرسالة هي فعليًا تصحيح كمية
+    const r = await logMeal.execute(ctxFor(repo, user, "خلي البيض 3 حبات مو 2"), {});
+    expect(r.redirected_from_log_meal_to_update).toBe(true);
+    expect(r.meal_logged).toBe(false); // صفر تسجيل تلقائي جديد
+    expect(r.ok).toBe(true); // التصحيح نفسه نجح (طبّق على مسوّدة، بانتظار تأكيد)
+
+    // الضمان الأهم: صفر وجبة مكرَّرة — الوجبة القديمة اتحذفت (reopen)، وما انسجّلت وحدة جديدة تلقائيًا
+    expect(await repo.countMealLogsForUser(user.id)).toBe(0);
+    const pending = mealState.loadPending(user);
+    expect(pending).not.toBeNull();
+    expect(pending!.items[pending!.items.length - 1].quantity).toBe(3);
+
+    // تأكيد صريح -> MealLog واحد نهائي فقط (صفر تكرار)
+    await logMeal.execute(ctxFor(repo, user, "اي"), {});
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+  });
+
+  it("رسالة جديدة كليًا بطعام مختلف بعد DIRECT_LOG ('اكلت 3 تمرات') -> log_meal يعمل عاديًا، صفر إعادة توجيه", async () => {
+    const repo = new InMemoryRepository();
+    const user = await freshUser(repo, "guard2");
+    await logMeal.execute(ctxFor(repo, user, "اكلت بيضة"), {});
+    expect(await repo.countMealLogsForUser(user.id)).toBe(1);
+
+    const r = await logMeal.execute(ctxFor(repo, user, "اكلت 3 تمرات"), {});
+    expect(r.redirected_from_log_meal_to_update).toBeFalsy();
+    expect(r.ok).toBe(true);
+    expect(r.meal_logged).toBe(true);
+    // وجبة جديدة فعلية حقيقية — صفر حذف للوجبة الأولى، الاثنتان موجودتان
+    expect(await repo.countMealLogsForUser(user.id)).toBe(2);
   });
 });

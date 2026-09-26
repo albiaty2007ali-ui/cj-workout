@@ -3,6 +3,7 @@
  * نفس ترتيب الأولوية بالضبط، نفس القوائم، نفس التعليقات التوثيقية للقرارات غير البديهية.
  */
 import { normalize } from "./arabicNormalize.js";
+import { findLeadingNumber, NUMBER_WORDS } from "./quantity.js";
 
 export const LOG_MEAL = "LOG_MEAL";
 export const ADD_FOOD = "ADD_FOOD";
@@ -107,9 +108,31 @@ export const UNDO_PHRASES = [...CANCEL_PHRASES, "الغيه", "شيلها", "ن�
 
 export const ADD_FOOD_PHRASES = ["زيدلي", "زيد", "ضيفلي", "ضيف", "اضيف", "أضيف", "كمان اكلت", "نسيت أضيف", "نسيت اضيف"];
 export const REMOVE_FOOD_PHRASES = ["شيل", "احذف", "إحذف", "شيلها", "الغي منها"];
-export const CHANGE_QUANTITY_PHRASES = ["خليها", "خله", "غيّر العدد", "غير العدد", "خلي الكمية"];
+export const CHANGE_QUANTITY_PHRASES = ["خليها", "خله", "غيّر العدد", "غير العدد", "خلي الكمية", "بدل العدد", "بدّل العدد"];
 export const SWAP_FOOD_PHRASES = ["بدل ", "بدّل ", "استبدل", "غيّر لـ", "غير ل"];
-export const CORRECTION_PHRASES = ["لا مو", "لا، مو", "غلط", "خطأ", "مو هيچي", "مو هيك"];
+export const CORRECTION_PHRASES = [
+  "لا مو", "لا، مو", "غلط", "خطأ", "مو هيچي", "مو هيك",
+  "لا أكلت", "لا اكلت", "صحح", "صححها", "حسبتها غلط", "العدد غلط", "الكمية غلط", "طلع العدد غلط",
+];
+
+// أفعال تغيير كمية بنيوية (خلي/صحح بدون لاحقة ثابتة) — تُقبَل فقط مع رقم فعلي بنفس الرسالة، حتى
+// ما تُصادف عبارة عامة غير متعلقة بكمية (مثلاً "خلي بالك") — Bug حقيقي حي اكتُشف: "خلي البيض 3
+// حبات مو 2" ما كانت تطابق أي عبارة ثابتة أعلاه (تحتاج "خليها" حرفيًا)، فتسقط لـLOG_MEAL الافتراضي
+// وتُنشئ وجبة مكرَّرة بكمية خاطئة (حبة وحدة بدل 3). نطاق الفحص هنا محدود أصلاً بمن يستدعيه
+// (فقط ضمن hasPending/hasUndoableLog بـdetectIntent — سياق فيه وجبة حديثة فعلاً).
+const QUANTITY_CORRECTION_VERBS = ["خلي", "صحح", "بدل", "بدّل", "غيّر", "غير"];
+export function looksLikeQuantityCorrectionVerb(textNorm: string): boolean {
+  if (findLeadingNumber(textNorm) === null) return false;
+  return QUANTITY_CORRECTION_VERBS.some((v) => textNorm.includes(v));
+}
+
+// نفي رقم صريح ("مو 2"، "مو وحدة"، "مو اثنين") — يفرق عن hasNegatedConsumption (نفي فعل استهلاك)
+// كليًا: هذا نفي **كمية** مذكورة، دليل قوي على تصحيح كمية موجودة مو استهلاك جديد.
+const NEGATED_NUMBER_WORDS = Object.keys(NUMBER_WORDS).sort((a, b) => b.length - a.length).join("|");
+const NEGATED_QUANTITY_RE = new RegExp(`مو\\s{0,3}(?:\\d+(?:\\.\\d+)?|${NEGATED_NUMBER_WORDS})`);
+export function hasNegatedQuantity(textNorm: string): boolean {
+  return NEGATED_QUANTITY_RE.test(textNorm);
+}
 
 export const PROTEIN_WORDS = ["بروتين"];
 export const CARB_WORDS = ["كارب", "كاربوهيدرات", "نشويات", "نشا"];
@@ -313,10 +336,10 @@ export function detectIntent(rawText: string, ctx: IntentContext): string {
   if (hasPending) {
     if (matchesPhrase(textNorm, CANCEL_PHRASES)) return CANCEL;
     if (matchesPhrase(textNorm, CONFIRM_PHRASES)) return CONFIRM;
-    if (includesAny(textNorm, CORRECTION_PHRASES)) return CORRECTION;
+    if (includesAny(textNorm, CORRECTION_PHRASES) || hasNegatedQuantity(textNorm)) return CORRECTION;
     if (includesAny(textNorm, SWAP_FOOD_PHRASES) && textNorm.includes("ب")) return SWAP_FOOD;
     if (includesAny(textNorm, REMOVE_FOOD_PHRASES)) return REMOVE_FOOD;
-    if (includesAny(textNorm, CHANGE_QUANTITY_PHRASES)) return CHANGE_QUANTITY;
+    if (includesAny(textNorm, CHANGE_QUANTITY_PHRASES) || looksLikeQuantityCorrectionVerb(textNorm)) return CHANGE_QUANTITY;
     if (includesAny(textNorm, ADD_FOOD_PHRASES)) return ADD_FOOD;
   }
 
@@ -342,10 +365,10 @@ export function detectIntent(rawText: string, ctx: IntentContext): string {
   // تشتغل عليها هي، مو على وجبة جديدة (مثلاً "لا مو بيضتين، 3" بعد "اكلت بيضتين")
   if (hasUndoableLog && !hasPending) {
     if (matchesPhrase(textNorm, UNDO_PHRASES)) return CANCEL;
-    if (includesAny(textNorm, CORRECTION_PHRASES)) return CORRECTION;
+    if (includesAny(textNorm, CORRECTION_PHRASES) || hasNegatedQuantity(textNorm)) return CORRECTION;
     if (includesAny(textNorm, SWAP_FOOD_PHRASES) && textNorm.includes("ب")) return SWAP_FOOD;
     if (includesAny(textNorm, REMOVE_FOOD_PHRASES)) return REMOVE_FOOD;
-    if (includesAny(textNorm, CHANGE_QUANTITY_PHRASES)) return CHANGE_QUANTITY;
+    if (includesAny(textNorm, CHANGE_QUANTITY_PHRASES) || looksLikeQuantityCorrectionVerb(textNorm)) return CHANGE_QUANTITY;
     if (includesAny(textNorm, ADD_FOOD_PHRASES)) return ADD_FOOD;
   }
 

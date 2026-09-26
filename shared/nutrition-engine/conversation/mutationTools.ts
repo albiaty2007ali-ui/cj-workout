@@ -13,7 +13,7 @@ import * as mealState from "../mealState.js";
 import * as corrections from "../corrections.js";
 import type { PendingMeal } from "../corrections.js";
 import { findLeadingNumber } from "../quantity.js";
-import { CONFIRM_PHRASES, isConsumptionAuthorized, isManualCalorieLogAuthorized, isWaterLogAuthorized, matchesPhrase } from "../intents.js";
+import { CHANGE_QUANTITY, CONFIRM_PHRASES, CORRECTION, isConsumptionAuthorized, isManualCalorieLogAuthorized, isWaterLogAuthorized, matchesPhrase } from "../intents.js";
 import { findMealType } from "../mealTypeDetection.js";
 import { logMealManually, logManualCalorieEntry, runMealLoggingPipeline, runWaterLoggingPipeline, summarizePending } from "../orchestrator.js";
 import type { CJTool, ToolExecContext } from "./types.js";
@@ -25,8 +25,54 @@ export interface LogMealToolResult {
   /** الرد الحتمي الحقيقي من المحرك المحلي — Gemini يقدر يعيد صياغته لهجويًا، لكن الأرقام تبقى من هنا فقط. */
   local_reply: string | null;
   /** موجود فقط لو رُفض الاستدعاء هيكليًا (رسالة جديدة كليًا ليست استهلاكًا فعليًا). */
-  rejection_reason?: "NOT_A_CONSUMPTION_STATEMENT";
+  rejection_reason?: "NOT_A_CONSUMPTION_STATEMENT" | "NOTHING_TO_UPDATE" | "NO_QUANTITY_FOUND";
+  /** true فقط لو Gemini طلب log_meal بالغلط لرسالة هي فعليًا تصحيح كمية — Backend رفض الطلب
+   *  الحرفي ونفّذ التصحيح الصحيح بدلاً عنه بنفس الاستدعاء (راجع التوثيق الكامل أسفل logMeal). */
+  redirected_from_log_meal_to_update?: boolean;
+  requires_confirmation?: boolean;
   [key: string]: unknown;
+}
+
+export interface UpdateMealToolResult {
+  ok: boolean;
+  local_reply: string | null;
+  /** true لو التعديل انطبّق على مسوّدة (pending) لسا ما انسجّلت رسميًا — لازم تأكيد صريح لاحق
+   *  قبل ما تنسجّل فعليًا بقاعدة البيانات (نفس ضمان "لا تسجيل بدون تأكيد" الأصلي، صفر استثناء هنا). */
+  requires_confirmation?: boolean;
+  rejection_reason?: "NOTHING_TO_UPDATE" | "NO_QUANTITY_FOUND";
+}
+
+/**
+ * المنطق الفعلي المشترك وراء أداة update_meal — مُستخرَج بدالة منفصلة لأنه يُستدعى من مكانين:
+ * (1) update_meal نفسها، (2) log_meal's Correction Guard أدناه (لما Gemini يطلب log_meal بالغلط
+ * لرسالة هي فعليًا تصحيح كمية — راجع توثيق logMeal الكامل). صفر تكرار منطق بين المسارين.
+ */
+async function performMealUpdate(ctx: ToolExecContext): Promise<UpdateMealToolResult> {
+  // فحص وجود رقم قابل للاستخدام **قبل** أي فتح/حذف حقيقي — يمنع حالة خطيرة: رسالة تصحيح بلا رقم
+  // واضح كانت (بالتصميم الأول) تحذف الوجبة المسجَّلة فعليًا (DIRECT_LOG reopen) بدون ما تحفظ أي
+  // مسوّدة بديلة، فتختفي الوجبة كليًا من حساب المستخدم. الآن: صفر لمس لأي بيانات حقيقية إلا لو
+  // فعلاً فيه رقم بالنص الخام (نفس المصدر الوحيد المعتمَد، صفر ثقة بمعامل من Gemini).
+  if (findLeadingNumber(ctx.rawText) === null && mealState.loadPending(ctx.user) === null) {
+    return { ok: false, local_reply: "شكد تريد تخليها بالضبط؟ اكتبلي رقم.", rejection_reason: "NO_QUANTITY_FOUND" };
+  }
+
+  let pending = mealState.loadPending(ctx.user);
+  if (!pending) {
+    const reopened = await directLog.reopenMealForEdit(ctx.repo, ctx.user, ctx.now);
+    if (!reopened) return { ok: false, local_reply: null, rejection_reason: "NOTHING_TO_UPDATE" };
+    pending = reopened as unknown as PendingMeal;
+  }
+
+  const [ok, msg] = await corrections.changeLastQuantity(pending, ctx.rawText);
+  if (!ok) {
+    // فشل غير متوقَّع (مثلاً pending موجود لكن بلا عناصر إطلاقًا) — لو كان reopen حصل بهذا
+    // الاستدعاء نفسه، لازم نحفظه كمسوّدة عادية (مو نتركه عالقًا بلا MealLog ولا pending محفوظ).
+    await mealState.savePending(ctx.repo, ctx.user, pending);
+    return { ok: false, local_reply: msg, rejection_reason: "NO_QUANTITY_FOUND" };
+  }
+
+  await mealState.savePending(ctx.repo, ctx.user, pending);
+  return { ok: true, local_reply: `${msg}\n\n${summarizePending(pending)}`, requires_confirmation: true };
 }
 
 /**
@@ -62,12 +108,31 @@ export const logMeal: CJTool<Record<string, never>, LogMealToolResult> = {
     "(مثل \"شكد سعرات البيتزا؟\" أو \"مشتهي بيتزا\" أو \"راح آكل بيتزا\") — هذي حالات يُرفض فيها الاستدعاء هيكليًا " +
     "بغض النظر عن أي معامل تمرره، لأن المصدر الوحيد المعتمَد هو النص الأصلي نفسه. يشتغل أيضًا لرد " +
     "تأكيد قصير صرف (\"ثبت\"/\"اي\") بعد سؤالك \"أثبته؟\" — بس لازم يكون آخر استدعاء get_food_nutrition " +
-    "مرّر for_logging:true.",
+    "مرّر for_logging:true. **لو استدعيتها بالغلط لرسالة هي فعليًا تصحيح كمية وجبة سابقة (مثل \"لا " +
+    "خليها 3\")، Backend يرفض الطلب الحرفي وينفّذ التصحيح الصحيح بدلاً عنه تلقائيًا (راجع " +
+    "redirected_from_log_meal_to_update بالنتيجة) — هذا خط دفاع إضافي، مو بديل عن استدعاء " +
+    "update_meal مباشرة أصلاً كما توثّقه هي.**",
   parameters: { type: "OBJECT", properties: {} },
   mutates: true,
   async execute(ctx: ToolExecContext): Promise<LogMealToolResult> {
-    const { authorized } = isConsumptionAuthorized(ctx.rawText, ctx.ctxFlags);
+    const { authorized, localIntent } = isConsumptionAuthorized(ctx.rawText, ctx.ctxFlags);
     if (!authorized) {
+      // **Correction Guard** (خط الدفاع النهائي، backend لا يثق باختيار Gemini للأداة إطلاقًا):
+      // لو المحرك المحلي الحتمي نفسه صنّف الرسالة كـCORRECTION/CHANGE_QUANTITY (يعتمد على بيانات
+      // حقيقية: has_pending أو has_undoable_log خلال آخر 5 دقائق فقط — راجع intents.ts's
+      // detectIntent)، فهذا يعني فعليًا "فيه وجبة حديثة قابلة للتعديل وهذي رسالة تصحيح كميتها" —
+      // ننفّذ التصحيح الصحيح بدل رفض عام غامض، بغض النظر شنو أداة طلبها Gemini حرفيًا. هذا بالضبط
+      // ما يمنع Bug حقيقي حي اكتُشف: "خلي البيض 3 حبات مو 2" كانت تُنشئ وجبة مكرَّرة بكمية خاطئة
+      // (بيضة وحدة بدل 3) لأن Gemini اختار log_meal بدل update_meal — الآن النتيجة الفعلية لا
+      // تعتمد على اختيار Gemini للأداة إطلاقًا، فقط على تحليل backend المستقل للنص + الحالة الحقيقية.
+      if (localIntent === CORRECTION || localIntent === CHANGE_QUANTITY) {
+        const updateResult = await performMealUpdate(ctx);
+        return {
+          ok: updateResult.ok, meal_logged: false, local_reply: updateResult.local_reply,
+          redirected_from_log_meal_to_update: true, requires_confirmation: updateResult.requires_confirmation,
+          rejection_reason: updateResult.rejection_reason,
+        };
+      }
       return (await tryConfirmActiveFood(ctx)) ?? { ok: false, meal_logged: false, local_reply: null, rejection_reason: "NOT_A_CONSUMPTION_STATEMENT" };
     }
     const { reply, meal_logged, ...rest } = await runMealLoggingPipeline(ctx.repo, ctx.user, ctx.rawText, ctx.now);
@@ -167,15 +232,6 @@ export const undoLastMeal: CJTool<Record<string, never>, directLog.UndoResult> =
   },
 };
 
-export interface UpdateMealToolResult {
-  ok: boolean;
-  local_reply: string | null;
-  /** true لو التعديل انطبّق على مسوّدة (pending) لسا ما انسجّلت رسميًا — لازم تأكيد صريح لاحق
-   *  قبل ما تنسجّل فعليًا بقاعدة البيانات (نفس ضمان "لا تسجيل بدون تأكيد" الأصلي، صفر استثناء هنا). */
-  requires_confirmation?: boolean;
-  rejection_reason?: "NOTHING_TO_UPDATE" | "NO_QUANTITY_FOUND";
-}
-
 /**
  * "أكلت دولمة" (DIRECT_LOG فوري) ثم "لا خليها 3 حبات" — بدون هذي الأداة، Gemini بوضع ACTIVE كان
  * يرد نصيًا بس صفر تأثير حقيقي (Bug حقيقي اكتُشف بالبحث: decision.kind==="text" يرجع فورًا من
@@ -202,31 +258,7 @@ export const updateMeal: CJTool<Record<string, never>, UpdateMealToolResult> = {
   parameters: { type: "OBJECT", properties: {} },
   mutates: true,
   async execute(ctx: ToolExecContext): Promise<UpdateMealToolResult> {
-    // فحص وجود رقم قابل للاستخدام **قبل** أي فتح/حذف حقيقي — يمنع حالة خطيرة: رسالة تصحيح بلا رقم
-    // واضح كانت (بالتصميم الأول) تحذف الوجبة المسجَّلة فعليًا (DIRECT_LOG reopen) بدون ما تحفظ أي
-    // مسوّدة بديلة، فتختفي الوجبة كليًا من حساب المستخدم. الآن: صفر لمس لأي بيانات حقيقية إلا لو
-    // فعلاً فيه رقم بالنص الخام (نفس المصدر الوحيد المعتمَد، صفر ثقة بمعامل من Gemini).
-    if (findLeadingNumber(ctx.rawText) === null && mealState.loadPending(ctx.user) === null) {
-      return { ok: false, local_reply: "شكد تريد تخليها بالضبط؟ اكتبلي رقم.", rejection_reason: "NO_QUANTITY_FOUND" };
-    }
-
-    let pending = mealState.loadPending(ctx.user);
-    if (!pending) {
-      const reopened = await directLog.reopenMealForEdit(ctx.repo, ctx.user, ctx.now);
-      if (!reopened) return { ok: false, local_reply: null, rejection_reason: "NOTHING_TO_UPDATE" };
-      pending = reopened as unknown as PendingMeal;
-    }
-
-    const [ok, msg] = await corrections.changeLastQuantity(pending, ctx.rawText);
-    if (!ok) {
-      // فشل غير متوقَّع (مثلاً pending موجود لكن بلا عناصر إطلاقًا) — لو كان reopen حصل بهذا
-      // الاستدعاء نفسه، لازم نحفظه كمسوّدة عادية (مو نتركه عالقًا بلا MealLog ولا pending محفوظ).
-      await mealState.savePending(ctx.repo, ctx.user, pending);
-      return { ok: false, local_reply: msg, rejection_reason: "NO_QUANTITY_FOUND" };
-    }
-
-    await mealState.savePending(ctx.repo, ctx.user, pending);
-    return { ok: true, local_reply: `${msg}\n\n${summarizePending(pending)}`, requires_confirmation: true };
+    return performMealUpdate(ctx);
   },
 };
 
