@@ -50,8 +50,26 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [showConsult, setShowConsult] = useState(false);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
   const { t } = useI18n();
+
+  // Auto-scroll ذكي: يمرّر تلقائيًا بس إذا المستخدم أصلًا قريب من الأسفل — لو صعد يقرأ رسائل
+  // قديمة، ما نقاطعه؛ بدلها يظهر زر "↓ رسائل جديدة" صغير يمرّر عند الضغط بس.
+  function handleMessagesScroll() {
+    const el = messagesRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    nearBottomRef.current = nearBottom;
+    if (nearBottom) setShowJumpToBottom(false);
+  }
+
+  function jumpToBottom() {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowJumpToBottom(false);
+  }
 
   useEffect(() => {
     api.get<MeResponse>("/me").then((res) => {
@@ -91,7 +109,11 @@ export default function Chat() {
   }, [navigate]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (nearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    } else if (messages.length > 0) {
+      setShowJumpToBottom(true);
+    }
   }, [messages, sending]);
 
   /**
@@ -240,7 +262,7 @@ export default function Chat() {
           </div>
         )}
 
-        <div className="chat-messages">
+        <div className="chat-messages" ref={messagesRef} onScroll={handleMessagesScroll}>
           {messages.length === 0 && (
             <>
               {justOnboarded && <div className="bubble bot">{t("chat.welcomeMessage")}</div>}
@@ -301,13 +323,21 @@ export default function Chat() {
           })}
           {sending && (
             <div className="bubble bot typing-bubble" aria-label={t("chat.typingLabel")}>
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
+              <span className="typing-label">{t("chat.typingLabel")}</span>
+              <span className="typing-dots">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </span>
             </div>
           )}
           <div ref={bottomRef} />
         </div>
+        {showJumpToBottom && (
+          <button type="button" className="jump-to-bottom-btn" onClick={jumpToBottom}>
+            ↓ {t("chat.jumpToBottom")}
+          </button>
+        )}
 
         {allPrompts.length > 0 && (
           <div className="quick-prompts">

@@ -450,8 +450,10 @@ body {
 .calorie-card {
   background: var(--surface-solid);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
 }
 .cc-label { margin: 0 0 6px; font-size: 0.85rem; color: var(--text-muted); }
 .cc-value { margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--heading); }
@@ -540,6 +542,15 @@ body {
   flex-direction: column;
   gap: 4px;
 }
+/* زر "رسائل جديدة" (Auto-scroll ذكي) — يظهر بس لو المستخدم صاعد يقرا رسائل قديمة ووصلت رسالة
+   جديدة، بدل ما نقاطعه بتمرير تلقائي لا يريده. */
+.jump-to-bottom-btn {
+  align-self: center; margin: -6px 0 4px; padding: 6px 16px; border-radius: var(--radius-pill);
+  background: var(--surface-solid); border: 1px solid var(--border); color: var(--text);
+  font-size: 0.8rem; cursor: pointer; box-shadow: var(--shadow-sm);
+  animation: page-fade-in var(--motion-fast) ease;
+}
+.jump-to-bottom-btn:hover { background: var(--moss); color: #fff; border-color: var(--moss); }
 .bubble {
   max-width: 75%;
   padding: 10px 14px;
@@ -552,7 +563,9 @@ body {
 .bubble-new-turn { margin-top: 8px; }
 .bubble.user { align-self: flex-end; background: var(--moss); color: #fff; }
 .bubble.bot { align-self: flex-start; background: var(--surface-solid); border: 1px solid var(--border); color: var(--text); }
-.typing-bubble { display: flex; align-items: center; gap: 5px; padding: 14px 16px; }
+.typing-bubble { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+.typing-label { font-size: 0.82rem; color: var(--text-muted); }
+.typing-dots { display: flex; align-items: center; gap: 5px; }
 .typing-dot {
   width: 7px;
   height: 7px;
@@ -604,8 +617,11 @@ body {
 .qp-btn {
   flex-shrink: 0; background: var(--surface-solid); border: 1px solid var(--border); color: var(--text);
   border-radius: 999px; padding: 8px 16px; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease,
+              border-color var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 .qp-btn:hover { background: var(--moss); color: #fff; border-color: var(--moss); }
+.qp-btn:active { transform: scale(0.96); }
 
 /* ---- عناصر مشتركة إضافية (وصفات/Onboarding/يومي/وزن) ---- */
 .container { max-width: 1100px; margin: 0 auto; padding: 48px 20px 64px; }
@@ -652,9 +668,12 @@ body {
 @media (max-width: 600px) { .recipe-grid { grid-template-columns: 1fr; } }
 .recipe-card {
   display: flex; flex-direction: column; background: var(--surface-solid); border: 1px solid var(--border); border-radius: 24px;
-  overflow: hidden; text-decoration: none; color: inherit; transition: transform 0.15s ease;
+  overflow: hidden; text-decoration: none; color: inherit;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
 }
-.recipe-card:hover { transform: translateY(-3px); }
+.recipe-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.recipe-card:active { transform: translateY(-1px) scale(0.99); }
 .recipe-card-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; background: var(--surface); }
 .recipe-card-img-placeholder {
   width: 100%; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;
@@ -679,14 +698,15 @@ body {
 .chat-recipe-card .recipe-card-btn { font-size: 0.78rem; padding: 0 12px; height: 30px; }
 
 /* بطاقة تغذية غنية بعد تسجيل وجبة فعلي بالشات — نفس القواعد البصرية بالضبط لـ.recipe-macro-box
-   (شبكة 4 خلايا، رقم بارز + تسمية تحته)، بحجم مضغوط يناسب عرض فقاعة الرسالة. صفر box-shadow
-   (نفس اتفاقية كل بطاقات التطبيق). الأرقام تجي حرفيًا من نفس totals اللي تُكتب لقاعدة البيانات
-   — البطاقة عرض بصري فقط، لا تحسب شي بنفسها. */
+   (شبكة 4 خلايا، رقم بارز + تسمية تحته)، بحجم مضغوط يناسب عرض فقاعة الرسالة. ظل خفيف جدًا
+   (--shadow-sm، حزمة تحسين UI/UX تستبدل قرار "صفر box-shadow" القديم — نفس السبب المذكور
+   بتقرير الفحص: التسطّح الكامل جزء من إحساس "رخيص"). الأرقام تجي حرفيًا من نفس totals اللي
+   تُكتب لقاعدة البيانات — البطاقة عرض بصري فقط، لا تحسب شي بنفسها. */
 .nutrition-card { max-width: 320px; margin: 6px 0 10px; }
 .nutrition-card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .nutrition-card-cell {
-  background: var(--surface-solid); border: 1px solid var(--border); border-radius: 12px;
-  padding: 8px 4px; text-align: center;
+  background: var(--surface-solid); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 4px; text-align: center; box-shadow: var(--shadow-sm);
 }
 .nutrition-card-cell .val { font-weight: 700; color: var(--heading); font-size: 0.92rem; margin: 0; }
 .nutrition-card-cell .lbl { font-size: 0.68rem; color: var(--text-muted); margin: 2px 0 0; }
@@ -887,9 +907,11 @@ body {
 .assistant-action-label { font-size: 0.88rem; font-weight: 600; }
 .assistant-action-desc { font-size: 0.76rem; color: var(--text-muted); }
 
-/* ---- أزرار Nudge (تنبيه أكل قليل جدًا) — نفس شكل .qp-btn داخل فقاعة رد البوت ---- */
+/* ---- أزرار Nudge (تنبيه أكل قليل جدًا) — نفس شكل .qp-btn، بس حدّ ذهبي خفيف يميّزها بصريًا عن
+   quick-prompts العادية (هذي اقتراح استباقي من البوت نفسه، مو خيار سريع عام). ---- */
 .nudge-actions { padding: 6px 0 0; margin: 0; }
-.nudge-action-btn { font-size: 0.8rem; }
+.nudge-action-btn { font-size: 0.8rem; border-color: var(--gold); }
+.nudge-action-btn:hover { background: var(--gold); color: var(--earth); border-color: var(--gold); }
 
 /* ---- "حول التطبيق والشروط" — إصدار/تغييرات/مطور/أسئلة شائعة/إخلاء مسؤولية/شروط/خصوصية ---- */
 .about-app-modal { max-width: 560px; }
