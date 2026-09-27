@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useI18n, type TranslationKey } from "../i18n/I18nContext";
 
@@ -31,9 +31,12 @@ const NAV_GROUPS: NavGroup[] = [
 
 export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, onOpenConsult, onOpenTournament }: SidebarProps) {
   const [open, setOpen] = useState(false);
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const location = useLocation();
+  const activeGroupKey = NAV_GROUPS.find((g) => g.items.some((i) => i.to === location.pathname))?.key ?? null;
+  const [openGroup, setOpenGroup] = useState<string | null>(activeGroupKey);
   const navigate = useNavigate();
   const { t } = useI18n();
+  const isActive = (to: string) => location.pathname === to;
 
   async function logout() {
     await api.post("/auth/logout");
@@ -55,7 +58,7 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
         </div>
         <nav className="sidebar-nav">
           <p className="sidebar-group-title">{t("sidebar.groupHome")}</p>
-          <Link className="sidebar-item" to="/chat" onClick={() => setOpen(false)}>{t("sidebar.chat")}</Link>
+          <Link className={`sidebar-item ${isActive("/chat") ? "active" : ""}`} to="/chat" onClick={() => setOpen(false)}>{t("sidebar.chat")}</Link>
 
           {NAV_GROUPS.map((group) => (
             <div key={group.key} className="sidebar-group">
@@ -66,7 +69,7 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
               {openGroup === group.key && (
                 <div className="sidebar-group-body">
                   {group.items.map((item) => (
-                    <Link key={item.to} className="sidebar-item" to={item.to} onClick={() => setOpen(false)}>{t(item.labelKey)}</Link>
+                    <Link key={item.to} className={`sidebar-item ${isActive(item.to) ? "active" : ""}`} to={item.to} onClick={() => setOpen(false)}>{t(item.labelKey)}</Link>
                   ))}
                 </div>
               )}
@@ -90,14 +93,14 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
             </>
           )}
 
-          <Link className="sidebar-item sidebar-item-highlight" to="/subscribe" onClick={() => setOpen(false)}>{t("sidebar.subscribe")}</Link>
+          <Link className={`sidebar-item sidebar-item-highlight ${isActive("/subscribe") ? "active" : ""}`} to="/subscribe" onClick={() => setOpen(false)}>{t("sidebar.subscribe")}</Link>
 
           <p className="sidebar-group-title">{t("sidebar.groupSettings")}</p>
-          <Link className="sidebar-item" to="/settings" onClick={() => setOpen(false)}>{t("sidebar.settings")}</Link>
-          {isAdmin && <Link className="sidebar-item" to="/admin" onClick={() => setOpen(false)}>{t("sidebar.admin")}</Link>}
+          <Link className={`sidebar-item ${isActive("/settings") ? "active" : ""}`} to="/settings" onClick={() => setOpen(false)}>{t("sidebar.settings")}</Link>
+          {isAdmin && <Link className={`sidebar-item ${isActive("/admin") ? "active" : ""}`} to="/admin" onClick={() => setOpen(false)}>{t("sidebar.admin")}</Link>}
         </nav>
         <div className="sidebar-bottom">
-          <Link className="sidebar-item sidebar-item-profile" to="/profile" onClick={() => setOpen(false)}>
+          <Link className={`sidebar-item sidebar-item-profile ${isActive("/profile") ? "active" : ""}`} to="/profile" onClick={() => setOpen(false)}>
             {photoUrl ? <img src={photoUrl} alt="" className="sidebar-avatar" /> : <span>👤</span>} {userName}
           </Link>
           <button className="sidebar-item" onClick={logout}>{t("sidebar.logout")}</button>

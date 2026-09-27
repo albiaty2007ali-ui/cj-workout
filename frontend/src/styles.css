@@ -29,6 +29,49 @@
   --danger: #b91c1c;
   --danger-bg: #fdeeee;
   --danger-border: rgba(185, 27, 27, 0.3);
+
+  /* ---- Design tokens (حزمة تحسين UI/UX) — تُضاف فوگ الموجود، صفر حذف/إعادة تسمية لأي متغيّر
+     ثيم حالي. مو ألوان، فلا تحتاج تعريف مختلف بكل [data-theme] — نفس القيم بكل الثيمات. ---- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  /* Type scale حقيقي — .font-display وغيرها تستخدمها بدل fontSize مخترَع بكل مكان استدعاء. */
+  --fs-caption: 0.78rem;
+  --fs-body: 0.92rem;
+  --fs-subtitle: 1.05rem;
+  --fs-title: 1.25rem;
+  --fs-display: 1.6rem;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 250ms;
+}
+
+/* Dark surfaces تحتاج ظل أقوى شوي حتى يبان أصلًا فوگ خلفية غامقة (نفس الظل الفاتح يذوب). */
+[data-theme="dark"],
+[data-theme="midnight"], [data-theme="ocean"], [data-theme="emerald"],
+[data-theme="sunset"], [data-theme="aurora"], [data-theme="carbon"] {
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* يحترم تفضيل تقليل الحركة — يصفّر مدة كل transition/animation (الجديدة والقديمة) بدل تعطيلها
+   واحدة واحدة. نمط قياسي معروف، يطابق قسم 7/26 من طلب المستخدم حرفيًا. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 [data-theme="dark"] {
@@ -120,6 +163,14 @@
     --danger-bg: rgba(153, 27, 27, 0.18);
     --danger-border: rgba(255, 138, 138, 0.35);
   }
+}
+
+/* انتقال ناعم بين الصفحات (حزمة تحسين UI/UX) — PageTransition.tsx يضيف key={pathname} على هذا
+   الغلاف، فيلعب الدخول من جديد كل تنقّل. صفر لمس لـ<Routes>/<Route>/Navigate، غلاف عرض بصري بحت. */
+.page-transition { animation: page-fade-in var(--motion-base) ease; }
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 * { box-sizing: border-box; }
@@ -261,14 +312,25 @@ body {
   text-decoration: none;
   background: none;
   border: none;
-  text-align: right;
+  text-align: start;
   font-size: 0.95rem;
   cursor: pointer;
   width: 100%;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+  border-inline-start: 3px solid transparent;
 }
 
 .sidebar-item:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* حالة الصفحة الحالية (حزمة تحسين UI/UX) — أول Active-state حقيقي بالتنقّل، Sidebar.tsx يضيف
+   هذا الصنف عبر useLocation() مقارنةً بـto الحقيقي لكل رابط. */
+.sidebar-item.active {
+  background: rgba(76, 122, 94, 0.22);
+  border-inline-start-color: var(--moss);
+  font-weight: 700;
+  color: #fff;
 }
 
 .sidebar-item-profile {
@@ -329,6 +391,17 @@ body {
   color: var(--text);
 }
 
+/* صنف بطاقة أساسي موحّد (حزمة تحسين UI/UX) — يُضاف كصنف إضافي فوگ .calorie-card/.recipe-card/
+   .meal-slot-card/.admin-nav-card/.admin-stat-card إلخ بدل ما كل وحدة تعرّف نفس الثلاث خواص
+   (خلفية/حدّ/radius) لحالها من جديد. صفر حذف لأي صنف قائم — إضافة فوگ، الأصناف الخاصة تبقى
+   للفروقات الحقيقية (padding/gap/hover مختلف لكل نوع بطاقة). */
+.card {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
 .field textarea {
   padding: 10px 12px;
   border: 1px solid var(--border-input);
@@ -345,14 +418,19 @@ body {
   justify-content: center;
   padding: 0 18px;
   height: 38px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
   cursor: pointer;
   border: none;
   font-size: 0.95rem;
   background: var(--moss);
   color: #fff;
+  transition: filter var(--motion-fast) ease, transform var(--motion-fast) ease, opacity var(--motion-fast) ease;
 }
+/* Micro-feedback موحّد لكل متغيّرات الزر (بدل لون hover مخصَّص لكل واحد) — يشتغل فوگ أي خلفية
+   بلا حاجة نعرف لون كل متغيّر مسبقًا. */
+.btn:not(:disabled):hover { filter: brightness(1.08); }
+.btn:not(:disabled):active { transform: scale(0.97); filter: brightness(0.97); }
 /* المُعدِّلات بعد .btn الأساسية عمدًا — نفس التخصيصية (Class واحد)، ترتيب الملف يقرر الفائز */
 .btn-moss { background: var(--moss); color: #fff; }
 .btn-outline-dark {
@@ -361,6 +439,8 @@ body {
   border: 1px solid var(--heading);
 }
 .btn-outline-dark:hover { background: rgba(76, 122, 94, 0.1); }
+/* يوحّد 3 نسخ inline مكرَّرة (Settings.tsx حذف الحساب، UserDetailModal.tsx حظر) بصنف وحد. */
+.btn-danger { background: var(--danger); color: #fff; }
 
 .calorie-cards {
   display: grid;
@@ -752,7 +832,7 @@ body {
 }
 .sidebar-group-header {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
-  padding: 11px 20px; color: #eee; background: none; border: none; text-align: right;
+  padding: 11px 20px; color: #eee; background: none; border: none; text-align: start;
   font-size: 0.95rem; cursor: pointer;
 }
 .sidebar-group-header:hover { background: rgba(255, 255, 255, 0.08); }
@@ -765,10 +845,25 @@ body {
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 50;
   display: flex; align-items: center; justify-content: center; padding: 20px;
+  animation: modal-overlay-in var(--motion-base) ease;
 }
+.modal-overlay.closing { animation: modal-overlay-out var(--motion-base) ease forwards; }
 .modal-card {
   position: relative; background: var(--surface-solid); border: 1px solid var(--border); border-radius: 18px;
   padding: 24px; max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto; color: var(--text);
+  box-shadow: var(--shadow-md);
+  animation: modal-card-in var(--motion-base) ease;
+}
+.modal-overlay.closing .modal-card { animation: modal-card-out var(--motion-base) ease forwards; }
+@keyframes modal-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes modal-card-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes modal-card-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.96) translateY(6px); }
 }
 .modal-close-btn {
   position: absolute; inset-inline-end: 14px; top: 14px; background: none; border: none;

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import PageTransition from "./components/PageTransition";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -29,6 +30,7 @@ import AdminFeedback from "./pages/admin/AdminFeedback";
 
 export default function App() {
   return (
+    <PageTransition>
     <Routes>
       <Route path="/" element={<Navigate to="/chat" replace />} />
       <Route path="/login" element={<Login />} />
@@ -61,5 +63,6 @@ export default function App() {
       <Route path="/admin/feedback" element={<AdminFeedback />} />
       <Route path="*" element={<Navigate to="/chat" replace />} />
     </Routes>
+    </PageTransition>
   );
 }
