@@ -931,7 +931,7 @@ body {
 .assistant-menu-body { margin-top: 12px; display: flex; flex-direction: column; gap: 18px; }
 .assistant-menu-group-title { font-weight: 700; color: var(--heading); margin: 0 0 8px; font-size: 0.95rem; }
 .assistant-menu-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-@media (max-width: 560px) { .assistant-menu-actions { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .assistant-menu-actions { grid-template-columns: 1fr; } }
 .assistant-action-card {
   display: flex; align-items: flex-start; gap: 10px; text-align: start; background: var(--surface);
   border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; cursor: pointer; color: var(--text);
