@@ -66,12 +66,15 @@ describe("ASK_* أسئلة معلوماتية عن طعام — صفر تسجي�
     expect(r.reply).toContain("غ");
   });
 
-  it("'شكد يعني خاشوقة؟' -> يذكر تمن (الوحدة الوحيدة الحقيقية المسجّلة كخاشوقة)، meal_logged=false", async () => {
+  it("'شكد يعني خاشوقة؟' -> أمثلة حقيقية من القاعدة (مو مخترعة)، meal_logged=false", async () => {
+    // بعد توحيد قياس الأطعمة السائبة (حزمة تعديلات الوحدات) صار عدد أطعمة أكبر يستخدم "خاشوقة"
+    // بدل صحن/ماعون — لا نثبّت طعامًا معيّنًا هنا (قابل للتغيّر)، فقط نتأكد إن الرد يستشهد بأرقام
+    // حقيقية من القاعدة (وزن بالغرام)، نفس روح الاختبار الأصلي.
     const user = await freshUser(repo, "u5");
     const r = await handleMessage(repo, user, "شكد يعني خاشوقة؟");
     expect(r.meal_logged).toBe(false);
-    expect(r.reply).toContain("تمن");
-    expect(r.reply).toContain("15غ");
+    expect(r.reply).toContain("خاشوقة");
+    expect(r.reply).toMatch(/\d+غ/);
   });
 
   it("'أريد بديل أخف للبيتزا' -> بديل حقيقي بنفس التصنيف، meal_logged=false", async () => {

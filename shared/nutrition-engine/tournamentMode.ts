@@ -1,5 +1,5 @@
 /**
- * "عندي بطولة" (Tournament Deficit Mode) — عجز سريع مؤقت للتحضير قبل بطولة رياضية. يخصم 1000
+ * "عندي بطولة" (Tournament Deficit Mode) — عجز سريع مؤقت للتحضير قبل بطولة رياضية. يخصم 500
  * سعرة من الهدف الحقيقي المحسوب أصلًا، بحد أدنى آمن غير قابل للتجاوز (safety.MIN_SAFE_CALORIES
  * — نفس الثابت المستخدَم لحساب الهدف الأصلي، صفر رقم أمان جديد مخترَع). يرجع تلقائيًا للهدف
  * الأصلي بعد انتهاء عدد الأيام المحدَّد — checkAndRevertIfExpired هي النقطة الوحيدة اللي تفحص
@@ -10,9 +10,9 @@ import * as safety from "./safety.js";
 import { todayBaghdadIso } from "./iraqTime.js";
 import type { Repository, NutritionProfileRecord } from "./db/repository.js";
 
-export const DEFICIT_KCAL = 1000;
+export const DEFICIT_KCAL = 500;
 export const MIN_DAYS = 1;
-export const MAX_DAYS = 14;
+export const MAX_DAYS = 35;
 
 export interface ActivateResult {
   ok: boolean;

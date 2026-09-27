@@ -8,10 +8,10 @@ import { describe, it, expect } from "vitest";
 import { matchMessage } from "../foodSearch.js";
 
 describe("matchMessage — أطعمة/أسماء عراقية جديدة أو aliases مضافة", () => {
-  it("'اكلت صحن صغير قيمة' -> قيمة (طعام جديد، food_id=59)، صحن صغير 250غ", async () => {
-    const r = await matchMessage("اكلت صحن صغير قيمة");
+  it("'اكلت خاشوقة قيمة' -> قيمة (طعام جديد، food_id=59)، خاشوقة 25غ (بعد توحيد قياس الأطعمة السائبة)", async () => {
+    const r = await matchMessage("اكلت خاشوقة قيمة");
     expect(r).toHaveLength(1);
-    expect(r[0]).toMatchObject({ food_id: 59, food_name: "قيمة", resolved: true, grams: 250 });
+    expect(r[0]).toMatchObject({ food_id: 59, food_name: "قيمة", resolved: true, grams: 25 });
   });
 
   it("'اكلت صمون حجري' -> صمون (alias جديد لطعام موجود، food_id=6 كما هو)", async () => {

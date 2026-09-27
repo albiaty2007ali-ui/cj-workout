@@ -9,7 +9,7 @@ interface TournamentStatus {
   current_target: number;
 }
 
-/** "عندي بطولة" — عجز -1000 سعرة مؤقت، محسوب بالكامل بالكود (shared/nutrition-engine/
+/** "عندي بطولة" — عجز -500 سعرة مؤقت، محسوب بالكامل بالكود (shared/nutrition-engine/
  * tournamentMode.ts) بحد أدنى آمن، يرجع تلقائيًا للهدف الأصلي بعد المدة — صفر تدخل AI بهذا
  * القرار، صفر رقم مخترَع (الخصم حسابي بسيط، الحد الأدنى ثابت أمان موجود أصلًا بالمشروع). */
 export default function TournamentModal({ onClose }: { onClose: () => void }) {
@@ -29,7 +29,7 @@ export default function TournamentModal({ onClose }: { onClose: () => void }) {
   async function activate() {
     setError(null);
     const n = Number(days);
-    if (!Number.isInteger(n) || n < 1 || n > 14) { setError("اختر عدد أيام بين 1 و14."); return; }
+    if (!Number.isInteger(n) || n < 1 || n > 35) { setError("اختر عدد أيام بين 1 و35."); return; }
     setBusy(true);
     const res = await api.post<{ ok: boolean }>("/tournament-mode?action=activate", { days: n });
     setBusy(false);
@@ -50,8 +50,8 @@ export default function TournamentModal({ onClose }: { onClose: () => void }) {
         <button type="button" className="modal-close-btn" aria-label={t("common.close")} onClick={onClose}>✕</button>
         <p className="font-display" style={{ fontSize: "1.2rem", fontWeight: 700, marginTop: 0 }}>🏆 عندي بطولة</p>
         <p style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>
-          هذا النظام مخصص للرياضيين للتحضير السريع قبل البطولات، حيث يتم خصم 1000 سعرة حرارية من
-          هدفك اليومي لخلق عجز قوي وسريع. يرجى استخدامه بحذر — الخصم محسوب دائمًا بحد أدنى آمن
+          هذا النظام مخصص للرياضيين للتحضير قبل البطولات، حيث يتم خصم 500 سعرة حرارية من
+          هدفك اليومي لخلق عجز إضافي. يرجى استخدامه بحذر — الخصم محسوب دائمًا بحد أدنى آمن
           ثابت (1200 سعرة للذكر / 1000 للأنثى)، ما ينزل تحته إطلاقًا مهما كان هدفك الأصلي.
         </p>
 
@@ -66,8 +66,8 @@ export default function TournamentModal({ onClose }: { onClose: () => void }) {
         ) : (
           <div style={{ marginTop: 4 }}>
             <div className="field">
-              <label>عدد الأيام (1-14)</label>
-              <input type="number" min={1} max={14} value={days} onChange={(e) => setDays(e.target.value)} />
+              <label>عدد الأيام (1-35)</label>
+              <input type="number" min={1} max={35} value={days} onChange={(e) => setDays(e.target.value)} />
             </div>
             {error && <p className="field-error">{error}</p>}
             <button type="button" className="btn btn-moss" disabled={busy} onClick={activate} style={{ marginTop: 8 }}>

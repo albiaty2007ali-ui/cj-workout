@@ -95,7 +95,7 @@ FOODS_SEED = [
         "name": "معكرونة", "category": "نشويات", "is_bulk": True,
         "nutrients_per_100g": {"calories": 158, "protein": 5.8, "carbs": 31, "fat": 0.9, "fiber": 1.8},
         "aliases": [{"text": "معكرونة", "multiplier": 1}, {"text": "مكرونة", "multiplier": 1}, {"text": "باستا", "multiplier": 1}],
-        "portions": [{"name": "صحن صغير", "grams": 150}, {"name": "صحن متوسط", "grams": 220}],
+        "portions": [{"name": "خاشوقة", "grams": 20}],
     },
     {
         "name": "بطاطا مقلية", "category": "نشويات", "is_bulk": True,
@@ -121,25 +121,25 @@ FOODS_SEED = [
         "name": "تشريب", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 140, "protein": 8, "carbs": 12, "fat": 6, "fiber": 1},
         "aliases": [{"text": "تشريب", "multiplier": 1}],
-        "portions": [{"name": "صحن صغير", "grams": 300}, {"name": "صحن متوسط", "grams": 400}],
+        "portions": [{"name": "خاشوقة", "grams": 25}],
     },
     {
         "name": "برياني", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 165, "protein": 7, "carbs": 20, "fat": 6, "fiber": 1},
         "aliases": [{"text": "برياني", "multiplier": 1}],
-        "portions": [{"name": "صحن صغير", "grams": 300}, {"name": "صحن متوسط", "grams": 400}],
+        "portions": [{"name": "خاشوقة", "grams": 20}],
     },
     {
         "name": "مرق", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 90, "protein": 6, "carbs": 5, "fat": 5, "fiber": 1.5},
         "aliases": [{"text": "مرق", "multiplier": 1}, {"text": "مرگة", "multiplier": 1}, {"text": "مرقة", "multiplier": 1}],
-        "portions": [{"name": "صحن صغير", "grams": 250}, {"name": "صحن متوسط", "grams": 350}],
+        "portions": [{"name": "خاشوقة", "grams": 20}],
     },
     {
         "name": "قوزي", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 200, "protein": 10, "carbs": 18, "fat": 10, "fiber": 1},
         "aliases": [{"text": "قوزي", "multiplier": 1}, {"text": "كوزي", "multiplier": 1}],
-        "portions": [{"name": "صحن صغير", "grams": 300}, {"name": "صحن متوسط", "grams": 400}],
+        "portions": [{"name": "خاشوقة", "grams": 20}],
     },
     {
         "name": "كبة", "category": "أكلات عراقية", "is_bulk": True,
@@ -158,7 +158,7 @@ FOODS_SEED = [
         "name": "باجة", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 190, "protein": 15, "carbs": 6, "fat": 12, "fiber": 0},
         "aliases": [{"text": "باجة", "multiplier": 1}, {"text": "پاچة", "multiplier": 1}],
-        "portions": [{"name": "صحن", "grams": 300}],
+        "portions": [{"name": "خاشوقة", "grams": 25}],
     },
 
     # ---------------- لحوم ودجاج (Bulk) ----------------
@@ -235,7 +235,7 @@ FOODS_SEED = [
         "name": "سلطة", "category": "سلطات", "is_bulk": True,
         "nutrients_per_100g": {"calories": 25, "protein": 1, "carbs": 4, "fat": 0.5, "fiber": 1.5},
         "aliases": [{"text": "سلطة", "multiplier": 1}, {"text": "زلاطة", "multiplier": 1}, {"text": "سلاطة", "multiplier": 1}],
-        "portions": [{"name": "صحن صغير", "grams": 150}, {"name": "صحن متوسط", "grams": 250}],
+        "portions": [{"name": "خاشوقة", "grams": 20}],
     },
 
     # ---------------- وجبات سريعة (Discrete — تُطلب كوحدة عادة) ----------------
@@ -400,7 +400,7 @@ FOODS_SEED = [
         "name": "تبسي باذنجان", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 180, "protein": 7, "carbs": 12, "fat": 12, "fiber": 2.5},
         "aliases": [{"text": "تبسي باذنجان", "multiplier": 1}, {"text": "تبسي بادنجان", "multiplier": 1}, {"text": "باذنجان بالفرن", "multiplier": 1}],
-        "portions": [{"name": "ماعون صغير", "grams": 300}, {"name": "ماعون متوسط", "grams": 375}, {"name": "ماعون كبير", "grams": 450}],
+        "portions": [{"name": "خاشوقة", "grams": 25}],
     },
     {
         "name": "بورك", "category": "وجبات سريعة", "is_bulk": False,
@@ -451,7 +451,7 @@ FOODS_SEED = [
         "name": "قيمة", "category": "أكلات عراقية", "is_bulk": True,
         "nutrients_per_100g": {"calories": 175, "protein": 9, "carbs": 16, "fat": 8, "fiber": 2.5},
         "aliases": [{"text": "قيمة", "multiplier": 1}, {"text": "قيمه", "multiplier": 1}],
-        "portions": [{"name": "صحن صغير", "grams": 250}, {"name": "صحن متوسط", "grams": 350}],
+        "portions": [{"name": "خاشوقة", "grams": 25}],
     },
     {
         "name": "أندومي", "category": "وجبات سريعة", "is_bulk": False,
@@ -487,5 +487,23 @@ FOODS_SEED = [
         "nutrients_per_100g": {"calories": 32, "protein": 0, "carbs": 8, "fat": 0, "fiber": 0},
         "aliases": [{"text": "شاي بالسكر", "multiplier": 1}, {"text": "چاي بالسكر", "multiplier": 1}, {"text": "چاي حلو", "multiplier": 1}],
         "portions": [{"name": "استكان", "grams": 100}],
+    },
+
+    # ---------------- إضافات وجبات سريعة (تُلحَق بآخر القائمة عمدًا، نفس السبب الموثَّق أعلاه —
+    # صفر إزاحة لـfood_id أي طعام موجود) ----------------
+    {
+        # شاورما دجاج — أخف دهنًا من "شاورما" أعلاه (لحم/مختلطة عادة)، طعام منفصل بتغذية حقيقية
+        # مختلفة لا مجرد alias. "كص دجاج" هو نفس اسم "شاورما" الدارج بالعراقي لكن بالدجاج تحديدًا.
+        "name": "شاورما دجاج", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 220, "protein": 16, "carbs": 21, "fat": 8, "fiber": 1.5},
+        "aliases": [{"text": "شاورما دجاج", "multiplier": 1}, {"text": "كص دجاج", "multiplier": 1}],
+        "portions": [{"name": "لفة", "grams": 220}],
+    },
+    {
+        # لفة فلافل — فلافل + خبز/صمون + خضار وصوص، طعام منفصل عن "فلافل" أعلاه (حبات مفردة بلا خبز)
+        "name": "لفة فلافل", "category": "وجبات سريعة", "is_bulk": False,
+        "nutrients_per_100g": {"calories": 250, "protein": 8, "carbs": 33, "fat": 9, "fiber": 4},
+        "aliases": [{"text": "لفة فلافل", "multiplier": 1}, {"text": "ساندويچ فلافل", "multiplier": 1}, {"text": "سندويچ فلافل", "multiplier": 1}],
+        "portions": [{"name": "لفة", "grams": 250}],
     },
 ]

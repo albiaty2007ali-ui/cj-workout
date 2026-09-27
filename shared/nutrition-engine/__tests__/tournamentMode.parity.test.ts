@@ -24,37 +24,45 @@ async function freshUser(repo: InMemoryRepository, id: string, overrides: Partia
 }
 
 describe("tournamentMode.activate", () => {
-  it("يخصم 1000 سعرة بالضبط عن الهدف الحقيقي (2249 -> 1249)", async () => {
+  it("يخصم 500 سعرة بالضبط عن الهدف الحقيقي (2249 -> 1749)", async () => {
     const repo = new InMemoryRepository();
     const profile = await freshUser(repo, "t1");
     const result = await tournamentMode.activate(repo, profile, 3, new Date("2026-01-01T10:00:00Z"));
     expect(result.ok).toBe(true);
-    expect(result.new_target).toBe(1249);
-    expect(profile.calorie_target).toBe(1249);
+    expect(result.new_target).toBe(1749);
+    expect(profile.calorie_target).toBe(1749);
     expect(profile.tournament_original_target).toBe(2249);
   });
 
-  it("يرفض عدد أيام خارج المدى (0 أو 15)", async () => {
+  it("يرفض عدد أيام خارج المدى (0 أو 36)", async () => {
     const repo = new InMemoryRepository();
     const profile = await freshUser(repo, "t2");
     expect((await tournamentMode.activate(repo, profile, 0)).ok).toBe(false);
-    expect((await tournamentMode.activate(repo, { ...profile, tournament_deficit_until: null }, 15)).ok).toBe(false);
+    expect((await tournamentMode.activate(repo, { ...profile, tournament_deficit_until: null }, 36)).ok).toBe(false);
+  });
+
+  it("يقبل الحد الأقصى الجديد (35 يوم)", async () => {
+    const repo = new InMemoryRepository();
+    const profile = await freshUser(repo, "t2b");
+    const result = await tournamentMode.activate(repo, profile, 35, new Date("2026-01-01T10:00:00Z"));
+    expect(result.ok).toBe(true);
+    expect(result.until).toBe("2026-02-05");
   });
 
   it("حد أدنى آمن صارم — لا ينزل الهدف عن 1200 للذكر مهما كان الهدف الأصلي منخفضًا", async () => {
     const repo = new InMemoryRepository();
-    const profile = await freshUser(repo, "t3", { calorie_target: 1900, sex: "male" });
+    const profile = await freshUser(repo, "t3", { calorie_target: 1600, sex: "male" });
     const result = await tournamentMode.activate(repo, profile, 5);
-    // 1900 - 1000 = 900، أقل من 1200 -> يُثبَّت عند 1200 بالضبط
+    // 1600 - 500 = 1100، أقل من 1200 -> يُثبَّت عند 1200 بالضبط
     expect(result.new_target).toBe(1200);
     expect(profile.calorie_target).toBe(1200);
   });
 
   it("حد أدنى آمن للأنثى (1000) مختلف عن الذكر (1200)", async () => {
     const repo = new InMemoryRepository();
-    const profile = await freshUser(repo, "t4", { calorie_target: 1700, sex: "female" });
+    const profile = await freshUser(repo, "t4", { calorie_target: 1400, sex: "female" });
     const result = await tournamentMode.activate(repo, profile, 5);
-    // 1700 - 1000 = 700، أقل من 1000 -> يُثبَّت عند 1000 بالضبط
+    // 1400 - 500 = 900، أقل من 1000 -> يُثبَّت عند 1000 بالضبط
     expect(result.new_target).toBe(1000);
   });
 
@@ -89,7 +97,7 @@ describe("checkAndRevertIfExpired — عبر context.build() (النقطة ال�
 
     const stillWithin = new Date("2026-01-02T10:00:00Z"); // يوم واحد بعد، لسا ضمن 3 أيام
     const ctx = await build(repo, "t7", profile, stillWithin);
-    expect(ctx.target_calories).toBe(1249);
+    expect(ctx.target_calories).toBe(1749);
   });
 
   it("بعد انتهاء المدة -> يرجّع تلقائيًا للهدف الأصلي بدون أي تدخل يدوي", async () => {
