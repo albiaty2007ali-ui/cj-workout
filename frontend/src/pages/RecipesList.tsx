@@ -102,12 +102,22 @@ export default function RecipesList() {
 
         <div className="recipe-grid">
           {loading && Array.from({ length: 6 }).map((_, i) => (
-            <div className="recipe-card" key={i} style={{ pointerEvents: "none", opacity: 0.5 }}>
-              <div className="recipe-card-img-placeholder">⏳</div>
+            <div className="recipe-card" key={i} style={{ pointerEvents: "none" }}>
+              <div className="skeleton" style={{ aspectRatio: "4/3", borderRadius: 0 }} />
+              <div className="recipe-card-body">
+                <div className="skeleton" style={{ height: 16, width: "70%" }} />
+                <div className="skeleton" style={{ height: 12, width: "40%" }} />
+                <div className="skeleton" style={{ height: 12, width: "90%" }} />
+              </div>
             </div>
           ))}
           {!loading && error && (
-            <div className="recipe-error"><span className="emoji">⚠️</span>صار خطأ بجلب الوصفات، حاول مرة ثانية.</div>
+            <div className="recipe-error">
+              <span className="emoji">⚠️</span>صار خطأ بجلب الوصفات، حاول مرة ثانية.
+              <button type="button" className="btn btn-outline-dark" style={{ display: "block", margin: "14px auto 0" }} onClick={() => fetchRecipes(query, category)}>
+                🔄 إعادة المحاولة
+              </button>
+            </div>
           )}
           {!loading && !error && shown.length === 0 && (
             <div className="recipe-empty"><span className="emoji">🍽️</span>لا توجد وصفات بهذا التصنيف حاليًا — راح تُضاف وصفات حقيقية قريبًا.</div>

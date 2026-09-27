@@ -688,7 +688,11 @@ body {
 .recipe-card-img { width: 100%; aspect-ratio: 4/3; object-fit: cover; background: var(--surface); }
 .recipe-card-img-placeholder {
   width: 100%; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;
-  font-size: 2.4rem; background: var(--surface);
+  font-size: 2.4rem;
+  /* تدرّج هادئ من ألوان الهوية بدل خلفية مسطّحة واحدة + إيموجي عائم وحيد — أقرب لإحساس "غلاف
+     وصفة" حقيقي بدون أي صورة فعلية (لا توجد أصول تصميم/صور بالمشروع). */
+  background: linear-gradient(135deg, var(--moss) 0%, var(--forest) 100%);
+  filter: saturate(0.85);
 }
 .recipe-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .recipe-card-name { font-weight: 700; font-size: 1rem; color: var(--heading); margin: 0; }
@@ -725,7 +729,8 @@ body {
 .recipe-hero-img { width: 100%; max-height: 340px; object-fit: cover; border-radius: 24px; }
 .recipe-hero-placeholder {
   width: 100%; height: 220px; display: flex; align-items: center; justify-content: center;
-  font-size: 4rem; background: var(--surface); border-radius: 24px;
+  font-size: 4rem; border-radius: 24px; box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, var(--moss) 0%, var(--forest) 100%); filter: saturate(0.85);
 }
 .recipe-meta-row { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; color: var(--text-muted); font-size: 0.88rem; }
 .recipe-servings-stepper { display: inline-flex; align-items: center; gap: 6px; }
@@ -735,20 +740,20 @@ body {
 }
 .recipe-servings-stepper button:disabled { opacity: 0.4; cursor: default; }
 .recipe-macro-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
-.recipe-macro-box { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: center; }
+.recipe-macro-box { background: var(--surface-solid); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; text-align: center; box-shadow: var(--shadow-sm); }
 .recipe-macro-box .val { font-weight: 700; color: var(--heading); font-size: 1.05rem; margin: 0; }
 .recipe-macro-box .lbl { font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 0; }
 
 .ingredient-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 16px; padding: 0; }
-.ingredient-list li { display: flex; justify-content: space-between; background: var(--surface-solid); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; color: var(--text); }
+.ingredient-list li { display: flex; justify-content: space-between; background: var(--surface-solid); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; color: var(--text); box-shadow: var(--shadow-sm); }
 .ingredient-qty { color: var(--text-muted); font-size: 0.85rem; }
 .sub-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-.sub-item { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; color: var(--text); }
+.sub-item { background: var(--surface-solid); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; font-size: 0.88rem; color: var(--text); box-shadow: var(--shadow-sm); }
 
 .tutorial-progress-bar { height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; margin: 16px 0 6px; }
 .tutorial-progress-fill { height: 100%; background: var(--moss); transition: width 0.25s ease; }
 .tutorial-progress-label { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px; }
-.tutorial-step-card { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 24px; padding: 28px; min-height: 160px; color: var(--text); }
+.tutorial-step-card { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 24px; padding: 28px; min-height: 160px; color: var(--text); box-shadow: var(--shadow-sm); }
 .tutorial-step-number { font-weight: 700; color: var(--moss); font-size: 0.85rem; margin: 0; }
 .tutorial-step-text { font-size: 1.15rem; margin-top: 10px; line-height: 1.8; }
 .tutorial-step-extra { margin-top: 14px; font-size: 0.9rem; color: var(--text-muted); }
