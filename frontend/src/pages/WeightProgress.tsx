@@ -98,7 +98,7 @@ export default function WeightProgress() {
       <main className="container" style={{ maxWidth: 720 }}>
         <div className="topbar">
           <Link to="/chat">{backArrow()} رجوع للشات</Link>
-          <Link to="/daily" style={{ color: "var(--text-muted)" }}>🍽️ يومي الغذائي</Link>
+          <Link to="/daily" style={{ color: "var(--text-muted)" }}>🍽️ غذائي اليومي</Link>
         </div>
 
         <h1 className="font-display">⚖️ متابعة الوزن</h1>

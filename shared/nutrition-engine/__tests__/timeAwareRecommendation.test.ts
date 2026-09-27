@@ -47,6 +47,7 @@ describe("طلب صريح لوجبة لا يُرفَض بسبب الوقت", () 
     const user = await freshUser(repo, "u3");
     const r = await handleMessage(repo, user, "شنو آكل هسه؟", LATE_NIGHT_UTC);
     expect(r.meal_logged).toBe(false);
-    expect(r.reply.length).toBeGreaterThan(0);
+    expect(r.reply).toBeTruthy();
+    expect((r.reply ?? "").length).toBeGreaterThan(0);
   });
 });

@@ -54,6 +54,8 @@ export interface MeResponse {
   ai_status: "ok" | "not_configured";
   email_verified: boolean;
   email: string;
+  notification_prompt_shown: boolean;
+  theme: string;
 }
 
 export interface SuggestedRecipe {

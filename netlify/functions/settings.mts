@@ -17,6 +17,11 @@ import { getVapidPublicKey } from "../../shared/nutrition-engine/notifications/p
 
 const AI_STYLES = new Set(["concise", "balanced", "detailed"]);
 const VISIBILITY_OPTIONS = new Set(["public", "private"]);
+// أسماء الثيمات (حزمة تطوير الثيمات) — مصدر الحقيقة الوحيد لأسماء الثيمات الصالحة بالـbackend؛
+// frontend/src/lib/themes.ts يطابقها حرفيًا (تعريف CSS لكل اسم بـstyles.css).
+const FREE_THEMES = new Set(["light", "dark"]);
+const PREMIUM_THEMES = new Set(["midnight", "ocean", "emerald", "sunset", "aurora", "carbon"]);
+const THEMES = new Set([...FREE_THEMES, ...PREMIUM_THEMES]);
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
@@ -51,6 +56,25 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       if (!AI_STYLES.has(style)) return jsonError(400, "VALIDATION_ERROR", "خيار غير صحيح");
       await userRef.set({ ai_response_style: style }, { merge: true });
       return jsonOk({ style });
+    }
+
+    // مودال تفعيل الإشعارات بعد الدخول (حزمة تطوير الوقت/الإشعارات) — يُستدعى مرة وحدة (تفعيل
+    // أو تجاهل، كلاهما "شوهد") فيختفي للأبد لهذا المستخدم، محفوظ بالـbackend لا localStorage.
+    if (action === "dismiss-notif-prompt") {
+      await userRef.set({ notification_prompt_shown: true }, { merge: true });
+      return jsonOk({ notification_prompt_shown: true });
+    }
+
+    if (action === "theme") {
+      const theme = body.theme;
+      if (!THEMES.has(theme)) return jsonError(400, "VALIDATION_ERROR", "ثيم غير معروف");
+      if (PREMIUM_THEMES.has(theme)) {
+        const repo = new FirestoreRepository();
+        const user = await repo.findUser(claims.sub);
+        if (!user?.is_premium) return jsonError(403, "PREMIUM_REQUIRED", "هذا الثيم متاح للمشتركين فقط");
+      }
+      await userRef.set({ theme }, { merge: true });
+      return jsonOk({ theme });
     }
 
     if (action === "privacy") {

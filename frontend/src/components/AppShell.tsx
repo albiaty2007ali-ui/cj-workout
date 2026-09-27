@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import AssistantMenu from "./AssistantMenu";
 import ConsultModal from "./ConsultModal";
 import TournamentModal from "./TournamentModal";
+import NotificationPromptModal from "./NotificationPromptModal";
 import type { AssistantAction } from "../lib/assistantActions";
 
 interface AppShellProps {
@@ -48,6 +49,7 @@ export default function AppShell({ userName, isAdmin, photoUrl, onQuickPrompt, c
       {showAssistant && <AssistantMenu onAction={handleAssistantAction} onClose={() => setShowAssistant(false)} />}
       {showConsult && <ConsultModal onClose={() => setShowConsult(false)} />}
       {showTournament && <TournamentModal onClose={() => setShowTournament(false)} />}
+      <NotificationPromptModal />
     </div>
   );
 }

@@ -510,6 +510,12 @@ export interface UserDisplayFields {
   /** تفضيل لغة الواجهة — "ar" افتراضي. الردود الفعلية بالشات (Gemini/القوالب) لسا عربي فقط
    * بغض النظر عن هذا الحقل، هذا يخص واجهة React فقط بالمرحلة الحالية. */
   language: "ar" | "en";
+  /** هل عُرض مودال تفعيل الإشعارات بعد الدخول لهذا المستخدم مرة وحدة أصلاً — false افتراضي،
+   * يُضبَط true دائمًا (تفعيل أو تجاهل) عبر settings.mts's action=dismiss-notif-prompt. */
+  notification_prompt_shown: boolean;
+  /** اسم الثيم المختار — "light"/"dark" مجانيين، البقية Premium (يُتحقَّق بالـbackend عبر
+   * settings.mts's action=theme، صفر ثقة بالواجهة فقط). */
+  theme: string;
 }
 
 export async function getUserDisplayFields(db: Firestore, userId: string): Promise<UserDisplayFields | null> {
@@ -522,6 +528,8 @@ export async function getUserDisplayFields(db: Firestore, userId: string): Promi
     profile_visibility: d.profile_visibility ?? "public", role: d.role ?? "user",
     intro_completed: d.intro_completed ?? false,
     language: d.language === "en" ? "en" : "ar",
+    notification_prompt_shown: d.notification_prompt_shown === true,
+    theme: typeof d.theme === "string" ? d.theme : "dark",
   };
 }
 
