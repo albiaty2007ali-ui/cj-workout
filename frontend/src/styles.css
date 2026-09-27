@@ -191,11 +191,11 @@ body {
 }
 .auth-card {
   background: var(--surface-solid);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   padding: 32px;
   width: 100%;
   max-width: 380px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-sm);
 }
 .auth-card h1 {
   margin: 0 0 24px;
