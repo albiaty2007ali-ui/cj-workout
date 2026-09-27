@@ -385,10 +385,11 @@ body {
 .notice-box {
   background: var(--surface-solid);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   padding: 18px 20px;
   margin-top: 16px;
   color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Skeleton Loading حقيقي (حزمة تحسين UI/UX) — بدل ظهور المحتوى فجأة أو قفز الـlayout أثناء أول
@@ -502,8 +503,8 @@ body {
 /* ---- شارة المستوى التجميلية (Profile) ---- */
 .level-badge-banner {
   display: flex; align-items: center; gap: 12px;
-  background: var(--surface-solid); border: 1px solid var(--gold); border-radius: 14px;
-  padding: 12px 16px; margin-top: 16px;
+  background: var(--surface-solid); border: 1px solid var(--gold); border-radius: var(--radius-md);
+  padding: 12px 16px; margin-top: 16px; box-shadow: var(--shadow-sm);
 }
 .level-badge-banner .badge-icon { font-size: 1.8rem; line-height: 1; }
 .level-badge-banner .badge-title { font-weight: 700; color: var(--heading); margin: 0; }
@@ -787,15 +788,21 @@ body {
 
 /* ---- متابعة الوزن ---- */
 .weight-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 20px 0; }
-.weight-chart-wrap { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 20px 0; }
+/* padding/margin فقط — الخلفية/الحدّ/الـradius يجيوا من .notice-box (تُستخدَم دائمًا سوا بالـJSX،
+   تكرارهم هنا كان بلا فائدة — نفس القيم بالضبط، صفر فرق بصري بالإزالة). */
+.weight-chart-wrap { padding: 16px; margin: 20px 0; }
 .weight-period-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .weight-period-tabs button { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; color: var(--text); }
 .weight-period-tabs button.active { background: var(--moss); color: #fff; border-color: var(--moss); }
 .weight-log-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .weight-log-form input { border: 1px solid var(--border-input); background: var(--surface-solid); color: var(--text); border-radius: 999px; padding: 0 14px; height: 38px; }
 .weight-history-list { list-style: none; padding: 0; margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-.weight-history-list li { display: flex; justify-content: space-between; align-items: center; background: var(--surface-solid); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; color: var(--text); }
-.weight-history-list button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; }
+.weight-history-list li { display: flex; justify-content: space-between; align-items: center; background: var(--surface-solid); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 0.88rem; color: var(--text); box-shadow: var(--shadow-sm); }
+.weight-history-list button {
+  background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem;
+  padding: 4px 8px; border-radius: var(--radius-sm); transition: background-color var(--motion-fast) ease;
+}
+.weight-history-list button:hover { background: var(--danger-bg); }
 .weekly-change-note { color: var(--text-muted); font-size: 0.85rem; }
 
 /* ---- لوحة الإدارة ---- */
