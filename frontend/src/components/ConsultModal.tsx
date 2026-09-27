@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { useI18n } from "../i18n/I18nContext";
+import { useModalTransition } from "../lib/useModalTransition";
 
 interface ConsultInfo {
   whatsapp_link: string;
@@ -12,6 +13,8 @@ export default function ConsultModal({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const [info, setInfo] = useState<ConsultInfo | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const { closing, requestClose } = useModalTransition(onClose);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.get<ConsultInfo>("/consult").then((res) => {
@@ -20,10 +23,12 @@ export default function ConsultModal({ onClose }: { onClose: () => void }) {
     });
   }, []);
 
+  useEffect(() => { cardRef.current?.focus(); }, []);
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="modal-close-btn" aria-label={t("common.close")} onClick={onClose}>✕</button>
+    <div className={`modal-overlay${closing ? " closing" : ""}`} onClick={requestClose}>
+      <div className="modal-card" ref={cardRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close-btn" aria-label={t("common.close")} onClick={requestClose}>✕</button>
         <p className="font-display" style={{ fontSize: "1.2rem", fontWeight: 700, marginTop: 0 }}>
           {t("consult.title")}
         </p>

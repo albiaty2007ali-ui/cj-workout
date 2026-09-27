@@ -519,7 +519,7 @@ export default function Settings() {
         <div className="notice-box" style={{ borderColor: "var(--danger)" }}>
           <h3 style={{ marginTop: 0, color: "var(--danger)" }}>منطقة الخطر</h3>
           {!confirmingDelete ? (
-            <button className="btn" style={{ background: "var(--danger)" }} onClick={() => setConfirmingDelete(true)}>
+            <button className="btn btn-danger" onClick={() => setConfirmingDelete(true)}>
               حذف الحساب
             </button>
           ) : (
@@ -530,7 +530,7 @@ export default function Settings() {
               </div>
               {deleteError && <p className="field-error">{deleteError}</p>}
               <div style={{ display: "flex", gap: 10 }}>
-                <button className="btn" style={{ background: "var(--danger)" }} type="submit">تأكيد الحذف</button>
+                <button className="btn btn-danger" type="submit">تأكيد الحذف</button>
                 <button className="btn btn-outline-dark" type="button" onClick={() => setConfirmingDelete(false)}>إلغاء</button>
               </div>
             </form>

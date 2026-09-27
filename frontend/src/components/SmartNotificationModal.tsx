@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { isAnyModalOpen } from "../lib/modalCoordinator";
 import { useI18n } from "../i18n/I18nContext";
+import { useModalTransition } from "../lib/useModalTransition";
 
 const POLL_INTERVAL_MS = 4 * 60 * 1000; // 4 دقائق — بطيء عمدًا، غير مزعج
 
@@ -22,6 +23,9 @@ function isTypingNow(): boolean {
 export default function SmartNotificationModal() {
   const { t } = useI18n();
   const [notif, setNotif] = useState<{ id: string; text: string } | null>(null);
+  const { closing, requestClose } = useModalTransition(() => setNotif(null));
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (notif) cardRef.current?.focus(); }, [notif]);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,9 +45,9 @@ export default function SmartNotificationModal() {
   if (!notif) return null;
 
   return (
-    <div className="modal-overlay" onClick={() => setNotif(null)}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="modal-close-btn" aria-label={t("common.close")} onClick={() => setNotif(null)}>✕</button>
+    <div className={`modal-overlay${closing ? " closing" : ""}`} onClick={requestClose}>
+      <div className="modal-card" ref={cardRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close-btn" aria-label={t("common.close")} onClick={requestClose}>✕</button>
         <p style={{ margin: "8px 0 0", fontSize: "1rem", lineHeight: 1.7 }}>{notif.text}</p>
       </div>
     </div>

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { MEAL_LABELS } from "../../i18n/translations";
+import { useModalTransition } from "../../lib/useModalTransition";
 
 interface DetailResponse {
   profile_info: {
@@ -40,6 +41,9 @@ export default function UserDetailModal({ userId, onClose }: { userId: string; o
   const [banCustomHours, setBanCustomHours] = useState("");
   const [banBusy, setBanBusy] = useState(false);
   const [banMsg, setBanMsg] = useState("");
+  const { closing, requestClose } = useModalTransition(onClose);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { cardRef.current?.focus(); }, []);
 
   function load() {
     api.get<DetailResponse>(`/admin/users?action=detail&id=${userId}`).then((res) => {
@@ -117,9 +121,9 @@ export default function UserDetailModal({ userId, onClose }: { userId: string; o
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card modal-card-wide" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="modal-close-btn" aria-label="إغلاق" onClick={onClose}>✕</button>
+    <div className={`modal-overlay${closing ? " closing" : ""}`} onClick={requestClose}>
+      <div className="modal-card modal-card-wide" ref={cardRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close-btn" aria-label="إغلاق" onClick={requestClose}>✕</button>
 
         {error && <p className="field-error">{error}</p>}
         {!data && !error && <p style={{ color: "var(--text-muted)" }}>...</p>}
@@ -249,7 +253,7 @@ export default function UserDetailModal({ userId, onClose }: { userId: string; o
                     <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(72)}>3 أيام</button>
                     <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(168)}>7 أيام</button>
                     <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(720)}>30 يوم</button>
-                    <button className="btn" style={{ background: "var(--danger)", color: "#fff" }} disabled={banBusy} onClick={() => ban("permanent")}>
+                    <button className="btn btn-danger" disabled={banBusy} onClick={() => ban("permanent")}>
                       🚫 حظر دائم
                     </button>
                   </div>

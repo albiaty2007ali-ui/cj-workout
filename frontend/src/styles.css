@@ -906,6 +906,10 @@ body {
   animation: modal-card-in var(--motion-base) ease;
 }
 .modal-overlay.closing .modal-card { animation: modal-card-out var(--motion-base) ease forwards; }
+/* .modal-card صار قابل للتركيز (tabIndex=-1، حزمة إدارة التركيز بالمودالات) — outline مخصَّص
+   خفيف بدل حلقة المتصفح الافتراضية الثقيلة حول كل البطاقة. */
+.modal-card:focus { outline: 2px solid var(--moss); outline-offset: 2px; }
+.modal-card:focus:not(:focus-visible) { outline: none; }
 @keyframes modal-overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-overlay-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes modal-card-in {

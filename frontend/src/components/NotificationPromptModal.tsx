@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type MeResponse } from "../lib/api";
 import { pushSupported, currentSubscription, subscribeToPush } from "../lib/push";
 import { useI18n } from "../i18n/I18nContext";
+import { useModalTransition } from "../lib/useModalTransition";
 
 const SHOW_AFTER_MS = 45_000;
 
@@ -18,6 +19,8 @@ export default function NotificationPromptModal() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { closing, requestClose } = useModalTransition(() => setVisible(false));
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +42,7 @@ export default function NotificationPromptModal() {
   }, []);
 
   async function dismiss() {
-    setVisible(false);
+    requestClose();
     await api.post("/settings?action=dismiss-notif-prompt", {});
   }
 
@@ -62,11 +65,13 @@ export default function NotificationPromptModal() {
     }
   }
 
+  useEffect(() => { if (visible) cardRef.current?.focus(); }, [visible]);
+
   if (!visible) return null;
 
   return (
-    <div className="modal-overlay" onClick={dismiss}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-overlay${closing ? " closing" : ""}`} onClick={dismiss}>
+      <div className="modal-card" ref={cardRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <p className="font-display" style={{ fontSize: "1.2rem", fontWeight: 700, marginTop: 0 }}>
           🔔 {t("notifPrompt.title")}
         </p>
