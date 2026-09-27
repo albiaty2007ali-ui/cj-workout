@@ -289,7 +289,7 @@ function LoggedMealControls({
   return (
     <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
       <button type="button" className="btn btn-outline-dark" disabled={busy} onClick={onEdit}>{t("daily.editButton")}</button>
-      <button type="button" className="btn btn-outline-dark" disabled={busy} onClick={onDelete}>{t("daily.deleteButton")}</button>
+      <button type="button" className="btn btn-outline-danger" disabled={busy} onClick={onDelete}>{t("daily.deleteButton")}</button>
     </div>
   );
 }
@@ -378,6 +378,20 @@ export default function Daily() {
 
         <h1 className="font-display">{t("daily.pageTitle")}</h1>
 
+        {!data && (
+          <div style={{ marginTop: 24 }}>
+            <div className="calorie-cards">
+              <div className="skeleton" style={{ height: 64 }} />
+              <div className="skeleton" style={{ height: 64 }} />
+            </div>
+            <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div className="skeleton" key={i} style={{ height: 88 }} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {data && !data.meals && (
           <div className="notice-box" style={{ marginTop: 24 }}>{t("daily.needsProfile")}</div>
         )}
@@ -442,7 +456,7 @@ export default function Daily() {
                       </>
                     ) : (
                       <>
-                        <p className="meal-slot-status">⏳ {t("daily.loggedStatus")}</p>
+                        <p className="meal-slot-status"><span className="meal-slot-empty-icon">⏳</span>{t("daily.loggedStatus")}</p>
                         {data.is_today && budget ? <p className="meal-slot-budget">{t("daily.suggestedBudget")}{budget} kcal</p> : null}
                         {data.is_today && <Link to="/chat" className="btn btn-outline-dark" style={{ marginTop: 8, display: "inline-block" }}>{t("daily.whatToEatButton")}</Link>}
                       </>
@@ -476,7 +490,7 @@ export default function Daily() {
                     </div>
                   ))
                 ) : (
-                  <p className="meal-slot-status">⏳ {t("daily.loggedStatus")}</p>
+                  <p className="meal-slot-status"><span className="meal-slot-empty-icon">⏳</span>{t("daily.loggedStatus")}</p>
                 )}
                 {data.is_today && <Link to="/chat" className="btn btn-outline-dark" style={{ marginTop: 8, display: "inline-block" }}>{t("daily.addSnackButton")}</Link>}
                 {data.is_today && (

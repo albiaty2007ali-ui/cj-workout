@@ -391,6 +391,17 @@ body {
   color: var(--text);
 }
 
+/* Skeleton Loading حقيقي (حزمة تحسين UI/UX) — بدل ظهور المحتوى فجأة أو قفز الـlayout أثناء أول
+   تحميل. shimmer بسيط بـCSS فقط (transform+opacity، يحترم prefers-reduced-motion تلقائيًا عبر
+   القاعدة العامة بالأعلى). */
+.skeleton {
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  opacity: 0.5;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.6; } }
+
 /* صنف بطاقة أساسي موحّد (حزمة تحسين UI/UX) — يُضاف كصنف إضافي فوگ .calorie-card/.recipe-card/
    .meal-slot-card/.admin-nav-card/.admin-stat-card إلخ بدل ما كل وحدة تعرّف نفس الثلاث خواص
    (خلفية/حدّ/radius) لحالها من جديد. صفر حذف لأي صنف قائم — إضافة فوگ، الأصناف الخاصة تبقى
@@ -749,7 +760,15 @@ body {
 .btn-block { width: 100%; }
 
 /* ---- يومي الغذائي ---- */
-.meal-slot-card { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; }
+.meal-slot-card {
+  background: var(--surface-solid); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+}
+.meal-slot-empty-icon { font-size: 1.4rem; opacity: 0.6; margin-inline-end: 4px; }
+/* زر إجراء هدّام بحدّ أحمر فقط (مو تعبئة كاملة) — حذف وجبة مسجَّلة أخف حدّة من "حظر حساب" مثلًا،
+   بس لازم يبين مختلف عن "تعديل" العادي بجنبه. */
+.btn-outline-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn-outline-danger:hover { background: var(--danger-bg); }
 .meal-slot-header { display: flex; justify-content: space-between; align-items: center; }
 .meal-slot-title { font-weight: 700; color: var(--heading); margin: 0; }
 .meal-slot-status { font-size: 0.8rem; color: var(--text-muted); }
