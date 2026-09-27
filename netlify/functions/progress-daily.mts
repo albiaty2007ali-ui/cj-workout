@@ -9,7 +9,7 @@
 import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreRepository, getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreRepository.js";
-import { authenticateRequest, isEmailVerified } from "../../shared/nutrition-engine/auth.js";
+import { authenticateRequest, isEmailVerified, checkBanStatus } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import * as calculator from "../../shared/nutrition-engine/calculator.js";
 import * as mealBudget from "../../shared/nutrition-engine/mealBudget.js";
@@ -97,6 +97,12 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     // متاحة، هذا خاص فقط بالتحوّرات (نفس نطاق طلب المستخدم: "تسجيل الوجبات")
     if (!isEmailVerified(claims)) {
       return jsonError(403, "EMAIL_NOT_VERIFIED", "أكّد بريدك الإلكتروني أول حتى تگدر تسجّل وجبات.");
+    }
+    const banStatus = await checkBanStatus(getFirestore(getFirebaseApp()), claims.sub);
+    if (banStatus.banned) {
+      return jsonError(403, "ACCOUNT_BANNED", "هذا الحساب محظور.", {
+        reason: banStatus.reason ?? "", expires_at: banStatus.expires_at ?? "", permanent: String(banStatus.permanent),
+      });
     }
     try {
       return await handlePost(req, claims);

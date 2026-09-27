@@ -49,6 +49,11 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     if (existing) {
       if (existing.disabled) return jsonError(403, "ACCOUNT_DISABLED", "هذا الحساب معطّل، تواصل مع الإدارة");
+      if (existing.ban.banned) {
+        return jsonError(403, "ACCOUNT_BANNED", "هذا الحساب محظور.", {
+          reason: existing.ban.reason ?? "", expires_at: existing.ban.expires_at ?? "", permanent: String(existing.ban.permanent),
+        });
+      }
       // Google تثبت ملكية البريد فعليًا بنفس لحظة الدخول — يفعّل حساب موجود ما زال غير مؤكَّد
       // (سجّل سابقًا بكلمة مرور ولم يدخل كود التحقق) بدل إبقائه محظورًا بلا داعٍ
       await db.collection("users").doc(existing.id).set({ google_id: googleId, email_verified: true }, { merge: true });

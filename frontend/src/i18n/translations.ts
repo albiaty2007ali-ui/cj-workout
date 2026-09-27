@@ -82,6 +82,14 @@ export const translations = {
       whatsappButton: "تواصل عبر واتساب",
       unavailable: "قناة الاستشارة غير متوفرة حاليًا، جرب لاحقًا.",
     },
+    banned: {
+      title: "تم تقييد حسابك",
+      reasonLabel: "السبب",
+      permanent: "هذا الحظر دائم.",
+      expiresLabel: "ينتهي الحظر في",
+      genericBody: "حسابك محظور حاليًا من استخدام CJ FOOD.",
+      logout: "تسجيل الخروج",
+    },
     themes: {
       premiumSectionTitle: "✨ ثيمات مميزة",
       preview: "معاينة",

@@ -10,6 +10,7 @@ interface UserRow {
   created_at: string | null; xp: number; streak_days: number; free_meals_used: number;
   is_premium: boolean; subscription_end_date: string | null; tournament_active: boolean;
   calorie_target: number | null; category: "free" | "paid" | "tournament";
+  ban: { banned: boolean; permanent: boolean; reason: string | null; expires_at: string | null };
 }
 
 interface Stats { total_users: number; total_subscribers: number; active_today: number; meals_logged_today: number; }
@@ -83,6 +84,7 @@ export default function AdminUsers() {
               <p style={{ fontWeight: 700, color: "var(--heading)", margin: 0 }}>
                 {u.name || "(بدون اسم)"} <span className={`admin-badge admin-badge-${u.category}`}>{CATEGORY_LABELS[u.category]}</span>
                 {!u.email_verified && <span className="admin-badge admin-badge-unverified" style={{ marginInlineStart: 6 }}>غير مؤكَّد</span>}
+                {u.ban.banned && <span className="admin-badge admin-badge-banned" style={{ marginInlineStart: 6 }}>🚫 محظور</span>}
               </p>
               <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: "4px 0 0" }}>{u.email}</p>
               <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "4px 0 0" }}>

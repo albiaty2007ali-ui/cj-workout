@@ -108,6 +108,10 @@ export default function Chat() {
     try {
       const res = await api.post<ChatReply>("/chat", { message: text });
       if (!res.success) {
+        if (res.error?.code === "ACCOUNT_BANNED") {
+          navigate("/account-banned", { state: { ban: res.error.details } });
+          return;
+        }
         const message =
           res.error?.code === "TRIAL_EXHAUSTED"
             ? t("chat.trialExhausted")

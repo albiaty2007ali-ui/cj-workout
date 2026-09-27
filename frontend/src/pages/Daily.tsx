@@ -342,7 +342,10 @@ export default function Daily() {
     setActionError(null);
     const res = await api.post(`/progress/daily?action=update`, { id, ...values });
     setBusyId(null);
-    if (!res.success) { setActionError(t("daily.actionError")); return; }
+    if (!res.success) {
+      if (res.error?.code === "ACCOUNT_BANNED") { navigate("/account-banned", { state: { ban: res.error.details } }); return; }
+      setActionError(t("daily.actionError")); return;
+    }
     setEditingId(null);
     await reload();
   }
@@ -353,7 +356,10 @@ export default function Daily() {
     setActionError(null);
     const res = await api.post(`/progress/daily?action=delete`, { id });
     setBusyId(null);
-    if (!res.success) { setActionError(t("daily.actionError")); return; }
+    if (!res.success) {
+      if (res.error?.code === "ACCOUNT_BANNED") { navigate("/account-banned", { state: { ban: res.error.details } }); return; }
+      setActionError(t("daily.actionError")); return;
+    }
     await reload();
   }
 

@@ -125,6 +125,7 @@ export interface UserCredentials {
   disabled: boolean;
   role: string;
   email_verified: boolean;
+  ban: BanStatus;
 }
 
 export async function findUserCredentialsByEmail(db: Firestore, email: string): Promise<UserCredentials | null> {
@@ -135,7 +136,42 @@ export async function findUserCredentialsByEmail(db: Firestore, email: string): 
   return {
     id: doc.id, password_hash: d.password_hash ?? null, disabled: d.disabled ?? false, role: d.role ?? "user",
     email_verified: d.email_verified === true, // undefined (حسابات قبل هذي الميزة) -> false عمدًا
+    ban: deriveBanStatus(d),
   };
+}
+
+// ---- نظام حظر الحسابات (حزمة تطوير الحظر) — حقول Firestore خام على مستند المستخدم، نفس نمط
+// disabled أعلاه (بوابة وصول، لا منطق أعمال يحتاج اختبار عبر InMemoryRepository).
+
+export interface BanStatus {
+  banned: boolean;
+  permanent: boolean;
+  reason: string | null;
+  expires_at: string | null; // ISO، null لو دائم أو غير محظور
+}
+
+const NOT_BANNED: BanStatus = { banned: false, permanent: false, reason: null, expires_at: null };
+
+/** يقارن ban_expires_at بالوقت الحالي (انتهاء تلقائي كسول، بلا Cron) — يُستدعى من أي مكان يقرأ
+ *  مستند مستخدم خام فيه حقول حظر محتملة. */
+export function deriveBanStatus(d: FirebaseFirestore.DocumentData): BanStatus {
+  const status = d.ban_status as string | undefined;
+  if (!status || status === "none") return NOT_BANNED;
+  if (status === "permanent") {
+    return { banned: true, permanent: true, reason: d.ban_reason ?? null, expires_at: null };
+  }
+  // status === "temporary"
+  const expiresAt = d.ban_expires_at?.toDate?.() ?? (d.ban_expires_at ? new Date(d.ban_expires_at) : null);
+  if (!expiresAt || new Date() > expiresAt) return NOT_BANNED; // انتهى الحظر المؤقت -> غير محظور فعليًا
+  return { banned: true, permanent: false, reason: d.ban_reason ?? null, expires_at: expiresAt.toISOString() };
+}
+
+/** فحص حظر مستقل بالـid — يُستخدَم بالطلبات الحساسة أثناء جلسة فعّالة (chat.mts/progress-daily.mts)،
+ *  لا يكتفي بفحص تسجيل الدخول فقط (طلب صريح: الحظر يمنع الاستخدام فورًا، مو بس عند دخول لاحق). */
+export async function checkBanStatus(db: Firestore, userId: string): Promise<BanStatus> {
+  const doc = await db.collection("users").doc(userId).get();
+  if (!doc.exists) return NOT_BANNED;
+  return deriveBanStatus(doc.data()!);
 }
 
 export async function emailExists(db: Firestore, email: string): Promise<boolean> {

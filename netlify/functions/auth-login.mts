@@ -29,6 +29,11 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     if (user.disabled) {
       return jsonError(403, "ACCOUNT_DISABLED", "هذا الحساب معطّل، تواصل مع الإدارة");
     }
+    if (user.ban.banned) {
+      return jsonError(403, "ACCOUNT_BANNED", "هذا الحساب محظور.", {
+        reason: user.ban.reason ?? "", expires_at: user.ban.expires_at ?? "", permanent: String(user.ban.permanent),
+      });
+    }
 
     const token = signSession({ sub: user.id, role: user.role, email, email_verified: user.email_verified });
     return jsonOk({ user_id: user.id }, { headers: { "Set-Cookie": buildSessionCookie(token) } });

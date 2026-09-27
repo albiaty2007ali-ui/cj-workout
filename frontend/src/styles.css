@@ -846,6 +846,7 @@ body {
 .admin-badge-paid { background: rgba(76, 122, 94, 0.15); color: var(--moss); }
 .admin-badge-tournament { background: rgba(201, 122, 61, 0.15); color: var(--status-orange); }
 .admin-badge-unverified { background: rgba(200, 60, 60, 0.15); color: var(--danger); }
+.admin-badge-banned { background: rgba(200, 60, 60, 0.22); color: var(--danger); font-weight: 700; }
 
 /* ---- درج/مودال تفصيل مستخدم — يمدّد .modal-card العام ---- */
 .modal-card-wide { max-width: 760px; }

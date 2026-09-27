@@ -18,7 +18,7 @@
 import type { Context } from "@netlify/functions";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { FirestoreRepository, getFirebaseApp, genId, getUserDisplayFields } from "../../shared/nutrition-engine/db/firestoreRepository.js";
-import { authenticateRequest, isAdminClaims } from "../../shared/nutrition-engine/auth.js";
+import { authenticateRequest, isAdminClaims, deriveBanStatus } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import * as calculator from "../../shared/nutrition-engine/calculator.js";
 import { todayBaghdadIso, addDaysIso } from "../../shared/nutrition-engine/iraqTime.js";
@@ -85,6 +85,7 @@ async function handleList(req: Request, db: FirebaseFirestore.Firestore): Promis
     return {
       id: doc.id, name: d.name ?? "", email: d.email ?? "", role: d.role ?? "user",
       disabled: d.disabled ?? false, email_verified: d.email_verified === true,
+      ban: deriveBanStatus(d),
       created_at: toDateSafe(d.created_at),
       xp: d.xp ?? 0, streak_days: d.streak_days ?? 0, free_meals_used: d.free_meals_used ?? 0,
       is_premium: isPremium, subscription_end_date: subEnd,
@@ -181,6 +182,7 @@ async function handleDetail(id: string, db: FirebaseFirestore.Firestore): Promis
       id, name: display.name, email: display.email, username: display.username, photo_url: display.photo_url,
       role: display.role, disabled: rawUser?.disabled ?? false,
       email_verified: rawUser?.email_verified === true,
+      ban: deriveBanStatus(rawUser ?? {}),
     },
     goals: profile ? {
       age: profile.age, weight_kg: profile.weight_kg, height_cm: profile.height_cm, sex: profile.sex,
@@ -242,6 +244,41 @@ async function handleGrantSubscription(req: Request, id: string, db: FirebaseFir
   return jsonOk({ ok: true, end_date: endDate });
 }
 
+async function handleBan(req: Request, id: string, db: FirebaseFirestore.Firestore, adminId: string): Promise<Response> {
+  const body = await req.json().catch(() => ({}));
+  const permanent = body.type === "permanent";
+  const durationHours = typeof body.duration_hours === "number" && body.duration_hours > 0 ? body.duration_hours : null;
+  if (!permanent && !durationHours) return jsonError(400, "VALIDATION_ERROR", "حدد type=permanent أو duration_hours.");
+  const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+  if (!reason) return jsonError(400, "VALIDATION_ERROR", "سبب الحظر مطلوب.");
+
+  const now = new Date();
+  const expiresAt = permanent ? null : new Date(now.getTime() + durationHours! * 60 * 60 * 1000);
+
+  await db.collection("users").doc(id).set({
+    ban_status: permanent ? "permanent" : "temporary", ban_reason: reason,
+    ban_started_at: now, ban_expires_at: expiresAt, banned_by: adminId,
+  }, { merge: true });
+  await db.collection("admin_logs").doc(genId()).set({
+    admin_id: adminId, action: "user_banned", target_id: id,
+    details: permanent ? `دائم — ${reason}` : `${durationHours} ساعة — ${reason}`, timestamp: now,
+  });
+  return jsonOk({ ban_status: permanent ? "permanent" : "temporary", expires_at: expiresAt?.toISOString() ?? null });
+}
+
+async function handleUnban(id: string, db: FirebaseFirestore.Firestore, adminId: string): Promise<Response> {
+  const now = new Date();
+  // "حذف الحظر بشكل كامل" — تصفير كل حقول الحظر لـnone/null، صفر restriction فعال يبقى (طلب
+  // صريح). سجل admin_logs يبقى هو السجل الإداري التاريخي، صفر ban_history منفصل.
+  await db.collection("users").doc(id).set({
+    ban_status: "none", ban_reason: null, ban_started_at: null, ban_expires_at: null, banned_by: null,
+  }, { merge: true });
+  await db.collection("admin_logs").doc(genId()).set({
+    admin_id: adminId, action: "user_unbanned", target_id: id, details: null, timestamp: now,
+  });
+  return jsonOk({ ban_status: "none" });
+}
+
 export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
   if (!claims) return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
@@ -266,6 +303,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     if (action === "update-targets") return await handleUpdateTargets(req, id, db);
     if (action === "grant-subscription") return await handleGrantSubscription(req, id, db, claims.sub);
+    if (action === "ban") return await handleBan(req, id, db, claims.sub);
+    if (action === "unban") return await handleUnban(id, db, claims.sub);
 
     return jsonError(400, "VALIDATION_ERROR", "action غير معروف.");
   } catch (err) {

@@ -19,6 +19,10 @@ export default function Login() {
     try {
       const res = await api.post<{ user_id: string }>("/auth/login", { email, password });
       if (!res.success) {
+        if (res.error?.code === "ACCOUNT_BANNED") {
+          navigate("/account-banned", { state: { ban: res.error.details } });
+          return;
+        }
         setError(res.error?.message ?? "صار خطأ، جرب مرة ثانية");
         return;
       }

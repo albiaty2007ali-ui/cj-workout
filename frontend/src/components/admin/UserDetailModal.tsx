@@ -6,6 +6,7 @@ interface DetailResponse {
   profile_info: {
     id: string; name: string; email: string; username: string | null; photo_url: string | null;
     role: string; disabled: boolean; email_verified: boolean;
+    ban: { banned: boolean; permanent: boolean; reason: string | null; expires_at: string | null };
   };
   goals: {
     age: number; weight_kg: number; height_cm: number; sex: string; goal: string; activity_level: string;
@@ -35,6 +36,10 @@ export default function UserDetailModal({ userId, onClose }: { userId: string; o
   const [savingTargets, setSavingTargets] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [grantingDays, setGrantingDays] = useState<number | "lifetime" | null>(null);
+  const [banReason, setBanReason] = useState("");
+  const [banCustomHours, setBanCustomHours] = useState("");
+  const [banBusy, setBanBusy] = useState(false);
+  const [banMsg, setBanMsg] = useState("");
 
   function load() {
     api.get<DetailResponse>(`/admin/users?action=detail&id=${userId}`).then((res) => {
@@ -66,6 +71,30 @@ export default function UserDetailModal({ userId, onClose }: { userId: string; o
       load();
     } finally {
       setGrantingDays(null);
+    }
+  }
+
+  async function ban(hours: number | "permanent") {
+    if (!banReason.trim()) { setBanMsg("لازم تكتب سبب الحظر أول."); return; }
+    setBanBusy(true);
+    setBanMsg("");
+    try {
+      const body = hours === "permanent" ? { type: "permanent", reason: banReason.trim() } : { type: "temporary", duration_hours: hours, reason: banReason.trim() };
+      const res = await api.post(`/admin/users?action=ban&id=${userId}`, body);
+      if (res.success) { setBanMsg("✓ تم الحظر"); setBanReason(""); load(); } else { setBanMsg(res.error?.message ?? "صار خطأ"); }
+    } finally {
+      setBanBusy(false);
+    }
+  }
+
+  async function unban() {
+    setBanBusy(true);
+    setBanMsg("");
+    try {
+      const res = await api.post(`/admin/users?action=unban&id=${userId}`, {});
+      if (res.success) { setBanMsg("✓ أُلغي الحظر"); load(); } else { setBanMsg(res.error?.message ?? "صار خطأ"); }
+    } finally {
+      setBanBusy(false);
     }
   }
 
@@ -102,6 +131,11 @@ export default function UserDetailModal({ userId, onClose }: { userId: string; o
               {!data.profile_info.email_verified && <span className="admin-badge admin-badge-unverified" style={{ marginInlineStart: 8 }}>بريد غير مؤكَّد</span>}
               {data.goals?.mode === "tournament" && <span className="admin-badge admin-badge-tournament" style={{ marginInlineStart: 8 }}>🏆 بطولة</span>}
               {data.progress.is_premium && <span className="admin-badge admin-badge-paid" style={{ marginInlineStart: 8 }}>💎 مشترك</span>}
+              {data.profile_info.ban.banned && (
+                <span className="admin-badge admin-badge-banned" style={{ marginInlineStart: 8 }}>
+                  🚫 {data.profile_info.ban.permanent ? "محظور دائمًا" : "محظور مؤقتًا"}
+                </span>
+              )}
             </p>
             <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: -8 }}>{data.profile_info.email}</p>
 
@@ -187,6 +221,53 @@ export default function UserDetailModal({ userId, onClose }: { userId: string; o
                 <button className="btn btn-outline-dark" disabled={grantingDays !== null} onClick={() => grant(90)}>{grantingDays === 90 ? "..." : "+ 3 أشهر"}</button>
                 <button className="btn btn-moss" disabled={grantingDays !== null} onClick={() => grant("lifetime")}>{grantingDays === "lifetime" ? "..." : "♾️ اشتراك مدى الحياة"}</button>
               </div>
+            </div>
+
+            {/* إدارة الحظر */}
+            <div className="admin-detail-section">
+              <h3>🔨 إدارة الحظر</h3>
+              {data.profile_info.ban.banned ? (
+                <>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                    {data.profile_info.ban.permanent ? "محظور دائمًا" : `محظور حتى ${data.profile_info.ban.expires_at ? new Date(data.profile_info.ban.expires_at).toLocaleString("ar-IQ") : "—"}`}
+                    {data.profile_info.ban.reason ? ` — السبب: ${data.profile_info.ban.reason}` : ""}
+                  </p>
+                  <button type="button" className="btn btn-moss" disabled={banBusy} onClick={unban}>
+                    {banBusy ? "..." : "✓ إلغاء الحظر"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <input
+                    value={banReason} onChange={(e) => setBanReason(e.target.value)}
+                    placeholder="سبب الحظر (مطلوب)" style={{ width: "100%", marginBottom: 8 }}
+                  />
+                  <div className="admin-list-actions" style={{ marginTop: 0, flexWrap: "wrap" }}>
+                    <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(1)}>ساعة</button>
+                    <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(6)}>6 ساعات</button>
+                    <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(24)}>يوم</button>
+                    <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(72)}>3 أيام</button>
+                    <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(168)}>7 أيام</button>
+                    <button className="btn btn-outline-dark" disabled={banBusy} onClick={() => ban(720)}>30 يوم</button>
+                    <button className="btn" style={{ background: "var(--danger)", color: "#fff" }} disabled={banBusy} onClick={() => ban("permanent")}>
+                      🚫 حظر دائم
+                    </button>
+                  </div>
+                  <div className="admin-form-row" style={{ marginTop: 8, alignItems: "center" }}>
+                    <input
+                      type="number" value={banCustomHours} onChange={(e) => setBanCustomHours(e.target.value)}
+                      placeholder="مدة مخصّصة (ساعات)" style={{ width: 150 }}
+                    />
+                    <button
+                      className="btn btn-outline-dark" disabled={banBusy || !(Number(banCustomHours) > 0)}
+                      onClick={() => ban(Number(banCustomHours))}
+                    >
+                      حظر لهذي المدة
+                    </button>
+                  </div>
+                </>
+              )}
+              {banMsg && <p style={{ fontSize: "0.8rem", color: "var(--moss)", marginTop: 6 }}>{banMsg}</p>}
             </div>
 
             {/* 4. سجل الملاحظات/البلاغات */}
