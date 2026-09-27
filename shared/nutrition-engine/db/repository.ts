@@ -123,6 +123,9 @@ export interface Repository {
   insertXpTransaction(tx: XpTransactionInput): Promise<void>;
   // مرتبة تصاعديًا بالتاريخ — لأغراض عرض فقط (مثلاً Progress Replay)، صفر استخدام بمنطق منح XP.
   listXpTransactionsByReason(userId: string, reason: string): Promise<{ amount: number; source: string | null; created_at: Date }[]>;
+  /** عدّاد بسيط بلا ترتيب (حزمة تطوير الإحالة) — يتفادى عمدًا orderBy فوگ فلترين تساوٍ لأن ذاك
+   *  يحتاج فهرس مركّب بـFirestore (اكتُشف حيًا: listXpTransactionsByReason فشلت فعليًا بدونه). */
+  countXpTransactionsByReason(userId: string, reason: string): Promise<number>;
 
   // ---- Active Days / Streaks ----
   findActiveDay(userId: string, date: string): Promise<ActiveDayRecord | null>;

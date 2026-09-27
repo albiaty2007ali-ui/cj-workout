@@ -160,6 +160,14 @@ export class FirestoreRepository implements Repository {
     });
   }
 
+  async countXpTransactionsByReason(userId: string, reason: string): Promise<number> {
+    // بلا orderBy عمدًا — فلترتا تساوٍ فقط، Firestore يخدمها بدون فهرس مركّب (بعكس
+    // listXpTransactionsByReason أعلاه اللي تحتاج فهرسًا لوجود orderBy فوگ فلترين).
+    const snap = await this.db.collection("xp_transactions")
+      .where("user_id", "==", userId).where("reason", "==", reason).count().get();
+    return snap.data().count;
+  }
+
   // ---- Active Days / Streaks ----
   private activeDayDocId(userId: string, date: string): string {
     return `${userId}_${date}`;

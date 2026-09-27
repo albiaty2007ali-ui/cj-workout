@@ -65,6 +65,10 @@ export class InMemoryRepository implements Repository {
       .map((t) => ({ amount: t.amount, source: t.source, created_at: t.created_at }));
   }
 
+  async countXpTransactionsByReason(userId: string, reason: string): Promise<number> {
+    return this.xpTransactions.filter((t) => t.user_id === userId && t.reason === reason).length;
+  }
+
   async findActiveDay(userId: string, date: string): Promise<ActiveDayRecord | null> {
     return this.activeDays.find((d) => d.user_id === userId && d.date === date) ?? null;
   }

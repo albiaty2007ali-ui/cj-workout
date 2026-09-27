@@ -17,8 +17,8 @@ export const REFERRAL_XP_REASON = "referral_signup";
  * بعد وقت التسجيل، فما يگدر يحيل نفسه).
  */
 export async function grantReferralXp(repo: Repository, referrer: UserRecord, newUserId: string): Promise<boolean> {
-  const grantsSoFar = await repo.listXpTransactionsByReason(referrer.id, REFERRAL_XP_REASON);
-  if (grantsSoFar.length >= MAX_REFERRAL_XP_GRANTS) return false;
+  const grantsSoFar = await repo.countXpTransactionsByReason(referrer.id, REFERRAL_XP_REASON);
+  if (grantsSoFar >= MAX_REFERRAL_XP_GRANTS) return false;
 
   const granted = await awardXp(repo, referrer, REFERRAL_XP, REFERRAL_XP_REASON, `referral_${newUserId}`);
   if (granted) await repo.saveUser(referrer);
