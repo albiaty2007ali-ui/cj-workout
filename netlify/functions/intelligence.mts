@@ -134,6 +134,9 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     }
 
     if (req.method === "POST" && action === "recovery-day") {
+      // اليوم المرن/Recovery Day صارت Premium فقط (حزمة تطوير الوقت/الاشتراك) — العرض (GET أعلاه)
+      // يبقى مفتوح للجميع، التفعيل الفعلي فقط محجوب. فحص backend حقيقي، مو مجرد إخفاء زر بالواجهة.
+      if (!user.is_premium) return jsonError(402, "PREMIUM_REQUIRED", "هذي الميزة متاحة للمشتركين فقط.");
       const body = await req.json().catch(() => ({}));
       const today = todayBaghdadIso();
       if (body.enable === false) {
@@ -149,6 +152,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     // Travel Mode (المرحلة 7) — نفس بنية RecoveryDayRecord الموجودة أصلاً، بس بحلقة على مدى تاريخ
     // بدل يوم واحد. صفر Collection جديد. حد أقصى TRAVEL_MODE_MAX_DAYS يوم لمنع كتابة غير محدودة.
     if (req.method === "POST" && action === "travel-mode") {
+      if (!user.is_premium) return jsonError(402, "PREMIUM_REQUIRED", "هذي الميزة متاحة للمشتركين فقط.");
       const body = await req.json().catch(() => ({}));
       const startDate = typeof body.start_date === "string" ? body.start_date : "";
       const endDate = typeof body.end_date === "string" ? body.end_date : "";

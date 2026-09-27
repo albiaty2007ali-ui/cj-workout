@@ -82,6 +82,12 @@ export const translations = {
       whatsappButton: "تواصل عبر واتساب",
       unavailable: "قناة الاستشارة غير متوفرة حاليًا، جرب لاحقًا.",
     },
+    premiumLock: {
+      title: "هذه الميزة متاحة للمشتركين",
+      descriptionPrefix: "ميزة",
+      descriptionSuffix: "محجوبة عن الحساب المجاني — اشترك حتى تفتحها وتستفيد من كل ميزات CJ FOOD.",
+      subscribeNow: "اشترك الآن",
+    },
     notifPrompt: {
       title: "لا تنسى تفعيل الإشعارات",
       description: "خلّي Captain CJ يذكّرك بالوجبات والمهام المهمة خلال يومك.",

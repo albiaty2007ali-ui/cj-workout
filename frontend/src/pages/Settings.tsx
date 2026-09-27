@@ -4,6 +4,7 @@ import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
 import ThemeToggle from "../components/ThemeToggle";
 import AboutAppModal from "../components/AboutAppModal";
+import PremiumFeatureModal from "../components/PremiumFeatureModal";
 import { pushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from "../lib/push";
 import { useIntroSlides } from "./IntroTour";
 import { useI18n } from "../i18n/I18nContext";
@@ -64,6 +65,7 @@ export default function Settings() {
   const [travelEnd, setTravelEnd] = useState("");
   const [travelBusy, setTravelBusy] = useState(false);
   const [travelMsg, setTravelMsg] = useState("");
+  const [showRecoveryPremiumLock, setShowRecoveryPremiumLock] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -90,8 +92,9 @@ export default function Settings() {
 
   async function toggleRecoveryDay() {
     if (recoveryDayActive === null) return;
-    setRecoveryBusy(true);
     const nextValue = !recoveryDayActive;
+    if (nextValue && !me?.is_premium) { setShowRecoveryPremiumLock(true); return; }
+    setRecoveryBusy(true);
     const res = await api.post<{ active: boolean; mode?: RecoveryMode }>(
       "/intelligence?action=recovery-day",
       nextValue ? { enable: true, mode: recoveryMode } : { enable: false },
@@ -100,11 +103,14 @@ export default function Settings() {
     if (res.success && res.data) {
       setRecoveryDayActive(res.data.active);
       flashSaved();
+    } else if (res.error?.code === "PREMIUM_REQUIRED") {
+      setShowRecoveryPremiumLock(true);
     }
   }
 
   async function activateTravelMode() {
     if (!travelStart || !travelEnd) return;
+    if (!me?.is_premium) { setShowRecoveryPremiumLock(true); return; }
     setTravelBusy(true);
     setTravelMsg("");
     const res = await api.post<{ days_activated: number }>("/intelligence?action=travel-mode", { start_date: travelStart, end_date: travelEnd });
@@ -112,6 +118,8 @@ export default function Settings() {
     if (res.success && res.data) {
       setTravelMsg(`✓ فعّلنا وضع السفر لـ${res.data.days_activated} يوم`);
       if (travelStart === todayIso()) { setRecoveryDayActive(true); setRecoveryMode("TRAVEL_DAY"); }
+    } else if (res.error?.code === "PREMIUM_REQUIRED") {
+      setShowRecoveryPremiumLock(true);
     } else {
       setTravelMsg(res.error?.message ?? "صار خطأ");
     }
@@ -414,6 +422,9 @@ export default function Settings() {
               {travelMsg && <p style={{ marginTop: 8, fontSize: "0.85rem" }}>{travelMsg}</p>}
             </div>
           </div>
+        )}
+        {showRecoveryPremiumLock && (
+          <PremiumFeatureModal featureName={t("settings.recoveryDayTitle")} onClose={() => setShowRecoveryPremiumLock(false)} />
         )}
 
         <div className="notice-box">
