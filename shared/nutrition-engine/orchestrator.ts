@@ -30,7 +30,7 @@ import * as tipsEngine from "./tipsEngine.js";
 import * as weightOps from "./weightOps.js";
 import * as xpEngine from "./xpEngine.js";
 import { getPortionsFor, isFoodBulk } from "./foodSearch.js";
-import { getCurrentPeriod, nowBaghdad, todayBaghdadIso } from "./iraqTime.js";
+import { getCurrentPeriod, getConversationalPeriod, nowBaghdad, todayBaghdadIso } from "./iraqTime.js";
 import * as mealBudget from "./mealBudget.js";
 import { explicitMealTypeKeyword, findMealType } from "./mealTypeDetection.js";
 import * as nluConfig from "./nlu/config.js";
@@ -597,7 +597,10 @@ async function handleExpressDesire(repo: Repository, user: UserRecord, textNorm:
     const profile = await repo.findNutritionProfile(user.id);
     const ctx = await context.build(repo, user.id, profile, now);
     const proteinNeeded = Math.max(0, (ctx.macro_targets.protein_g ?? 0) - ctx.consumed_protein);
-    return { reply: await recommendations.suggestMealWithin(ctx.remaining_calories, proteinNeeded), meal_logged: false };
+    let reply = await recommendations.suggestMealWithin(ctx.remaining_calories, proteinNeeded);
+    const timePrefix = responses.timeAwarePrefix(getConversationalPeriod(now));
+    if (timePrefix) reply = `${timePrefix} ${reply}`;
+    return { reply, meal_logged: false };
   }
 
   return { reply: responses.desireAck(false), meal_logged: false };
@@ -1144,6 +1147,8 @@ async function handleMessageCore(repo: Repository, user: UserRecord, text: strin
     goal: profile ? nutritionCtx.goal : null,
     conversation_state: conversationState,
     recent_turns: conversationState.recent_turns,
+    streak_days: user.streak_days,
+    is_premium: user.is_premium,
   };
 
   const provider = conversationConfig.getConversationProvider();
@@ -1422,6 +1427,15 @@ async function dispatch(
     const ctx = await context.build(repo, user.id, profile, now);
     const proteinNeeded = Math.max(0, (ctx.macro_targets.protein_g ?? 0) - ctx.consumed_protein);
     let reply = await recommendations.suggestMealWithin(ctx.remaining_calories, proteinNeeded);
+
+    // وعي بالوقت (لا يُصفّي قائمة الاقتراحات، فقط يصوغ البادئة + يسمّي نوع الوجبة المتوقَّع) —
+    // findMealType يعطي الأولوية لذكر صريح بالرسالة نفسها، فطلب "أريد غداء" الساعة 10 مساءً ما
+    // ينحجب أبدًا حتى لو الوقت يقترح عشاء.
+    const timePrefix = responses.timeAwarePrefix(getConversationalPeriod(now));
+    if (timePrefix) {
+      const mealLabel = responses.MEAL_TYPE_LABELS[findMealType(textNorm, now)];
+      reply = `${timePrefix}${mealLabel ? ` وقت ${mealLabel} تقريبًا —` : ""} ${reply}`;
+    }
 
     // ربط حقيقي بقسم وجبات الدايت — نفس recipeSearch.ts الموجود، صفر بحث موازٍ جديد. أول
     // وصفة حقيقية تصير suggested_recipe مهيكلة (recipe_id حقيقي، لاستخدام الفرونت إند لاحقًا

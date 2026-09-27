@@ -77,6 +77,10 @@ export interface ConversationTurnContext {
   conversation_state: ConversationState;
   /** آخر 3 أدوار كحد أقصى، كل نص مختصر — صفر تاريخ محادثة كامل غير محدود (ضبط تكلفة). */
   recent_turns: { role: "user" | "model"; text: string }[];
+  /** حقول Context Awareness إضافية (حزمة تطوير الوقت/السياق) — تُقرَأ من `UserRecord` مباشرة،
+   *  صفر حقل DB جديد. */
+  streak_days: number;
+  is_premium: boolean;
 }
 
 export interface ToolCallDecision {

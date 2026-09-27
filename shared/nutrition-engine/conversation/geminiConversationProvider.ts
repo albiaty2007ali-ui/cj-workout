@@ -28,6 +28,8 @@ interface GeminiResponse { candidates?: { content?: GeminiContent }[] }
 function buildContextText(ctx: ConversationTurnContext): string {
   const lines = [
     `الوقت الحالي ببغداد: ${ctx.current_time_iraq}`,
+    ctx.streak_days > 0 ? `سلسلة الالتزام الحالية (Streak): ${ctx.streak_days} يوم` : null,
+    ctx.is_premium ? `المستخدم مشترك (Premium)` : null,
     ctx.target_calories !== null ? `هدف السعرات اليومي: ${ctx.target_calories} kcal` : null,
     ctx.remaining_calories !== null ? `الباقي من السعرات اليوم: ${ctx.remaining_calories} kcal` : null,
     ctx.goal ? `هدف المستخدم: ${ctx.goal}` : null,

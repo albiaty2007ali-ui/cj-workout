@@ -289,6 +289,24 @@ function pick<T>(templates: T[]): T {
   return templates[Math.floor(Math.random() * templates.length)];
 }
 
+// بادئات وعي بالوقت — تُستخدَم فقط من `orchestrator.ts` عند نية سؤال/اقتراح أكل محدَّدة (مو كل
+// رسالة، تجنّبًا للتكرار المزعج). مفاتيحها تطابق `iraqTime.getConversationalPeriod()` حرفيًا.
+const TIME_AWARE_PREFIX_TEMPLATES: Record<string, string[]> = {
+  fajr: ["هسه بعده وقت مبكر كابتن 🌅"],
+  morning: ["صباح الخير كابتن، إذا جوعان نرتبلك ريوك مناسب.", "صباح الخير 🌤️"],
+  noon: ["هسه تقريبًا وقت الغداء 🍽️"],
+  afternoon: ["دخلنا بالعصر، إذا جوعان نكدر نخلي سناك مناسب."],
+  maghrib: ["صار وقت العشا تقريبًا 🌙"],
+  evening: ["مسا الخير كابتن 🌙"],
+  night: ["الوقت صار متأخر كابتن، إذا تريد أگدر أقترحلك شي خفيف."],
+  late_night: ["الساعة متأخرة جدًا كابتن 🌙 لو جوعان أگدر أقترحلك شي خفيف يناسب معدتك."],
+};
+
+export function timeAwarePrefix(period: string): string | null {
+  const options = TIME_AWARE_PREFIX_TEMPLATES[period];
+  return options ? pick(options) : null;
+}
+
 function format(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? `{${key}}`));
 }

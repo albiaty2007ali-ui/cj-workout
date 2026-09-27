@@ -66,6 +66,32 @@ export function relevantMealForPeriod(period: string): string {
   return PERIOD_TO_MEAL[period] ?? "dinner";
 }
 
+// فترات أدق **لصياغة الرد بالمحادثة فقط** — موازية لـ`PERIOD_BOUNDARIES` أعلاه، لا تستبدلها ولا
+// تُستهلَك من أي منطق حالي (under_target/streaks/notifications/...). أي تغيير هنا صفر تأثير على
+// تلك الأنظمة الـ15+ الموجودة، عمدًا.
+export const CONVERSATIONAL_PERIOD_BOUNDARIES: Record<string, [number, number]> = {
+  fajr: [4, 5], // 04:00–05:59
+  morning: [6, 10], // 06:00–10:59
+  noon: [11, 14], // 11:00–14:59
+  afternoon: [15, 16], // 15:00–16:59
+  maghrib: [17, 18], // 17:00–18:59
+  evening: [19, 21], // 19:00–21:59
+  night: [22, 23], // 22:00–23:59
+  late_night: [0, 3], // 00:00–03:59
+};
+
+export function getConversationalPeriod(date: Date = new Date()): string {
+  const { hour } = baghdadParts(date);
+  for (const [period, [start, end]] of Object.entries(CONVERSATIONAL_PERIOD_BOUNDARIES)) {
+    if (start <= end) {
+      if (hour >= start && hour <= end) return period;
+    } else if (hour >= start || hour <= end) {
+      return period;
+    }
+  }
+  return "evening";
+}
+
 /** تاريخ اليوم البغدادي كسلسلة "YYYY-MM-DD" — يطابق تخزين عمود Date بايثون (date().isoformat()). */
 export function todayBaghdadIso(date: Date = new Date()): string {
   const { year, month, day } = baghdadParts(date);
