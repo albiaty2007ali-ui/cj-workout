@@ -33,6 +33,11 @@ export interface UserRecord {
    *  نفس نمط pending_food_topic_json/last_direct_log_json تمامًا. null قبل أول رسالة بوضع
    *  SHADOW/ACTIVE، أو لأي مستخدم لم يستخدم هذا الوضع إطلاقًا. */
   conversation_state_json: string | null;
+  /** كود إحالة فريد يُولَّد مرة وحدة عند التسجيل (حزمة تطوير الإحالة) — يُستخدَم برابط المشاركة. */
+  referral_code: string;
+  /** id صاحب الإحالة اللي جاب هذا المستخدم، أو null (تسجيل عادي بلا رابط إحالة). يُضبَط مرة
+   *  وحدة عند التسجيل فقط، ثابت بعدها للأبد. */
+  referred_by: string | null;
 }
 
 export interface XpTransactionInput {
@@ -110,6 +115,8 @@ export interface Repository {
   // ---- Users ----
   findUser(userId: string): Promise<UserRecord | null>;
   saveUser(user: UserRecord): Promise<void>;
+  /** يبحث عن صاحب كود إحالة معيّن (حزمة تطوير الإحالة) — null لو الكود غير موجود. */
+  findUserByReferralCode(code: string): Promise<UserRecord | null>;
 
   // ---- XP Ledger ----
   findXpTransactionBySource(userId: string, source: string): Promise<boolean>;

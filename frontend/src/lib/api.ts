@@ -56,6 +56,7 @@ export interface MeResponse {
   email: string;
   notification_prompt_shown: boolean;
   theme: string;
+  referral_code: string;
 }
 
 export interface SuggestedRecipe {

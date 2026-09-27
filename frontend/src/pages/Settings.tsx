@@ -238,7 +238,9 @@ export default function Settings() {
   if (!me || !settings) return null;
 
   async function shareApp() {
-    const url = "https://cjworkout.netlify.app/chat";
+    // رابط إحالة حقيقي (حزمة تطوير الإحالة) — منح XP يصير فقط لما يسجّل حساب جديد فعليًا عبر
+    // هذا الرابط (auth-register.mts)، صفر XP لمجرد الضغط على هذا الزر.
+    const url = `https://cjworkout.netlify.app/register?ref=${encodeURIComponent(me?.referral_code ?? "")}`;
     const text = "جرب تطبيق CJ FOOD لحساب السعرات وتنظيم التغذية بالذكاء الاصطناعي!";
     if (navigator.share) {
       try {

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useI18n } from "../i18n/I18nContext";
 import GoogleSignInButton from "../components/GoogleSignInButton";
@@ -7,6 +7,8 @@ import GoogleSignInButton from "../components/GoogleSignInButton";
 export default function Register() {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
+  const refCode = searchParams.get("ref") ?? "";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,12 +21,12 @@ export default function Register() {
     setErrors({});
     setLoading(true);
     try {
-      const res = await api.post<{ user_id: string }>("/auth/register", { name, email, password, confirm });
+      const res = await api.post<{ user_id: string }>("/auth/register", { name, email, password, confirm, ref: refCode || undefined });
       if (!res.success) {
         setErrors(res.error?.details ?? { _: res.error?.message ?? "صار خطأ، جرب مرة ثانية" });
         return;
       }
-      navigate("/verify-email");
+      navigate("/chat");
     } finally {
       setLoading(false);
     }

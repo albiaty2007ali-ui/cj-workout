@@ -155,16 +155,27 @@ export function generateVerificationCode(): string {
   return n.toString().padStart(6, "0");
 }
 
+// كود إحالة (حزمة تطوير الإحالة) — 8 محارف من مجموعة بلا حروف/أرقام ملتبسة (0/O، 1/I/L) لسهولة
+// نسخه/كتابته يدويًا لو احتاج المستخدم.
+const REFERRAL_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export function generateReferralCode(): string {
+  const bytes = randomBytes(8);
+  let code = "";
+  for (let i = 0; i < 8; i++) code += REFERRAL_CODE_ALPHABET[bytes[i]! % REFERRAL_CODE_ALPHABET.length];
+  return code;
+}
+
 export const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 دقيقة
 export const VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 ثانية
 
 /** ينشئ مستخدم جديد بكلمة مرور مشفَّرة — email_verified:true فورًا (صفر كود/إيميل تحقق، راجع
  * isEmailVerified أعلاه لسبب الإلغاء) فيدخل المستخدم للتطبيق مباشرة بلا انتظار كود ما بوصله. */
 export async function createUser(
-  db: Firestore, input: NewUserInput,
-): Promise<{ id: string; role: string }> {
+  db: Firestore, input: NewUserInput, referredByUserId: string | null = null,
+): Promise<{ id: string; role: string; referral_code: string }> {
   const id = randomUUID().replace(/-/g, "");
   const passwordHash = hashPassword(input.password);
+  const referralCode = generateReferralCode();
   await db.collection("users").doc(id).set({
     name: input.name, email: input.email, password_hash: passwordHash, role: "user", disabled: false,
     xp: 0, streak_days: 0, longest_streak: 0, streak_started_at: null, last_active_date: null,
@@ -172,9 +183,10 @@ export async function createUser(
     pending_recipe_confirmation_id: null, pending_food_topic_json: null, pending_meal_json: null,
     last_direct_log_json: null, ai_response_style: "balanced", streak_freeze_balance: 0,
     email_verified: true,
+    referral_code: referralCode, referred_by: referredByUserId,
     created_at: FieldValue.serverTimestamp(),
   });
-  return { id, role: "user" };
+  return { id, role: "user", referral_code: referralCode };
 }
 
 export interface VerifyEmailResult {
@@ -257,6 +269,7 @@ export async function createUserFromGoogle(db: Firestore, input: NewGoogleUserIn
     pending_recipe_confirmation_id: null, pending_food_topic_json: null, pending_meal_json: null,
     last_direct_log_json: null, ai_response_style: "balanced", streak_freeze_balance: 0,
     email_verified: true,
+    referral_code: generateReferralCode(), referred_by: null,
     created_at: FieldValue.serverTimestamp(),
   });
   return { id, role: "user" };

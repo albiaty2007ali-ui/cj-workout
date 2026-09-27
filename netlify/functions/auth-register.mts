@@ -1,15 +1,16 @@
 /** POST /api/auth/register — يعادل auth.py's register(). */
 import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
-import { getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreRepository.js";
+import { getFirebaseApp, FirestoreRepository } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { emailExists, createUser, signSession, buildSessionCookie } from "../../shared/nutrition-engine/auth.js";
 import { validateName, validateEmail, validatePassword } from "../../shared/nutrition-engine/validation.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
+import { grantReferralXp } from "../../shared/nutrition-engine/referral.js";
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method !== "POST") return jsonError(405, "METHOD_NOT_ALLOWED", "استخدم POST فقط.");
 
-  let body: { name?: unknown; email?: unknown; password?: unknown; confirm?: unknown };
+  let body: { name?: unknown; email?: unknown; password?: unknown; confirm?: unknown; ref?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -20,6 +21,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
   const confirm = typeof body.confirm === "string" ? body.confirm : "";
+  const refCode = typeof body.ref === "string" ? body.ref.trim() : "";
 
   const errors: Record<string, string> = {};
   const nameErr = validateName(name);
@@ -39,7 +41,18 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonError(400, "VALIDATION_ERROR", "تحقق من الحقول.", errors);
     }
 
-    const { id, role } = await createUser(db, { name, email, password });
+    const repo = new FirestoreRepository(db);
+    const referrer = refCode ? await repo.findUserByReferralCode(refCode) : null;
+    const { id, role } = await createUser(db, { name, email, password }, referrer?.id ?? null);
+
+    // منح XP لصاحب الإحالة — best-effort، فشله لا يوقف التسجيل أبدًا (نفس فلسفة فشل الإيميل).
+    if (referrer) {
+      try {
+        await grantReferralXp(repo, referrer, id);
+      } catch (e) {
+        console.warn("referral XP grant failed:", e);
+      }
+    }
 
     // لا إرسال بريد إطلاقًا هنا (لا ترحيب ولا كود تحقق): Resend بلا نطاق موثَّق لا يسلّم لغير بريد
     // صاحب الحساب، فالإرسال هنا كان بلا فائدة لأي مستخدم حقيقي غير حساب المطوّر نفسه. email_verified

@@ -98,6 +98,8 @@ export class FirestoreRepository implements Repository {
       ai_response_style: d.ai_response_style ?? "balanced",
       streak_freeze_balance: d.streak_freeze_balance ?? 0,
       conversation_state_json: d.conversation_state_json ?? null,
+      referral_code: d.referral_code ?? "",
+      referred_by: d.referred_by ?? null,
     };
   }
 
@@ -112,8 +114,15 @@ export class FirestoreRepository implements Repository {
       last_direct_log_json: user.last_direct_log_json, ai_response_style: user.ai_response_style,
       streak_freeze_balance: user.streak_freeze_balance,
       conversation_state_json: user.conversation_state_json,
+      referral_code: user.referral_code, referred_by: user.referred_by,
       updated_at: FieldValue.serverTimestamp(),
     }, { merge: true });
+  }
+
+  async findUserByReferralCode(code: string): Promise<UserRecord | null> {
+    const snap = await this.db.collection("users").where("referral_code", "==", code).limit(1).get();
+    if (snap.empty) return null;
+    return this.findUser(snap.docs[0]!.id);
   }
 
   // ---- XP Ledger ----

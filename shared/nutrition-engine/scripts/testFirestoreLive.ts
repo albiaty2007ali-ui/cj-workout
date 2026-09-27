@@ -17,6 +17,7 @@ function makeUser(overrides: Partial<UserRecord> = {}): UserRecord {
     current_recipe_step: 0, pending_recipe_confirmation_id: null, pending_food_topic_json: null,
     pending_meal_json: null, last_direct_log_json: null, ai_response_style: "balanced",
     streak_freeze_balance: 0, conversation_state_json: null,
+    referral_code: "TESTCODE", referred_by: null,
     ...overrides,
   };
 }

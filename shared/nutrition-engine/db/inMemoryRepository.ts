@@ -39,6 +39,13 @@ export class InMemoryRepository implements Repository {
     this.users.set(user.id, { ...user });
   }
 
+  async findUserByReferralCode(code: string): Promise<UserRecord | null> {
+    for (const u of this.users.values()) {
+      if (u.referral_code === code) return { ...u };
+    }
+    return null;
+  }
+
   private xpTransactions: (XpTransactionInput & { id: string; created_at: Date })[] = [];
   private activeDays: ActiveDayRecord[] = [];
   streakMilestones: StreakMilestoneRecord[] = [];
