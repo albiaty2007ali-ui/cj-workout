@@ -53,13 +53,10 @@ describe("signSession / verifySession", () => {
 });
 
 describe("isEmailVerified", () => {
-  it("true فقط لو email_verified === true حرفيًا", () => {
+  it("يرجّع true دائمًا — التحقق بالبريد أُلغي كشرط وصول (Resend بلا نطاق موثَّق لا يسلّم لغير بريد صاحب الحساب)", () => {
     expect(isEmailVerified({ sub: "u1", role: "user", email: "a@b.com", email_verified: true })).toBe(true);
-    expect(isEmailVerified({ sub: "u1", role: "user", email: "a@b.com", email_verified: false })).toBe(false);
-  });
-
-  it("null بأمان -> false", () => {
-    expect(isEmailVerified(null)).toBe(false);
+    expect(isEmailVerified({ sub: "u1", role: "user", email: "a@b.com", email_verified: false })).toBe(true);
+    expect(isEmailVerified(null)).toBe(true);
   });
 });
 

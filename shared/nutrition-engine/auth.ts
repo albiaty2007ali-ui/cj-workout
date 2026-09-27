@@ -41,9 +41,17 @@ export interface SessionClaims {
   email_verified: boolean;
 }
 
-/** إشارة تحقق مركزية — نفس فلسفة isAdminClaims (فحص من claims الموقَّعة، صفر قراءة DB إضافية). */
-export function isEmailVerified(claims: SessionClaims | null): boolean {
-  return !!claims && claims.email_verified === true;
+/**
+ * إشارة تحقق مركزية — نفس فلسفة isAdminClaims (فحص من claims الموقَّعة، صفر قراءة DB إضافية).
+ * **مُعطَّلة عمدًا (تُرجع true دائمًا)**: حساب Resend المستخدَم بلا نطاق بريد موثَّق يرفض تسليم
+ * أي إيميل لغير بريد صاحب الحساب نفسه (قيد سندج/تجربة قياسي بمزوّدي البريد) — مطالبة مستخدمين
+ * حقيقيين بكود تحقق لا يصلهم كانت تقفلهم فعليًا خارج التطبيق بلا أي مخرج. تبقى الدالة والفحوصات
+ * اللي تستدعيها (chat.mts/progress-daily.mts) موجودة كنقطة مركزية وحيدة — لو تفعّل نطاق بريد
+ * موثَّق مستقبلًا، رجّع الشرط الحقيقي هنا فقط (claims?.email_verified === true) وكل شي غيره
+ * يشتغل تلقائيًا بدون لمس أي ملف ثاني.
+ */
+export function isEmailVerified(_claims: SessionClaims | null): boolean {
+  return true;
 }
 
 /**
@@ -150,27 +158,23 @@ export function generateVerificationCode(): string {
 export const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000; // 15 دقيقة
 export const VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // 60 ثانية
 
-/** ينشئ مستخدم جديد بكلمة مرور مشفَّرة، بحالة email_verified:false + كود تحقق أول — يرجّع
- * (id, role, code) حتى auth-register.mts يرسل الكود عبر البريد فورًا. */
+/** ينشئ مستخدم جديد بكلمة مرور مشفَّرة — email_verified:true فورًا (صفر كود/إيميل تحقق، راجع
+ * isEmailVerified أعلاه لسبب الإلغاء) فيدخل المستخدم للتطبيق مباشرة بلا انتظار كود ما بوصله. */
 export async function createUser(
   db: Firestore, input: NewUserInput,
-): Promise<{ id: string; role: string; code: string }> {
+): Promise<{ id: string; role: string }> {
   const id = randomUUID().replace(/-/g, "");
   const passwordHash = hashPassword(input.password);
-  const code = generateVerificationCode();
-  const now = new Date();
   await db.collection("users").doc(id).set({
     name: input.name, email: input.email, password_hash: passwordHash, role: "user", disabled: false,
     xp: 0, streak_days: 0, longest_streak: 0, streak_started_at: null, last_active_date: null,
     free_meals_used: 0, current_recipe_id: null, current_recipe_step: 0,
     pending_recipe_confirmation_id: null, pending_food_topic_json: null, pending_meal_json: null,
     last_direct_log_json: null, ai_response_style: "balanced", streak_freeze_balance: 0,
-    email_verified: false, email_verification_code: code,
-    email_verification_expires: new Date(now.getTime() + VERIFICATION_CODE_TTL_MS),
-    email_verification_sent_at: now,
+    email_verified: true,
     created_at: FieldValue.serverTimestamp(),
   });
-  return { id, role: "user", code };
+  return { id, role: "user" };
 }
 
 export interface VerifyEmailResult {

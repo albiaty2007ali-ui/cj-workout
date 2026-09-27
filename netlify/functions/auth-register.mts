@@ -5,7 +5,6 @@ import { getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreReposi
 import { emailExists, createUser, signSession, buildSessionCookie } from "../../shared/nutrition-engine/auth.js";
 import { validateName, validateEmail, validatePassword } from "../../shared/nutrition-engine/validation.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
-import { sendWelcomeEmail, sendVerificationEmail } from "../../shared/nutrition-engine/emailService.js";
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method !== "POST") return jsonError(405, "METHOD_NOT_ALLOWED", "استخدم POST فقط.");
@@ -40,24 +39,12 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonError(400, "VALIDATION_ERROR", "تحقق من الحقول.", errors);
     }
 
-    const { id, role, code } = await createUser(db, { name, email, password });
+    const { id, role } = await createUser(db, { name, email, password });
 
-    try {
-      await sendWelcomeEmail(email, name);
-    } catch (e) {
-      console.warn("welcome email failed:", e);
-    }
-    // فشل إرسال كود التحقق لا يوقف التسجيل (نفس قاعدة email failures never block the action)،
-    // بس يبقى المستخدم غير مفعّل — زر "إعادة الإرسال" بشاشة التحقق يغطي حالة الفشل هذي.
-    try {
-      await sendVerificationEmail(email, name, code);
-    } catch (e) {
-      console.warn("verification email failed:", e);
-    }
-
-    // email_verified:false دائمًا هنا — التسجيل لا يمنح وصولاً فعليًا للتطبيق (شات/لوحة/تسجيل
-    // وجبات) إلا بعد إدخال الكود، راجع auth-verify-email.mts + chat.mts/progress-daily.mts's حراس
-    const token = signSession({ sub: id, role, email, email_verified: false });
+    // لا إرسال بريد إطلاقًا هنا (لا ترحيب ولا كود تحقق): Resend بلا نطاق موثَّق لا يسلّم لغير بريد
+    // صاحب الحساب، فالإرسال هنا كان بلا فائدة لأي مستخدم حقيقي غير حساب المطوّر نفسه. email_verified
+    // صار true مباشرة من createUser — راجع auth.ts's isEmailVerified لتفاصيل القرار.
+    const token = signSession({ sub: id, role, email, email_verified: true });
     return jsonOk({ user_id: id }, { headers: { "Set-Cookie": buildSessionCookie(token) } });
   } catch (err) {
     console.error("auth-register error:", err);
