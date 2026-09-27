@@ -10,9 +10,12 @@
     <script>
       // يُطبَّق قبل أول Paint حتى ما يصير "ومضة" لون خاطئ لحظة تحميل الصفحة —
       // نفس مفتاح localStorage ("cj_theme") المستخدم بالنسخة الأصلية (static/js/settings.js)
+      // القائمة يدويًا مطابقة لـsettings.mts's THEMES + frontend/src/lib/themes.ts (لا يمكن
+      // استيراد وحدة TS بسكربت ما قبل React) — لو أضفت ثيم جديد حدّث هذي القائمة أيضًا.
       try {
         var t = localStorage.getItem("cj_theme");
-        if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+        var valid = ["light", "dark", "midnight", "ocean", "emerald", "sunset", "aurora", "carbon"];
+        if (valid.indexOf(t) !== -1) document.documentElement.setAttribute("data-theme", t);
       } catch (e) {}
     </script>
   </head>

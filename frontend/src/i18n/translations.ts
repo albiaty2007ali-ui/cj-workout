@@ -82,6 +82,14 @@ export const translations = {
       whatsappButton: "تواصل عبر واتساب",
       unavailable: "قناة الاستشارة غير متوفرة حاليًا، جرب لاحقًا.",
     },
+    themes: {
+      premiumSectionTitle: "✨ ثيمات مميزة",
+      preview: "معاينة",
+    },
+    themePreview: {
+      title: "معاينة ثيم",
+      useTheme: "استخدام هذا الثيم",
+    },
     premiumLock: {
       title: "هذه الميزة متاحة للمشتركين",
       descriptionPrefix: "ميزة",

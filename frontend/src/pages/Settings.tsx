@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
-import ThemeToggle from "../components/ThemeToggle";
+import ThemeSelector from "../components/ThemeSelector";
 import AboutAppModal from "../components/AboutAppModal";
 import PremiumFeatureModal from "../components/PremiumFeatureModal";
 import { pushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from "../lib/push";
@@ -263,7 +263,7 @@ export default function Settings() {
 
         <div className="notice-box">
           <h3 style={{ marginTop: 0 }}>المظهر</h3>
-          <ThemeToggle />
+          <ThemeSelector isPremium={me.is_premium} currentTheme={me.theme} />
         </div>
 
         <div className="notice-box">

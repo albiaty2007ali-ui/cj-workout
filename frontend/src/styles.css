@@ -45,6 +45,65 @@
   --danger-border: rgba(255, 138, 138, 0.35);
 }
 
+/* ---- ثيمات Premium (حزمة تطوير الثيمات) ----
+   كل ثيم يعيد تعريف نفس الرموز الـ11 اللي [data-theme="dark"] أعلاه يعيد تعريفها بالضبط —
+   صفر رمز جديد، صفر "CSS hack" منفصل. الألوان الثابتة للهوية (--forest/--moss/--gold/...) تبقى
+   بدون تغيير بكل الثيمات (نفس قرار Light/Dark الحالي: Sidebar/Hero/Admin لا تُعاد تلوينها).
+   danger/danger-bg/danger-border نفس قيم [data-theme="dark"] بكل الثيمات (لون تحذير موحّد،
+   مستقل عن هوية الثيم نفسه). */
+[data-theme="midnight"] {
+  --bg: #0a0e1a; --surface: #131a2e; --surface-solid: #0f1524;
+  --text: #e8ecf7; --text-muted: rgba(232, 236, 247, 0.65);
+  --border: rgba(232, 236, 247, 0.14); --border-input: rgba(232, 236, 247, 0.2);
+  --heading: #8fa8ff;
+  --danger: #ff8a8a; --danger-bg: rgba(153, 27, 27, 0.18); --danger-border: rgba(255, 138, 138, 0.35);
+}
+
+[data-theme="ocean"] {
+  --bg: #061a1c; --surface: #0e2a2d; --surface-solid: #0a2224;
+  --text: #e3f6f5; --text-muted: rgba(227, 246, 245, 0.65);
+  --border: rgba(227, 246, 245, 0.14); --border-input: rgba(227, 246, 245, 0.2);
+  --heading: #5fd0c7;
+  --danger: #ff8a8a; --danger-bg: rgba(153, 27, 27, 0.18); --danger-border: rgba(255, 138, 138, 0.35);
+}
+
+[data-theme="emerald"] {
+  --bg: #08150f; --surface: #10251a; --surface-solid: #0c1d14;
+  --text: #e5f5ea; --text-muted: rgba(229, 245, 234, 0.65);
+  --border: rgba(229, 245, 234, 0.14); --border-input: rgba(229, 245, 234, 0.2);
+  --heading: #4ade80;
+  --danger: #ff8a8a; --danger-bg: rgba(153, 27, 27, 0.18); --danger-border: rgba(255, 138, 138, 0.35);
+}
+
+[data-theme="sunset"] {
+  --bg: #1a0f0a; --surface: #2b1810; --surface-solid: #23130d;
+  --text: #f7ece3; --text-muted: rgba(247, 236, 227, 0.65);
+  --border: rgba(247, 236, 227, 0.14); --border-input: rgba(247, 236, 227, 0.2);
+  --heading: #f5a15b;
+  --danger: #ff8a8a; --danger-bg: rgba(153, 27, 27, 0.18); --danger-border: rgba(255, 138, 138, 0.35);
+}
+
+[data-theme="aurora"] {
+  --bg: #130a1f; --surface: #221232; --surface-solid: #1b0e28;
+  --text: #f0e7fa; --text-muted: rgba(240, 231, 250, 0.65);
+  --border: rgba(240, 231, 250, 0.14); --border-input: rgba(240, 231, 250, 0.2);
+  --heading: #c084fc;
+  --danger: #ff8a8a; --danger-bg: rgba(153, 27, 27, 0.18); --danger-border: rgba(255, 138, 138, 0.35);
+}
+
+[data-theme="carbon"] {
+  --bg: #0d0d0d; --surface: #1a1a1a; --surface-solid: #141414;
+  --text: #eeeeee; --text-muted: rgba(238, 238, 238, 0.65);
+  --border: rgba(238, 238, 238, 0.14); --border-input: rgba(238, 238, 238, 0.2);
+  --heading: #ffffff;
+  --danger: #ff8a8a; --danger-bg: rgba(153, 27, 27, 0.18); --danger-border: rgba(255, 138, 138, 0.35);
+}
+
+/* انتقال سلس بين الثيمات — نفس الرموز فقط، صفر مكتبة جديدة. */
+:root {
+  transition: background-color .25s ease, color .25s ease, border-color .25s ease;
+}
+
 /* "تلقائي" (بدون data-theme صريح) يتبع تفضيل نظام التشغيل مباشرة. اختيار "فاتح" الصريح
    يبقى له الأولوية حتى لو نظام التشغيل غامق. */
 @media (prefers-color-scheme: dark) {
@@ -645,6 +704,27 @@ body {
   padding: 7px 14px; font-size: 0.85rem; cursor: pointer;
 }
 .theme-segmented button.active { background: var(--moss); color: #fff; }
+
+/* ---- شبكة ثيمات Premium (حزمة تطوير الثيمات) ---- */
+.theme-swatch {
+  width: 44px; height: 44px; border-radius: 14px; border: 2px solid var(--border);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s ease, border-color 0.15s ease; padding: 0;
+}
+.theme-swatch:hover { transform: scale(1.06); }
+.theme-swatch-active { border-color: var(--moss); box-shadow: 0 0 0 2px rgba(76, 122, 94, 0.35); }
+.theme-swatch-lock { font-size: 0.85rem; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+.theme-preview-link {
+  border: none; background: transparent; color: var(--moss); font-size: 0.72rem;
+  cursor: pointer; padding: 0; text-decoration: underline;
+}
+
+.theme-preview-box { border-radius: 14px; overflow: hidden; margin: 14px 0; border: 1px solid var(--border); }
+.theme-preview-card { background: var(--bg); color: var(--text); padding: 18px; }
+.theme-preview-bubble {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  border-radius: 12px; padding: 10px 14px; display: inline-block; font-size: 0.9rem;
+}
 
 .lang-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
 .lang-toggle-btn { border: none; background: transparent; color: var(--text-muted); border-radius: 999px; padding: 7px 16px; font-size: 0.85rem; cursor: pointer; }
