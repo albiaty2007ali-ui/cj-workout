@@ -60,38 +60,10 @@ export interface MeResponse {
   seen_features: Record<string, number>;
 }
 
-export interface SuggestedRecipe {
-  id: string;
-  slug: string;
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-}
-
-export interface NudgeAction {
-  icon: string;
-  label: string;
-  kind: "navigate" | "chat" | "consult";
-  target?: string;
-  prompt?: string;
-}
-
+/** الشات صار محادثة Gemini مباشرة بلا Function Calling — رد نصي فقط، صفر تسجيل/بيانات مرفقة. */
 export interface ChatReply {
   reply: string | null;
-  meal_logged: boolean;
-  today_calories?: number;
-  target_calories?: number;
-  remaining?: number;
-  xp?: number;
-  free_meals_used?: number;
-  suggested_recipe?: SuggestedRecipe | null;
-  meal_calories?: number;
-  meal_protein?: number;
-  meal_carbs?: number;
-  meal_fat?: number;
-  nudge_actions?: NudgeAction[];
+  is_system_error?: boolean;
 }
 
 export interface ReferralStats {

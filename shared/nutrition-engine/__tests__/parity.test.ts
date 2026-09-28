@@ -1,12 +1,13 @@
 /**
  * اختبارات تكافؤ (Parity) — تتحقق إن المنفذ TS يطابق سلوك الأصل Python حرفيًا، باستخدام نفس
- * الأمثلة الموثّقة بالـdocstrings الأصلية (arabic_normalize.py / quantity.py / fuzzy.py).
+ * الأمثلة الموثّقة بالـdocstrings الأصلية (arabic_normalize.py / quantity.py). اختبارات fuzzy.py
+ * حُذفت (كانت بهذا الملف) عند إزالة محرك الشات المحلي القديم — fuzzy.ts نفسها حُذفت (كانت
+ * جزءًا من استخراج الكيانات النصي، حصري بالشات القديم).
  */
 import { describe, it, expect } from "vitest";
 import { normalize } from "../arabicNormalize.js";
 import { parseWaterMl, findLeadingNumber, NUMBER_WORDS } from "../quantity.js";
 import { sequenceMatcherRatio } from "../sequenceMatcher.js";
-import { classifyCandidates, candidateTokens, leftoverText, type FuzzyMatch } from "../fuzzy.js";
 
 describe("arabicNormalize.normalize", () => {
   it("يوحّد أشكال الألف والياء المقصورة", () => {
@@ -99,55 +100,5 @@ describe("sequenceMatcherRatio — يطابق Python difflib.SequenceMatcher.rat
 
   it("مثال كلاسيكي معروف من توثيق Python نفسه: 'rain' vs 'shine' -> 0.4", () => {
     expect(sequenceMatcherRatio("rain", "shine")).toBeCloseTo(0.4444, 3);
-  });
-});
-
-describe("fuzzy.classifyCandidates", () => {
-  const makeMatch = (confidence: number): FuzzyMatch => ({
-    food_id: 1, food_name: "طعام", confidence,
-    alias_row: {
-      alias_id: 1, food_id: 1, food_name: "طعام", normalized_alias: "طعام",
-      quantity_multiplier: 1, is_plural_unspecified: 0, is_bulk: 0,
-    },
-  });
-
-  it("ثقة عالية (>=0.90) -> auto", () => {
-    const result = classifyCandidates([makeMatch(0.95)]);
-    expect(result.kind).toBe("auto");
-  });
-
-  it("ثقة متوسطة (0.70-0.89) -> confirm", () => {
-    const result = classifyCandidates([makeMatch(0.75)]);
-    expect(result.kind).toBe("confirm");
-  });
-
-  it("مرشحان متقاربان فوق عتبة التأكيد -> ambiguous", () => {
-    const result = classifyCandidates([makeMatch(0.80), makeMatch(0.74)]);
-    expect(result.kind).toBe("ambiguous");
-  });
-
-  it("ثقة منخفضة جدًا -> none", () => {
-    const result = classifyCandidates([makeMatch(0.40)]);
-    expect(result.kind).toBe("none");
-  });
-
-  it("قائمة فاضية -> none", () => {
-    expect(classifyCandidates([]).kind).toBe("none");
-  });
-});
-
-describe("fuzzy.candidateTokens / leftoverText", () => {
-  it("يستثني StopWords ويبني Bigrams", () => {
-    const leftover = "اكلت طعام غريب اليوم";
-    const tokens = candidateTokens(leftover);
-    expect(tokens).toContain("طعام");
-    expect(tokens).toContain("غريب");
-    expect(tokens).not.toContain("اكلت"); // StopWord
-  });
-
-  it("leftoverText يستبدل الأجزاء المستهلكة بمسافات فقط", () => {
-    // span [0,5) يغطي "اكلت " (4 أحرف + مسافة) = 5 حروف تتحول لمسافات
-    const result = leftoverText("اكلت بيض ولبن", [[0, 5]]);
-    expect(result).toBe("     بيض ولبن");
   });
 });

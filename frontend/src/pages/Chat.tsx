@@ -1,26 +1,20 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api, type ChatReply, type MeResponse, type SuggestedRecipe } from "../lib/api";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { api, type ChatReply, type MeResponse } from "../lib/api";
 import type { GreetingResponse } from "../lib/greetingApi";
 import type { DailyResponse, WeightStatsResponse } from "../lib/progressApi";
 import type { DailySummaryResponse } from "../lib/intelligenceApi";
 import AppShell from "../components/AppShell";
-import ConsultModal from "../components/ConsultModal";
 import { useI18n } from "../i18n/I18nContext";
-
-interface MealNutrition {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-}
+import { renderSafeMarkdown } from "../lib/safeMarkdown";
 
 interface Message {
   role: "user" | "bot";
   text: string;
-  recipeCard?: SuggestedRecipe;
-  mealCard?: MealNutrition;
-  nudgeActions?: ChatReply["nudge_actions"];
+  /** فقط لفقاعات خطأ نظام (فشل اتصال بـGemini) — نص مختلف واضح + زر إعادة محاولة، ليس رد بوت عادي. */
+  isError?: boolean;
+  /** نص المستخدم الأصلي اللي فشل إرساله، لزر "إعادة المحاولة". */
+  retryText?: string;
 }
 
 /**
@@ -33,6 +27,9 @@ const STATIC_PROMPTS: Array<{ labelKey: "chat.quickPromptWhatToEat" | "chat.quic
   { labelKey: "chat.quickPromptRemaining", prompt: "باقيلي شكد سعرات؟" },
   { labelKey: "chat.quickPromptSleep", prompt: "راح أنام" },
 ];
+
+/** يطابق نفس الثابت بـnetlify/functions/chat.mts — آخر كم رسالة تُرسَل كسياق لـGemini. */
+const MAX_HISTORY_TURNS = 20;
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -48,8 +45,6 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(null);
-  const [showConsult, setShowConsult] = useState(false);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [freeMealBanner, setFreeMealBanner] = useState<"warn1" | "limit" | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -91,7 +86,6 @@ export default function Chat() {
         return;
       }
       setMe(res.data);
-      if (res.data.profile) setRemaining(res.data.profile.calorie_target);
     });
     api.get<GreetingResponse>("/greeting").then((res) => {
       if (res.success && res.data) setGreeting(res.data);
@@ -142,56 +136,45 @@ export default function Chat() {
 
   /**
    * نقطة الإرسال الفعلية الوحيدة — تستدعيها كل من: نموذج الكتابة (sendMessage)، أزرار الشات
-   * السريعة (STATIC_PROMPTS/greeting.prompts)، القائمة الجانبية، مساعد CJ (عبر ?send=)، وأزرار
-   * nudge_actions. كل هذي المصادر ترسل فعليًا الآن (لا تكتفي بتعبئة مربع الكتابة).
+   * السريعة (STATIC_PROMPTS/greeting.prompts)، القائمة الجانبية، مساعد CJ (عبر ?send=)، وزر
+   * إعادة المحاولة. الشات صار محادثة Gemini مباشرة بلا تسجيل/تعديل بيانات — الرد نص فقط، فصفر
+   * إعادة جلب لـ/progress/daily أو /me بعد كل رسالة (كانت ضرورية بالمحرك القديم اللي يسجّل
+   * وجبات/ماي من داخل الشات، الشات الجديد لا يقدر يغيّر أي بيانات إطلاقًا).
    */
   async function dispatchMessage(text: string) {
     if (!text.trim() || sending) return;
+
+    // آخر N رسالة من المحادثة الحالية (React state نفسها، صفر تخزين سيرفر) — تُرسَل مع كل طلب
+    // حتى Gemini يفهم السياق (قسم 9 بالطلب: "مشتهي بيتزا" ← "وإذا حجم وسط؟" يبقى مفهوم كمتابعة).
+    // فقاعات خطأ النظام (isError) تُستبعَد من السياق — مو رد Gemini حقيقي، تشويش بلا فائدة.
+    const history = messages
+      .filter((m) => !m.isError)
+      .slice(-MAX_HISTORY_TURNS)
+      .map((m) => ({ role: m.role === "bot" ? ("assistant" as const) : ("user" as const), text: m.text }));
 
     setMessages((prev) => [...prev, { role: "user", text }]);
     setSending(true);
 
     try {
-      const res = await api.post<ChatReply>("/chat", { message: text });
+      const res = await api.post<ChatReply>("/chat", { message: text, history });
       if (!res.success) {
         if (res.error?.code === "ACCOUNT_BANNED") {
           navigate("/account-banned", { state: { ban: res.error.details } });
           return;
         }
-        const message =
-          res.error?.code === "TRIAL_EXHAUSTED"
-            ? t("chat.trialExhausted")
-            : res.error?.message ?? t("chat.genericError");
-        setMessages((prev) => [...prev, { role: "bot", text: message }]);
+        const message = res.error?.message ?? t("chat.genericError");
+        setMessages((prev) => [...prev, { role: "bot", text: message, isError: true, retryText: text }]);
+        return;
+      }
+      if (res.data?.is_system_error) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "bot", text: res.data?.reply ?? t("chat.genericError"), isError: true, retryText: text },
+        ]);
         return;
       }
       const reply = res.data?.reply ?? "...";
-      const mealCard =
-        res.data?.meal_logged && typeof res.data.meal_calories === "number"
-          ? {
-              calories: res.data.meal_calories,
-              protein: res.data.meal_protein ?? 0,
-              carbs: res.data.meal_carbs ?? 0,
-              fat: res.data.meal_fat ?? 0,
-            }
-          : undefined;
-      setMessages((prev) => [
-        ...prev,
-        { role: "bot", text: reply, recipeCard: res.data?.suggested_recipe ?? undefined, mealCard, nudgeActions: res.data?.nudge_actions },
-      ]);
-      if (typeof res.data?.remaining === "number") setRemaining(res.data.remaining);
-      if (typeof res.data?.today_calories === "number" && daily) {
-        setDaily({ ...daily, target_calories: daily.target_calories });
-      }
-      // أرقام اليوم (أكلت/متبقي) ممكن تكون تغيّرت بعد أي رسالة (تسجيل وجبة/ماي) — نجيبها من جديد
-      api.get<DailyResponse>("/progress/daily").then((r) => {
-        if (r.success && r.data && r.data.meals) setDaily(r.data);
-      });
-      // free_meals_used بالرد يعني وجبة مجانية استُهلكت هسه — نجيب /me من جديد حتى
-      // free_meals_remaining (وseen_features لبانر التنبيه) يبقى حقيقي، مو قيمة أول تحميل باهتة.
-      if (typeof res.data?.free_meals_used === "number") {
-        api.get<MeResponse>("/me").then((r) => { if (r.success && r.data) setMe(r.data); });
-      }
+      setMessages((prev) => [...prev, { role: "bot", text: reply }]);
     } finally {
       setSending(false);
     }
@@ -220,12 +203,6 @@ export default function Chat() {
     dispatchMessage(decodeURIComponent(toSend));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
-
-  function handleNudgeAction(action: NonNullable<ChatReply["nudge_actions"]>[number]) {
-    if (action.kind === "navigate" && action.target) navigate(action.target);
-    else if (action.kind === "chat" && action.prompt) dispatchMessage(action.prompt);
-    else if (action.kind === "consult") setShowConsult(true);
-  }
 
   if (!me) return null; // بانتظار /api/me — لا نعرض القائمة الجانبية بدون اسم مستخدم حقيقي
 
@@ -320,48 +297,21 @@ export default function Chat() {
             const newTurn = i === 0 || messages[i - 1].role !== m.role;
             return (
               <div key={i}>
-                <div className={`bubble ${m.role}${newTurn ? " bubble-new-turn" : ""}`}>{m.text}</div>
-                {m.mealCard && (
-                  <div className="nutrition-card">
-                    <div className="nutrition-card-grid">
-                      <div className="nutrition-card-cell">
-                        <p className="val">{m.mealCard.calories}</p>
-                        <p className="lbl">{t("chat.macroCalories")}</p>
-                      </div>
-                      <div className="nutrition-card-cell">
-                        <p className="val">{m.mealCard.protein}غ</p>
-                        <p className="lbl">{t("chat.macroProtein")}</p>
-                      </div>
-                      <div className="nutrition-card-cell">
-                        <p className="val">{m.mealCard.carbs}غ</p>
-                        <p className="lbl">{t("chat.macroCarbs")}</p>
-                      </div>
-                      <div className="nutrition-card-cell">
-                        <p className="val">{m.mealCard.fat}غ</p>
-                        <p className="lbl">{t("chat.macroFat")}</p>
-                      </div>
-                    </div>
+                {m.role === "bot" && !m.isError ? (
+                  <div
+                    className={`bubble bot${newTurn ? " bubble-new-turn" : ""}`}
+                    dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(m.text) }}
+                  />
+                ) : (
+                  <div className={`bubble ${m.role}${m.isError ? " bubble-error" : ""}${newTurn ? " bubble-new-turn" : ""}`}>
+                    {m.text}
                   </div>
                 )}
-                {m.recipeCard && (
-                  <Link className="recipe-card chat-recipe-card" to={`/recipes/${encodeURIComponent(m.recipeCard.slug)}`}>
-                    <div className="recipe-card-img-placeholder">🍽️</div>
-                    <div className="recipe-card-body">
-                      <p className="recipe-card-name">{m.recipeCard.name}</p>
-                      <p className="recipe-card-macros">
-                        {m.recipeCard.calories} kcal · بروتين {m.recipeCard.protein}غ · كارب {m.recipeCard.carbs}غ · دهون {m.recipeCard.fat}غ
-                      </p>
-                      <span className="btn btn-outline-dark recipe-card-btn">{t("chat.viewRecipeButton")}</span>
-                    </div>
-                  </Link>
-                )}
-                {m.nudgeActions && m.nudgeActions.length > 0 && (
-                  <div className="quick-prompts nudge-actions">
-                    {m.nudgeActions.map((a, ai) => (
-                      <button type="button" key={ai} className="qp-btn nudge-action-btn" onClick={() => handleNudgeAction(a)}>
-                        {a.icon} {a.label}
-                      </button>
-                    ))}
+                {m.isError && m.retryText && (
+                  <div className="quick-prompts">
+                    <button type="button" className="qp-btn" disabled={sending} onClick={() => dispatchMessage(m.retryText!)}>
+                      🔄 {t("chat.retryButton")}
+                    </button>
                   </div>
                 )}
               </div>
@@ -403,7 +353,6 @@ export default function Chat() {
           <button type="submit" disabled={sending}>{t("chat.sendButton")}</button>
         </form>
       </div>
-      {showConsult && <ConsultModal onClose={() => setShowConsult(false)} />}
     </AppShell>
   );
 }

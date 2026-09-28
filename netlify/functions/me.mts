@@ -8,7 +8,6 @@ import { FirestoreRepository, getFirebaseApp, getUserDisplayFields } from "../..
 import { authenticateRequest, isAdminClaims } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
 import { trialExhausted, freeMealsRemaining } from "../../shared/nutrition-engine/userStatus.js";
-import { getConversationalMode } from "../../shared/nutrition-engine/conversation/config.js";
 import { generateReferralCode } from "../../shared/nutrition-engine/auth.js";
 
 export default async (req: Request, _context: Context): Promise<Response> => {
@@ -49,9 +48,9 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       theme: display?.theme ?? "dark",
       seen_features: display?.seen_features ?? {},
       referral_code: user.referral_code,
-      // إشارة حقيقية (مو شارة ثابتة دائمًا خضراء) — يعكس هل GEMINI_API_KEY مضبوط فعليًا وGEMINI_
-      // CONVERSATIONAL_MODE ليس OFF. لا يستدعي Gemini حقيقيًا (صفر تكلفة/تأخير)، بس لا يخترع حالة.
-      ai_status: getConversationalMode() !== "OFF" && Boolean(process.env.GEMINI_API_KEY) ? "ok" : "not_configured",
+      // إشارة حقيقية (مو شارة ثابتة دائمًا خضراء) — الشات صار محادثة Gemini مباشرة (صفر أوضاع
+      // OFF/SHADOW/ACTIVE بعد إزالة محرك النية القديم)، فالحالة الوحيدة المهمة هي وجود المفتاح.
+      ai_status: Boolean(process.env.GEMINI_API_KEY) ? "ok" : "not_configured",
     });
   } catch (err) {
     console.error("me error:", err);

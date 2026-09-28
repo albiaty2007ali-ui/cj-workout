@@ -411,6 +411,7 @@ export const translations = {
       sendButton: "إرسال",
       trialExhausted: "خلصت وجباتك المجانية 🌱 تحتاج اشتراك للمتابعة.",
       genericError: "صار خطأ، جرب مرة ثانية.",
+      retryButton: "إعادة المحاولة",
       quickPromptWhatToEat: "🥗 شنو آكل هسه؟",
       quickPromptRemaining: "🔥 شكد باقيلي سعرات؟",
       quickPromptSleep: "😴 راح أنام",

@@ -1,18 +1,20 @@
 /**
- * POST /api/chat — يعادل chat.py's api_chat بالإنتاج الحالي. Netlify Function v2 (Web-standard
- * Request/Response). Stateless بالكامل — كل الحالة (pending_meal_json، إلخ) تُقرأ/تُكتب من
- * Postgres عبر PostgresRepository بكل استدعاء، بدون أي متغير Module-level قابل للتغيّر.
+ * POST /api/chat — محادثة Gemini مباشرة (النظام الجديد بالكامل، يحل محل المحرك المحلي القديم
+ * كشف-نية/orchestrator/dispatch). **صفر منطق تسجيل/تعديل هنا** — هذا الملف لا يستدعي
+ * finalizeMeal/runWaterLoggingPipeline/أي دالة تكتب بيانات إطلاقًا. المسار الوحيد: auth →
+ * بناء Context للقراءة فقط → نداء Gemini وحيد بلا Tools (geminiChat.ts) → { reply }.
  */
 import type { Context } from "@netlify/functions";
 import { getFirestore } from "firebase-admin/firestore";
-import { FirestoreRepository, getFirebaseApp } from "../../shared/nutrition-engine/db/firestoreRepository.js";
-import { handleMessage } from "../../shared/nutrition-engine/orchestrator.js";
+import { FirestoreRepository, getFirebaseApp, getUserDisplayFields } from "../../shared/nutrition-engine/db/firestoreRepository.js";
 import { authenticateRequest, isEmailVerified, checkBanStatus } from "../../shared/nutrition-engine/auth.js";
 import { jsonOk, jsonError } from "../../shared/nutrition-engine/httpResponse.js";
-import { sendNotification } from "../../shared/nutrition-engine/notifications/engine.js";
-import { getProvider } from "../../shared/nutrition-engine/provider.js";
+import { todayTotals } from "../../shared/nutrition-engine/calculator.js";
+import { xpProgress } from "../../shared/nutrition-engine/levels.js";
+import { callGeminiChat, type ChatHistoryTurn } from "../../shared/nutrition-engine/geminiChat.js";
 
-interface NewMilestone { days: number; label: string; xp_reward: number }
+const MAX_HISTORY_TURNS = 20;
+const CHAT_ERROR_MESSAGE = "صار عندي خلل مؤقت بالاتصال، حاول مرة ثانية.";
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method !== "POST") {
@@ -23,12 +25,9 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   if (!claims) {
     return jsonError(401, "UNAUTHENTICATED", "يجب تسجيل الدخول.");
   }
-  // طلب أمني صريح: صفر وصول للشات (وبالتالي تسجيل الوجبات عبره) قبل تأكيد البريد
   if (!isEmailVerified(claims)) {
     return jsonError(403, "EMAIL_NOT_VERIFIED", "أكّد بريدك الإلكتروني أول حتى تگدر تستخدم الشات.");
   }
-  // فحص حظر حقيقي أثناء الجلسة (حزمة تطوير الحظر) — لا يكفي فحص تسجيل الدخول وحده لأن JWT
-  // صالح 14 يوم؛ حساب يُحظَر أثناء جلسة فعّالة لازم يُمنع فورًا، طلب صريح بالمواصفة.
   const banStatus = await checkBanStatus(getFirestore(getFirebaseApp()), claims.sub);
   if (banStatus.banned) {
     return jsonError(403, "ACCOUNT_BANNED", "هذا الحساب محظور.", {
@@ -36,7 +35,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     });
   }
 
-  let body: { message?: unknown };
+  let body: { message?: unknown; history?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -48,6 +47,18 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     return jsonError(400, "VALIDATION_ERROR", "الرسالة فاضية.");
   }
 
+  // history تُرسَل من العميل نفسه (React state) — الخدمة عديمة الحالة بالكامل، صفر حفظ محادثة
+  // بالسيرفر. نتحقق من الشكل بدل الثقة العمياء بجسم الطلب.
+  const rawHistory = Array.isArray(body.history) ? body.history : [];
+  const history: ChatHistoryTurn[] = rawHistory
+    .filter((t): t is { role: unknown; text: unknown } => typeof t === "object" && t !== null)
+    .map((t) => ({
+      role: t.role === "assistant" ? "assistant" as const : "user" as const,
+      text: typeof t.text === "string" ? t.text : "",
+    }))
+    .filter((t) => t.text.trim().length > 0)
+    .slice(-MAX_HISTORY_TURNS);
+
   try {
     const repo = new FirestoreRepository();
     const user = await repo.findUser(claims.sub);
@@ -55,50 +66,36 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonError(404, "USER_NOT_FOUND", "الحساب غير موجود.");
     }
 
-    const result = await handleMessage(repo, user, text);
+    const [profile, display, levels, dayTotals] = await Promise.all([
+      repo.findNutritionProfile(claims.sub),
+      getUserDisplayFields(getFirestore(getFirebaseApp()), claims.sub),
+      repo.listLevels(),
+      todayTotals(repo, claims.sub),
+    ]);
 
-    if (result.premium_required) {
-      return jsonError(402, "TRIAL_EXHAUSTED", "خلصت وجباتك المجانية. تحتاج اشتراك لتكملة التسجيل.");
+    const progress = xpProgress(levels, user.xp);
+    const remaining = profile ? profile.calorie_target - dayTotals.calories : null;
+
+    const result = await callGeminiChat(text, history, {
+      displayName: display?.name || "كابتن",
+      age: profile?.age ?? null,
+      currentWeight: profile?.weight_kg ?? null,
+      goal: profile?.goal ?? null,
+      calorieTarget: profile?.calorie_target ?? null,
+      remainingCalories: remaining,
+      level: progress.level,
+      levelTitle: progress.title,
+      streakDays: user.streak_days,
+      isPremium: user.is_premium,
+    });
+
+    if (result.error || !result.reply) {
+      return jsonOk({ reply: CHAT_ERROR_MESSAGE, is_system_error: true });
     }
 
-    // صياغة اختيارية عبر Gemini — لا تلمس أي رقم، فقط تنويع الجملة. تُتخطى بأمان بدون
-    // GEMINI_API_KEY (getProvider() ترجع NullAIProvider)، ولا ترمي أبدًا ولا تعطّل الرد الأصلي.
-    // تُتخطى أيضًا صراحة لو الرد أصلًا صادر من طبقة المحادثة الجديدة (GEMINI_CONVERSATIONAL_
-    // MODE=ACTIVE، علامة _composed_by_gemini) — نداء Gemini ثانٍ لتنويع نص Gemini نفسه زائد
-    // بلا فائدة (تكلفة/زمن إضافي مجانًا)، راجع orchestrator.ts's assembleActiveResult.
-    const composedByGemini = Boolean((result as { _composed_by_gemini?: boolean })._composed_by_gemini);
-    delete (result as { _composed_by_gemini?: boolean })._composed_by_gemini;
-    const provider = getProvider();
-    if (!composedByGemini && result.reply && provider.isAvailable()) {
-      const rephrased = await provider.rephrase(result.reply, { kind: result.meal_logged ? "meal_logged" : "chat_reply" });
-      if (rephrased) result.reply = rephrased;
-    }
-
-    // Push حقيقي لأي محطة Streak جديدة — Best-effort دائمًا (sendNotification لا ترمي، ولا تؤخر
-    // إرسال رد الشات نفسه لو فشلت). await عمدًا (مو fire-and-forget) — بيئة Serverless ما تضمن
-    // إكمال عمل بالخلفية بعد رجوع الاستجابة (قرار مقصود من قبل، لم يُعاد النظر فيه بمرحلة
-    // Gemini-First: هذا الفرع نادر أصلًا — يعمل فقط عند عبور محطة Streak حقيقية، مو بكل رسالة —
-    // فتكلفته الزمنية على الحالة الشائعة صفرية، وسلامة تسليم الـPush أهم من توفير ms نادرة).
-    const newMilestones = result.new_milestones as NewMilestone[] | undefined;
-    if (newMilestones && newMilestones.length > 0) {
-      const db = getFirestore(getFirebaseApp());
-      for (const m of newMilestones) {
-        await sendNotification(db, claims.sub, "STREAK", `streak_${m.days}`, "/profile", "🔥 محطة جديدة!", `${m.label} — +${m.xp_reward} XP`);
-      }
-      // ربط بسيط مع بطاقة الإنجاز القابلة للمشاركة (حزمة الإحالة/Premium) — زر إضافي فقط لو
-      // ماكو nudge_actions أصلًا من مسار ثانٍ (نفس أولوية attachUnderEatingNudge's الحارس،
-      // صفر استبدال لأي اقتراح موجود). صفر لمس لمنطق حساب المحطات نفسه.
-      if (!result.nudge_actions) {
-        result.nudge_actions = [
-          { icon: "📤", label: "شارك إنجازك", kind: "navigate", target: "/profile?share=streak" },
-        ];
-      }
-    }
-
-    return jsonOk(result);
+    return jsonOk({ reply: result.reply });
   } catch (err) {
-    // لا نكشف تفاصيل الخطأ الداخلي للمستخدم أبدًا — تُسجَّل بـLogs فقط (console.error يصل Netlify Logs)
     console.error("chat function error:", err);
-    return jsonError(500, "INTERNAL_ERROR", "صار خطأ غير متوقع، جرب مرة ثانية.");
+    return jsonOk({ reply: CHAT_ERROR_MESSAGE, is_system_error: true });
   }
 };

@@ -1,74 +1,29 @@
 /**
- * منفذ من nutrition_ai/orchestrator.py — القلب اللي يجمع كل الطبقات (Intent Detector, Entity
- * Extractor, Quantity Resolver, Meal State Machine, Nutrition Calculator, Recommendation Engine,
- * Tips Engine, Context Manager, Response Generator) لبناء رد واحد. لا اتصال شبكة هنا، ولا أي رقم
- * سعرات يُخترع — كل شيء يمر من foodSearch.ts/foods.sqlite عبر calculator.ts.
- *
- * ملاحظة هجرة: إشعار Push لمحطة Streak جديدة عمدًا خارج هذا الملف — orchestrator.ts يبقى
- * Repository-agnostic (يشتغل بنفس الدقة مع InMemoryRepository بالاختبارات وFirestoreRepository
- * حقيقيًا)، بينما إرسال Push يحتاج Firestore مباشرة (اشتراكات المتصفح). DispatchResult يحمل
- * new_milestones، والمستدعي (netlify/functions/chat.mts) يستخدمها لإرسال push حقيقي best-effort
- * (فشل الإرسال لا يوقف ولا يؤخر تسجيل الوجبة/الماي أبدًا — راجع notifications/engine.ts).
+ * بعد إزالة محرك الشات المحلي القديم (كشف نية/dispatch/Gemini tool-calling — الشات صار محادثة
+ * Gemini مباشرة عبر shared/nutrition-engine/geminiChat.ts + netlify/functions/chat.mts الجديد)،
+ * هذا الملف عاد يحتوي فقط الدوال المشتركة اللي تستخدمها ميزات غير-شات حقيقية:
+ * - finalizeMeal (نقطة الحقيقة الوحيدة لإنشاء MealLog) + logMealManually/logManualCalorieEntry
+ *   (زر "+ إضافة وجبة يدويًا" بـDaily.tsx، عبر progress-daily.mts) + updateMealLogTotals/
+ *   deleteMealLogById (إدارة وجبات اليوم اليدوية، نفس الصفحة).
+ * - handleWaterLog/runWaterLoggingPipeline (زر "✅ شربت كوب" بإشعار الماي، water-quick-log.mts).
+ * - markRecipeAwaitingConfirmation (إكمال تحضير وصفة، recipes-actions.mts).
+ * صفر اتصال شبكة هنا، صفر رقم سعرات يُخترع — كل شيء يمر من foodSearch.ts/foods.sqlite عبر
+ * calculator.ts، بالضبط متل قبل — هذا التوثيق لم يتغيّر، فقط طبقة كشف-النية القديمة حُذفت.
  */
-import { normalize } from "./arabicNormalize.js";
 import * as behaviorAggregator from "./behaviorAggregator.js";
 import * as calculator from "./calculator.js";
 import * as context from "./context.js";
-import * as corrections from "./corrections.js";
 import * as directLog from "./directLog.js";
-import { extractFoodEntities } from "./entities.js";
-import * as intents from "./intents.js";
-import * as mealState from "./mealState.js";
 import * as patternDetection from "./patternDetection.js";
-import { findLeadingNumber, parseWaterMl } from "./quantity.js";
-import * as recipeMatching from "./recipeMatching.js";
-import * as recipeSearch from "./recipeSearch.js";
-import * as recommendations from "./recommendations.js";
+import { parseWaterMl } from "./quantity.js";
 import * as responses from "./responses.js";
 import * as streaks from "./streaks.js";
 import * as tipsEngine from "./tipsEngine.js";
-import * as weightOps from "./weightOps.js";
 import * as xpEngine from "./xpEngine.js";
-import { getPortionsFor, isFoodBulk } from "./foodSearch.js";
-import { getCurrentPeriod, getConversationalPeriod, nowBaghdad, todayBaghdadIso } from "./iraqTime.js";
-import * as mealBudget from "./mealBudget.js";
-import { explicitMealTypeKeyword, findMealType } from "./mealTypeDetection.js";
-import * as nluConfig from "./nlu/config.js";
-import { NLU_ALLOWED_INTENTS } from "./nlu/knownIntents.js";
-import type { NLUContext } from "./nlu/types.js";
-import { pyFloatStr } from "./pyRound.js";
+import { nowBaghdad, todayBaghdadIso } from "./iraqTime.js";
 import { FREE_MEALS_CAP } from "./userStatus.js";
 import type { Repository, UserRecord } from "./db/repository.js";
-import type { PendingMeal, PendingItem } from "./corrections.js";
-import * as brain from "./conversation/brain.js";
-import * as conversationConfig from "./conversation/config.js";
-import * as conversationTools from "./conversation/tools.js";
-import * as mutationTools from "./conversation/mutationTools.js";
-import * as stateStore from "./conversation/stateStore.js";
-import type * as conversationTypes from "./conversation/types.js";
-
-// كلمات تصنيف تُمرَّر مباشرة لـrecipeSearch بدل بحث نصي حر — نفس عبارات
-// intents.RECIPE_CATEGORY_PHRASES المركّبة عمدًا (تفادي تصادم مع تسجيل وجبة فعلي)
-const RECIPE_CATEGORY_KEYWORDS: Record<string, string> = {
-  "حلو": "حلويات", "حلويات": "حلويات",
-  "مشروب حار": "مشروبات حارة", "قهوة": "مشروبات حارة", "شاي": "مشروبات حارة",
-  "مشروب بارد": "مشروبات باردة",
-};
-
-async function matchRecipeCategoryId(repo: Repository, textNorm: string): Promise<string | null> {
-  if (!intents.RECIPE_CATEGORY_PHRASES.some((p) => textNorm.includes(p))) return null;
-  for (const [keyword, categoryName] of Object.entries(RECIPE_CATEGORY_KEYWORDS)) {
-    if (textNorm.includes(keyword)) {
-      const category = await repo.findRecipeCategoryByName(categoryName);
-      if (category) return category.id;
-    }
-  }
-  return null;
-}
-
-const REOPEN_INTENTS = new Set([
-  intents.CORRECTION, intents.CHANGE_QUANTITY, intents.REMOVE_FOOD, intents.SWAP_FOOD, intents.ADD_FOOD,
-]);
+import type { PendingMeal } from "./mealTypes.js";
 
 async function markMealLogged(repo: Repository, user: UserRecord, mealType: string, now: Date): Promise<void> {
   if (mealType !== "breakfast" && mealType !== "lunch" && mealType !== "dinner") return;
@@ -89,225 +44,29 @@ function addResolvedToPending(pending: PendingMeal, hit: { food_id: number; food
   });
 }
 
-type ClarificationItem =
-  | { kind: "quantity"; food_id: number; food_name: string }
-  | { kind: "confirm_match"; food_id: number; food_name: string; alias_row: unknown; start: number | null; end: number | null; source_text: string }
-  | { kind: "ambiguous_match"; options: { food_id: number; food_name: string; alias_row: unknown }[]; start: number | null; end: number | null; source_text: string };
-
-async function clarificationPrompt(item: ClarificationItem): Promise<string> {
-  if (item.kind === "confirm_match") return responses.clarifyConfirmMatch(item.food_name);
-  if (item.kind === "ambiguous_match") {
-    const [a, b] = item.options;
-    return responses.clarifyAmbiguous(a.food_name, b.food_name);
-  }
-  const portions = await getPortionsFor(item.food_id);
-  if (portions.length === 0) return responses.clarifyQuantityNoPortions(item.food_name);
-  const lines = portions.map((p) => `🍽️ ${p.portion_name}`).join("\n");
-  return responses.clarifyQuantityWithPortions(item.food_name, lines);
-}
-
-export function summarizePending(pending: PendingMeal): string {
-  const total = pending.items.reduce((s, i) => s + i.calories, 0);
-  const mealLabel = responses.MEAL_TYPE_LABELS[pending.meal_type] ?? "الوجبة";
-  return (
-    `صار عندي لـ${mealLabel}: ${responses.itemsInline(pending.items)}\n` +
-    `🔥 تقريباً ${total} سعرة\n\n${responses.mealConfirmPrompt(pending.meal_type)}`
-  );
-}
-
-type ResolvedClarificationResult =
-  | { food_id: number; food_name: string; resolved: true; grams: number; portion_name?: string }
-  | { food_id: number; food_name: string; needsQuantity: true }
-  | "REJECTED"
-  | null;
-
-/**
- * الطعام معروف الآن (تأكيد هوية أو اختيار من مرشّحين)، لكن resolveAliasAt ما گدر يحدد الكمية من
- * نص الرسالة الأصلية (مثلاً "باجة" بدون "صحن باجة" أو رقم) — بدل رجوع null (يخلي نفس سؤال
- * "تقصد X؟" يتكرر للأبد لأن المستخدم فعليًا أكّد بس الكود يرمي التأكيد)، نحوّلها لتوضيح "quantity"
- * جديد بنفس الشكل اللي يصير بالمطابقة التلقائية عالية الثقة (entities.ts).
- */
-function toResult(hit: Awaited<ReturnType<typeof import("./foodSearch.js").resolveAliasAt>>): ResolvedClarificationResult {
-  if (hit.resolved) return hit as ResolvedClarificationResult;
-  return { food_id: hit.food_id, food_name: hit.food_name, needsQuantity: true };
-}
-
-async function resolveClarificationItem(item: ClarificationItem, textNorm: string): Promise<ResolvedClarificationResult> {
-  const { resolveQuantityForFood, resolveAliasAt } = await import("./foodSearch.js");
-
-  if (item.kind === "quantity") {
-    const res = await resolveQuantityForFood(item.food_id, textNorm);
-    if (res.resolved) {
-      return { food_id: item.food_id, food_name: item.food_name, resolved: true, grams: res.grams!, portion_name: res.portion_name };
-    }
-    return null;
-  }
-
-  if (item.kind === "confirm_match") {
-    if (intents.matchesPhrase(textNorm, intents.CONFIRM_PHRASES)) {
-      const hit = await resolveAliasAt(item.alias_row as never, item.source_text, item.start ?? 0);
-      return toResult(hit);
-    }
-    if (intents.matchesPhrase(textNorm, intents.CANCEL_PHRASES)) return "REJECTED";
-    return null;
-  }
-
-  if (item.kind === "ambiguous_match") {
-    const normText = normalize(textNorm);
-    for (const opt of item.options) {
-      if (normalize(opt.food_name) && normText.includes(normalize(opt.food_name))) {
-        const hit = await resolveAliasAt(opt.alias_row as never, item.source_text, item.start ?? 0);
-        return toResult(hit);
-      }
-    }
-    const stripped = normText.trim();
-    if (stripped === "1" || stripped === "الاول" || stripped === "الأول") {
-      const hit = await resolveAliasAt(item.options[0].alias_row as never, item.source_text, item.start ?? 0);
-      return toResult(hit);
-    }
-    if (stripped === "2" || stripped === "الثاني" || stripped === "الثانية") {
-      const hit = await resolveAliasAt(item.options[1].alias_row as never, item.source_text, item.start ?? 0);
-      return toResult(hit);
-    }
-    return null;
-  }
-
-  return null;
-}
-
-function hasAnswerableClarification(pending: PendingMeal | null): boolean {
-  if (!pending || !pending.pending_clarifications?.length) return false;
-  const first = pending.pending_clarifications[0] as ClarificationItem;
-  return first.kind === "confirm_match" || first.kind === "ambiguous_match";
-}
-
 export interface DispatchResult {
   reply: string | null;
   meal_logged: boolean;
   [key: string]: unknown;
 }
 
-function clarificationFoodIds(c: ClarificationItem): Set<number> {
-  if (c.kind === "ambiguous_match") return new Set(c.options.map((o) => o.food_id));
-  return "food_id" in c ? new Set([c.food_id]) : new Set();
-}
-
-async function handleMealMessage(
-  repo: Repository, user: UserRecord, textNorm: string, pending: PendingMeal | null, now: Date,
-): Promise<DispatchResult> {
-  if (pending) {
-    const remainingClarifications: ClarificationItem[] = [];
-    for (const item of pending.pending_clarifications as ClarificationItem[]) {
-      const result = await resolveClarificationItem(item, textNorm);
-      if (result === "REJECTED") continue;
-      if (result !== null && "needsQuantity" in result) {
-        // الهوية تأكدت (بس الكمية ماكو بالرسالة الأصلية) — نستبدل سؤال "تقصد X؟" بسؤال كمية حقيقي
-        // بدل ما يتكرر نفس سؤال التأكيد للأبد كل ما يجاوب المستخدم "اي".
-        remainingClarifications.push({ kind: "quantity", food_id: result.food_id, food_name: result.food_name });
-      } else if (result !== null) {
-        const n = await calculator.computeFood(result.food_id, result.grams);
-        addResolvedToPending(pending, result, n);
-      } else {
-        remainingClarifications.push(item);
-      }
-    }
-    pending.pending_clarifications = remainingClarifications;
-
-    const newEntities = await extractFoodEntities(textNorm);
-    const existingItemIds = new Set(pending.items.map((i) => i.food_id));
-    const quantityClarificationIds = new Set(
-      (pending.pending_clarifications as ClarificationItem[])
-        .filter((c) => c.kind === "quantity")
-        .map((c) => (c as { food_id: number }).food_id),
-    );
-
-    for (const hit of newEntities.resolved) {
-      const fid = hit.food_id;
-      if (existingItemIds.has(fid) || quantityClarificationIds.has(fid)) continue;
-      pending.pending_clarifications = (pending.pending_clarifications as ClarificationItem[]).filter(
-        (c) => !clarificationFoodIds(c).has(fid),
-      );
-      const n = await calculator.computeFood(fid, hit.grams ?? 0);
-      addResolvedToPending(pending, hit, n);
-      existingItemIds.add(fid);
-    }
-
-    let pendingClarificationIds = new Set<number>();
-    for (const c of pending.pending_clarifications as ClarificationItem[]) {
-      for (const id of clarificationFoodIds(c)) pendingClarificationIds.add(id);
-    }
-    for (const clar of newEntities.clarifications as unknown as ClarificationItem[]) {
-      const cids = clarificationFoodIds(clar);
-      const overlaps = [...cids].some((id) => existingItemIds.has(id) || pendingClarificationIds.has(id));
-      if (cids.size > 0 && overlaps) continue;
-      (pending.pending_clarifications as ClarificationItem[]).push(clar);
-      pendingClarificationIds = new Set([...pendingClarificationIds, ...cids]);
-    }
-
-    await mealState.savePending(repo, user, pending);
-
-    if (pending.pending_clarifications.length > 0) {
-      return { reply: await clarificationPrompt(pending.pending_clarifications[0] as ClarificationItem), meal_logged: false };
-    }
-    if (pending.items.length > 0) {
-      return { reply: summarizePending(pending), meal_logged: false };
-    }
-    return { reply: "ما قدرت أتعرف على أكلة واضحة برسالتك. جرب تكتب اسم الأكلة بالضبط.", meal_logged: false };
-  }
-
-  // ---------------- رسالة جديدة كليًا ----------------
-  const result = await extractFoodEntities(textNorm);
-  if (result.resolved.length === 0 && result.clarifications.length === 0) {
-    // رسالة تذكر كلمة وجبة صريحة بس بدون اسم أكلة فعلي ("فطور !!"، "غداء") — هذا مو "ما فهمت
-    // شي إطلاقًا"، هذا واضح جدًا شنو الوجبة، بس ناقص اسم الأكلة. رد مخصّص أفضل بكثير من الرسالة
-    // العامة (اكتُشف هذا الفرق من شكوى مستخدم حقيقية: "فطور !!" أعطت ردًا عامًا يوحي بالفشل).
-    const bareMealType = explicitMealTypeKeyword(textNorm);
-    if (bareMealType) {
-      const label = responses.MEAL_TYPE_LABELS[bareMealType] ?? "الوجبة";
-      return { reply: `تمام كابتن، شنو أكلت بالضبط بـ${label}؟ گلي اسم الأكلة (مثلاً: بيضتين وخبز) وأحسبلك السعرات.`, meal_logged: false };
-    }
-    return {
-      reply: 'ما قدرت أتعرف على أكلة واضحة برسالتك. جرب تكتب اسم الأكلة بالضبط (مثلاً: "تغديت دولمة" أو "فطرت بيضتين وخبز").',
-      meal_logged: false,
-    };
-  }
-
-  const mealType = findMealType(textNorm, now);
-
-  if (result.clarifications.length === 0) {
-    return tryDirectLog(repo, user, mealType, textNorm, result.resolved, now);
-  }
-
-  // طلب صريح: جرّب تحل توضيحات الكمية تلقائيًا بالحصة المتوسطة الحقيقية بدل سؤال المستخدم —
-  // لو كل التوضيحات كانت من نوع "quantity" وانحلت، الرسالة تصير مؤهَّلة لنفس DIRECT_LOG العادي
-  const auto = await autoResolveQuantityClarifications(result.clarifications as ClarificationItem[]);
-  if (auto.remaining.length === 0) {
-    return tryDirectLog(repo, user, mealType, textNorm, [...result.resolved, ...auto.resolved], now, auto.assumedAny);
-  }
-
-  const newPending = mealState.newPending(mealType, textNorm);
-  for (const hit of [...result.resolved, ...auto.resolved]) {
-    const n = await calculator.computeFood(hit.food_id, hit.grams ?? 0);
-    addResolvedToPending(newPending, hit, n);
-  }
-  newPending.pending_clarifications = auto.remaining as unknown as PendingMeal["pending_clarifications"];
-  await mealState.savePending(repo, user, newPending);
-  return { reply: await clarificationPrompt(newPending.pending_clarifications[0] as ClarificationItem), meal_logged: false };
+function newPending(mealType: string, rawText: string): PendingMeal {
+  return { meal_type: mealType, raw_text: rawText, items: [], pending_clarifications: [] };
 }
 
 /**
- * نقطة الحقيقة الوحيدة لإنشاء MealLog — source="confirmed" (تأكيد صريح) أو source="direct"/
- * "recipe" (DIRECT_LOG، يُبنى Undo Snapshot).
+ * نقطة الحقيقة الوحيدة لإنشاء MealLog — source="direct" فقط الآن (الشات القديم كان يستخدم
+ * أيضًا "confirmed"/"recipe" لمسارات كشف-النية المحذوفة؛ الاستدعاءات الباقية — الإضافة اليدوية
+ * بـDaily.tsx — دائمًا "direct").
  */
 async function finalizeMeal(
   repo: Repository, user: UserRecord, pending: PendingMeal, target: number,
-  source: "confirmed" | "direct" | "recipe", now: Date,
+  source: "direct", now: Date,
 ): Promise<DispatchResult> {
   const wasFreeMeal = !user.is_premium;
   if (wasFreeMeal) {
     const ok = await repo.incrementFreeMealsUsedIfBelowCap(user.id, FREE_MEALS_CAP);
     if (!ok) {
-      if (source === "confirmed") await mealState.savePending(repo, user, null);
       return { reply: null, meal_logged: false, premium_required: true };
     }
     user.free_meals_used += 1;
@@ -329,7 +88,6 @@ async function finalizeMeal(
   await xpEngine.awardXp(repo, user, xpAwarded, "meal_logged", log.id);
   const streakSnapshot = await streaks.recordActiveDay(repo, user, now);
 
-  if (source === "confirmed") await mealState.savePending(repo, user, null);
   await markMealLogged(repo, user, pending.meal_type, now);
 
   const dayTotals = await calculator.todayTotals(repo, user.id, now);
@@ -363,14 +121,12 @@ async function finalizeMeal(
     if (insightMessage) reply += `\n\n👀 ${insightMessage}`;
   }
 
-  if (source === "direct" || source === "recipe") {
-    const snapshot = directLog.buildMealSnapshot(
-      log.id, pending.meal_type, pending.raw_text, pending.items,
-      xpAwarded, wasFreeMeal, streakSnapshot, mealStatusBefore, now,
-    );
-    await directLog.save(repo, user, snapshot);
-    reply += `\n\n${responses.directLogUndoHint()}`;
-  }
+  const snapshot = directLog.buildMealSnapshot(
+    log.id, pending.meal_type, pending.raw_text, pending.items,
+    xpAwarded, wasFreeMeal, streakSnapshot, mealStatusBefore, now,
+  );
+  await directLog.save(repo, user, snapshot);
+  reply += `\n\n${responses.directLogUndoHint()}`;
 
   await repo.saveUser(user);
 
@@ -382,71 +138,16 @@ async function finalizeMeal(
   };
 }
 
-async function tryDirectLog(
-  repo: Repository, user: UserRecord, mealType: string, rawText: string,
-  resolvedHits: { food_id: number; food_name: string; grams?: number; quantity?: number; unit_grams?: number; portion_name?: string }[],
-  now: Date, assumedMediumPortion = false,
-): Promise<DispatchResult> {
-  const tempPending = mealState.newPending(mealType, rawText);
-  for (const hit of resolvedHits) {
-    const n = await calculator.computeFood(hit.food_id, hit.grams ?? 0);
-    addResolvedToPending(tempPending, hit, n);
-  }
-  const profile = await repo.findNutritionProfile(user.id);
-  const target = profile ? profile.calorie_target : 2000;
-  const result = await finalizeMeal(repo, user, tempPending, target, "direct", now);
-  // طلب صريح: تسجيل تلقائي بالحصة المتوسطة الحقيقية بدل انتظار تأكيد — يبقى الرقم من القاعدة
-  // دائمًا، بس لازم نفصح دائمًا إنها حصة مُفترَضة وقابلة للتعديل (راجع autoResolveQuantity
-  // Clarifications أدناه لمصدر assumedMediumPortion)
-  if (assumedMediumPortion && result.reply) {
-    result.reply += "\n\nسجلتلك حصة متوسطة معيارية، إذا كانت الكمية مختلفة تكدر تعدلها بأي وقت!";
-  }
-  return result;
-}
-
-/**
- * طلب صريح من المستخدم (بعد نقاش تعارض مع "لا تفترض الكمية"): بدل سؤال المستخدم عن حجم حصة
- * طعام bulk بلا وزن محدد بنفس الرسالة، افترض "الحصة المتوسطة" الحقيقية من قاعدة foods.sqlite
- * وسجّلها مباشرة — الرقم يبقى 100% حقيقي من القاعدة (صفر تخمين AI)، فقط "أي حصة" تُفترَض بدل
- * تُسأل، وتُفصَح دائمًا بالرد (tryDirectLog أعلاه). لا يمس identity ambiguity (confirm_match/
- * ambiguous_match) — تلك لسا تحتاج جواب حقيقي، هذا فقط لتوضيحات الكمية (kind:"quantity").
- */
-async function autoResolveQuantityClarifications(clarifications: ClarificationItem[]): Promise<{
-  resolved: { food_id: number; food_name: string; grams: number; portion_name?: string }[];
-  remaining: ClarificationItem[];
-  assumedAny: boolean;
-}> {
-  const resolved: { food_id: number; food_name: string; grams: number; portion_name?: string }[] = [];
-  const remaining: ClarificationItem[] = [];
-  let assumedAny = false;
-
-  for (const item of clarifications) {
-    if (item.kind !== "quantity") { remaining.push(item); continue; }
-    // محصور بأطعمة bulk (وجبات/أطباق تحتاج "أي حجم حصة" — تمن/قيمة/باجة، نفس أمثلة الطلب
-    // الأصلي) — طعام منفصل غير bulk بجمع بلا رقم ("تمرات") الغموض فيه "أي عدد وحدات"، افتراض
-    // عدد وحدات محدَّد (مثلاً حبة وحدة) تخمين كمية أكبر خطورة من افتراض حجم صحن قياسي، فيبقى
-    // يُسأل عادي — راجع نقاش الجلسة، القرار محصور بمعنى "الحصة المتوسطة" الحرفي المطلوب.
-    if (!(await isFoodBulk(item.food_id))) { remaining.push(item); continue; }
-    const portions = await getPortionsFor(item.food_id);
-    if (portions.length === 0) { remaining.push(item); continue; }
-    const medium = portions.find((p) => String(p.portion_name).includes("متوسط")) ?? portions[0];
-    resolved.push({ food_id: item.food_id, food_name: item.food_name, grams: Number(medium.grams), portion_name: String(medium.portion_name) });
-    assumedAny = true;
-  }
-  return { resolved, remaining, assumedAny };
-}
-
 /**
  * إضافة وجبة يدويًا من واجهة "مدير وجبات اليوم" (بعد بحث المستخدم باسم طعام حقيقي واختيار
- * غرام) — نفس نمط tryDirectLog بالضبط (عنصر واحد محلول)، صفر منطق XP/عداد مجاني/ستريك مكرر:
- * finalizeMeal الموجودة أصلًا تتكفّل بكل شي (بما فيها نافذة تراجع 5 دقائق كميزة إضافية مجانية،
- * بما إن source="direct").
+ * غرام) — صفر منطق XP/عداد مجاني/ستريك مكرر: finalizeMeal أعلاه تتكفّل بكل شي (بما فيها نافذة
+ * تراجع 5 دقائق).
  */
 export async function logMealManually(
   repo: Repository, user: UserRecord, mealType: string,
   foodId: number, foodName: string, grams: number, now: Date = new Date(),
 ): Promise<DispatchResult> {
-  const tempPending = mealState.newPending(mealType, `[إضافة يدوية] ${foodName}`);
+  const tempPending = newPending(mealType, `[إضافة يدوية] ${foodName}`);
   const n = await calculator.computeFood(foodId, grams);
   addResolvedToPending(tempPending, { food_id: foodId, food_name: foodName, grams }, n);
   const profile = await repo.findNutritionProfile(user.id);
@@ -455,21 +156,15 @@ export async function logMealManually(
 }
 
 /**
- * إضافة "سعرات يدوية حرة" من واجهة "مدير وجبات اليوم" — لطعام غير موجود بقاعدة foods.sqlite
- * (مثلاً وجبة من مطعم/خارج البيت). **استثناء صريح وموثَّق** لقاعدة "الأرقام من قاعدة البيانات
- * فقط": هذي أرقام يُبلّغ عنها المستخدم بنفسه عن شي أكله فعلاً، تمامًا كما يسمح EditMealForm
- * الموجود أصلًا بالواجهة بتعديل الأرقام الأربعة لوجبة مسجَّلة بدون أي قيد DB — نفس السابقة
- * المقبولة أصلًا بالمشروع، تُطبَّق هنا على "إضافة" جديدة بدل "تعديل" وجبة موجودة فقط.
- * food_id=-1 (Sentinel، أبدًا رقم DB حقيقي) — عنصر PendingItem مؤقّت يُستهلَك فقط داخل
- * finalizeMeal بهذا الاستدعاء ثم يُهمَل، صفر تخزين food_id لكل عنصر أصلاً (matched_foods_json
- * أسماء نصية فقط، راجع توثيق finalizeMeal). نفس نمط logMealManually تمامًا — صفر تكرار منطق
- * XP/عداد مجاني/ستريك/نافذة تراجع 5 دقائق (finalizeMeal تتكفّل بكل شي، source="direct").
+ * إضافة "سعرات يدوية حرة" من واجهة "مدير وجبات اليوم" — لطعام غير موجود بقاعدة foods.sqlite.
+ * استثناء موثَّق لقاعدة "الأرقام من قاعدة البيانات فقط": هذي أرقام يُبلّغ عنها المستخدم بنفسه.
+ * food_id=-1 (Sentinel) — عنصر مؤقّت يُستهلَك داخل finalizeMeal بهذا الاستدعاء فقط.
  */
 export async function logManualCalorieEntry(
   repo: Repository, user: UserRecord, mealType: string, foodName: string,
   calories: number, protein = 0, carbs = 0, fat = 0, now: Date = new Date(),
 ): Promise<DispatchResult> {
-  const tempPending = mealState.newPending(mealType, `[إضافة يدوية] ${foodName}`);
+  const tempPending = newPending(mealType, `[إضافة يدوية] ${foodName}`);
   tempPending.items.push({ food_id: -1, food_name: foodName, grams: 0, calories, protein, carbs, fat });
   const profile = await repo.findNutritionProfile(user.id);
   const target = profile ? profile.calorie_target : 2000;
@@ -495,10 +190,8 @@ export interface MealLogPatch {
 }
 
 /**
- * تعديل يدوي لأرقام وجبة مسجَّلة اليوم (سعرات/بروتين/كارب/دهون فقط — لا توجد بيانات عناصر
- * مفصَّلة محفوظة لإعادة حساب حقيقية من الكمية، راجع خطة "مدير وجبات اليوم"). لا يؤثر على XP
- * (ثابتة 10 لكل وجبة بغض النظر عن قيمتها) ولا الستريك — فقط الأرقام + behavior_daily snapshot
- * (حتى لا تبقى النقاط الشخصية/التحديات على أرقام قديمة بعد التعديل).
+ * تعديل يدوي لأرقام وجبة مسجَّلة اليوم (سعرات/بروتين/كارب/دهون فقط). لا يؤثر على XP (ثابتة 10
+ * لكل وجبة) ولا الستريك — فقط الأرقام + behavior_daily snapshot.
  */
 export async function updateMealLogTotals(
   repo: Repository, user: UserRecord, mealLogId: string, patch: MealLogPatch, now: Date = new Date(),
@@ -512,12 +205,8 @@ export async function updateMealLogTotals(
 }
 
 /**
- * حذف وجبة مسجَّلة اليوم (أي وجبة، مو بس الأخيرة — بعكس directLog.undo()'s نافذة 5 دقائق).
- * يرجّع XP الحقيقي المسجَّل فعليًا لهذي الوجبة تحديدًا (بحث بالـLedger بدل افتراض رقم ثابت)
- * وعداد الوجبات المجانية (لو كانت وجبة مجانية). **قيد موثَّق عمدًا**: لا يلمس الستريك/
- * ActiveDay/محطات الستريك إطلاقًا — استرجاعها الصحيح يحتاج معرفة هل هذي كانت أول نشاط باليوم
- * وهل بقي نشاط ثاني بعد الحذف، وهذا غير قابل لإعادة البناء من سجل الوجبة وحده بعد فوات الأوان
- * (directLog.ts يحلّها فقط عبر Snapshot لحظي غير موجود هنا). راجع القرار الموثَّق بالخطة.
+ * حذف وجبة مسجَّلة اليوم (أي وجبة، مو بس الأخيرة). **قيد موثَّق عمدًا**: لا يلمس الستريك/
+ * ActiveDay/محطات الستريك إطلاقًا (راجع القرار الموثَّق بالخطة الأصلية).
  */
 export async function deleteMealLogById(
   repo: Repository, user: UserRecord, mealLogId: string, now: Date = new Date(),
@@ -540,389 +229,14 @@ export async function deleteMealLogById(
   return { ok: true };
 }
 
-async function confirmPending(repo: Repository, user: UserRecord, pending: PendingMeal, target: number, now: Date): Promise<DispatchResult> {
-  if (pending.pending_clarifications.length > 0) {
-    return { reply: await clarificationPrompt(pending.pending_clarifications[0] as ClarificationItem), meal_logged: false };
-  }
-  return finalizeMeal(repo, user, pending, target, "confirmed", now);
-}
-
-/** وصفة خلص طبخها — ما تُحتسب سعراتها لين المستخدم يجاوب صراحة "أكلتها". */
+/** وصفة خلص طبخها — ما تُحتسب سعراتها لين المستخدم يجاوب صراحة "أكلتها" (تفعيل هذا المسار صار
+ * فقط عبر صفحة /recipes's وضع الطبخ الآن — تأكيد "أكلتها" الشاتي القديم حُذف مع الشات). */
 export async function markRecipeAwaitingConfirmation(repo: Repository, user: UserRecord, recipeId: string): Promise<string> {
   user.current_recipe_id = null;
   user.current_recipe_step = 0;
   user.pending_recipe_confirmation_id = recipeId;
   await repo.saveUser(user);
   return responses.recipeFinishedPrompt();
-}
-
-async function finalizeRecipeMeal(repo: Repository, user: UserRecord, target: number, now: Date): Promise<DispatchResult> {
-  const recipeId = user.pending_recipe_confirmation_id;
-  user.pending_recipe_confirmation_id = null;
-  const recipe = recipeId ? await repo.findRecipeById(recipeId) : null;
-  if (!recipe) {
-    await repo.saveUser(user);
-    return { reply: "ماكو وصفة بانتظار التأكيد هسه 🙂", meal_logged: false };
-  }
-
-  const pending = mealState.newPending(findMealType("", now), recipe.name);
-  pending.items.push({
-    food_id: -1, food_name: recipe.name, grams: 0,
-    calories: recipe.calories, protein: recipe.protein, carbs: recipe.carbs, fat: recipe.fat,
-  });
-  return finalizeMeal(repo, user, pending, target, "recipe", now);
-}
-
-function handleGreeting(user: UserRecord, now: Date): DispatchResult {
-  const absence = streaks.daysAbsent(user, now);
-  let reply: string;
-  if (absence >= 7) reply = responses.returnGreeting("long");
-  else if (absence >= 3) reply = responses.returnGreeting("medium");
-  else if (absence >= 1) reply = responses.returnGreeting("short");
-  else {
-    reply = responses.greeting();
-    if (user.streak_days > 1) reply += `\n${responses.streakContinuesNote(user.streak_days)}`;
-  }
-  return { reply, meal_logged: false };
-}
-
-async function handleExpressDesire(repo: Repository, user: UserRecord, textNorm: string, now: Date): Promise<DispatchResult> {
-  const result = await extractFoodEntities(textNorm);
-  if (result.resolved.length > 0 || result.clarifications.length > 0) {
-    return { reply: responses.desireAck(true), meal_logged: false };
-  }
-
-  const mealType = explicitMealTypeKeyword(textNorm);
-  if (mealType) {
-    const profile = await repo.findNutritionProfile(user.id);
-    const ctx = await context.build(repo, user.id, profile, now);
-    const proteinNeeded = Math.max(0, (ctx.macro_targets.protein_g ?? 0) - ctx.consumed_protein);
-    let reply = await recommendations.suggestMealWithin(ctx.remaining_calories, proteinNeeded);
-    const timePrefix = responses.timeAwarePrefix(getConversationalPeriod(now));
-    if (timePrefix) reply = `${timePrefix} ${reply}`;
-    return { reply, meal_logged: false };
-  }
-
-  return { reply: responses.desireAck(false), meal_logged: false };
-}
-
-/** "ما أحب الدجاج" — صفر تسجيل وجبة دائمًا (راجع intents.ts's EXPRESS_DISLIKE لسبب وجودها،
- *  Bug حقيقي حي أصلحته). صفر تخزين دائم بهذا المسار المحلي عمدًا — ذاكرة "الأطعمة المرفوضة"
- *  الحقيقية (تُستخدَم فعليًا باستبعاد اقتراحات لاحقة) موجودة فقط بطبقة Gemini ACTIVE mode
- *  (conversation/tools.ts's record_food_dislike + ConversationState.disliked_foods) — هذا
- *  المسار الحتمي هدفه الوحيد منع التسجيل الوهمي، حتى بدون Gemini إطلاقًا (GEMINI_CONVERSATIONAL_
- *  MODE=OFF أو فشل/سقوط Gemini)، لا تكرار نظام ذاكرة كامل هنا. */
-async function handleExpressDislike(textNorm: string): Promise<DispatchResult> {
-  const result = await extractFoodEntities(textNorm);
-  const hasFood = result.resolved.length > 0 || result.clarifications.length > 0;
-  return { reply: responses.dislikeAck(hasFood), meal_logged: false };
-}
-
-function askedMacro(textNorm: string): "protein" | "carb" | "fat" | null {
-  if (intents.PROTEIN_WORDS.some((w) => textNorm.includes(w))) return "protein";
-  if (intents.CARB_WORDS.some((w) => textNorm.includes(w))) return "carb";
-  if (intents.FAT_WORDS.some((w) => textNorm.includes(w))) return "fat";
-  return null;
-}
-
-function generalNutritionTopic(textNorm: string): string {
-  if (textNorm.includes("قبل التمرين")) return "pre_workout";
-  if (textNorm.includes("بعد التمرين")) return "post_workout";
-  if (textNorm.includes("توقيت الوجبات")) return "meal_timing";
-  if (textNorm.includes("مشروبات غازية")) return "sugary_drinks";
-  if (textNorm.includes("فاست فود")) return "fast_food";
-  if (textNorm.includes("حلويات")) return "desserts";
-  if (intents.PROTEIN_WORDS.some((w) => textNorm.includes(w))) return "protein";
-  if (intents.CARB_WORDS.some((w) => textNorm.includes(w))) return "carb";
-  if (intents.FAT_WORDS.some((w) => textNorm.includes(w))) return "fat";
-  if (intents.FIBER_WORDS.some((w) => textNorm.includes(w))) return "fiber";
-  return "generic";
-}
-
-async function extractFirstFood(textNorm: string): Promise<[number, string] | [null, null]> {
-  const result = await extractFoodEntities(textNorm);
-  if (result.resolved.length > 0) {
-    const item = result.resolved[0];
-    return [item.food_id, item.food_name];
-  }
-  for (const c of result.clarifications) {
-    if ("food_id" in c && c.food_id) return [c.food_id, c.food_name];
-  }
-  return [null, null];
-}
-
-async function handleFoodTopic(repo: Repository, user: UserRecord, textNorm: string, kind: "craving" | "plan", now: Date): Promise<DispatchResult> {
-  const [foodId, foodName] = await extractFirstFood(textNorm);
-  if (foodId === null) {
-    user.pending_food_topic_json = null;
-    await repo.saveUser(user);
-    return { reply: kind === "craving" ? responses.cravingAck(null) : responses.planAck(null), meal_logged: false };
-  }
-
-  user.pending_food_topic_json = JSON.stringify({ food_id: foodId, food_name: foodName, kind });
-  await repo.saveUser(user);
-
-  // "plan" (وجبة مخطَّطة لليوم، "اليوم غدانا تمن") -> اقتراح كمية فوري، صفر انتظار سؤال ثاني.
-  // "craving" يبقى كما هو (ack بس) — خارج نطاق هذا التغيير.
-  if (kind === "plan") {
-    const profile = await repo.findNutritionProfile(user.id);
-    const ctx = await context.build(repo, user.id, profile, now);
-
-    // حرج: الباقي اليومي الكامل غير منطقي لوجبة وحدة (اكتُشف بتحقق حي حقيقي — "اليوم غدانا تمن"
-    // كانت تعطي "111 خاشوقة" لأنها استخدمت كل سعرات اليوم). نوزّع نفس منطق meal_budget.py
-    // المُثبَت أصلًا (يومي الغذائي بالفلاسك) على الوجبات غير المسجَّلة فقط لهذا اليوم بالذات.
-    const targetMealType = findMealType(textNorm, now);
-    const { year, month, day } = nowBaghdad(now);
-    const meals = await calculator.mealsByTypeForDay(repo, user.id, year, month, day);
-    const unloggedMealTypes = (["breakfast", "lunch", "dinner"] as const).filter((m) => meals[m].status === "NOT_STARTED");
-    const budgets = mealBudget.distributeRemainingBudget(Math.max(ctx.remaining_calories, 0), unloggedMealTypes, getCurrentPeriod(now));
-    const mealBudgetCalories = budgets[targetMealType] ?? ctx.remaining_calories; // fallback: الوجبة أصلًا مسجَّلة أو نوع غير معروف
-
-    const reply = await recommendations.suggestPortionCountForRemaining(foodId, foodName!, mealBudgetCalories);
-    return { reply, meal_logged: false };
-  }
-
-  const ack = responses.cravingAck(foodName);
-  return { reply: ack, meal_logged: false };
-}
-
-async function handlePortionForFood(
-  repo: Repository, user: UserRecord, textNorm: string, now: Date, nluFoodQuery: string | null = null,
-): Promise<DispatchResult> {
-  let [foodId, foodName] = await extractFirstFood(textNorm);
-  // Gemini NLU (لو فعّال ووصل هالمعالج) نظّف اسم الطعام (مثلاً غلطة إملائية) — نجرب فيه بس إذا
-  // الاستخراج المحلي المباشر فشل، صفر أولوية عليه أبدًا.
-  if (foodId === null && nluFoodQuery) {
-    [foodId, foodName] = await extractFirstFood(nluFoodQuery);
-  }
-  if (foodId === null && user.pending_food_topic_json) {
-    const topic = JSON.parse(user.pending_food_topic_json) as { food_id: number; food_name: string };
-    foodId = topic.food_id;
-    foodName = topic.food_name;
-  }
-
-  if (foodId === null) {
-    return { reply: responses.noFoodInTopicPrompt(), meal_logged: false };
-  }
-
-  const profile = await repo.findNutritionProfile(user.id);
-  const ctx = await context.build(repo, user.id, profile, now);
-  // رقم هدف صريح مذكور بنفس الرسالة ("مشتهي دولمة" ← "أريدها 500 سعرة") — نختار أقرب كمية
-  // حقيقية لهذا الرقم بدل أكبر كمية تدخل بالباقي (نية مختلفة جوهريًا عن سؤال "شكد آكل؟" العادي).
-  const targetMatch = textNorm.match(/(\d+)\s*سعر/);
-  let reply = targetMatch
-    ? await recommendations.suggestPortionNearTarget(foodId, foodName!, parseInt(targetMatch[1], 10))
-    : await recommendations.suggestPortionForFood(foodId, foodName!, ctx.remaining_calories);
-  const tipCategory = tipsEngine.chooseCategoryForContext(ctx, null);
-  const tipText = await tipsEngine.pickTip(repo, user.id, tipCategory);
-  if (tipText) reply += `\n\n🌱 ${tipText}`;
-  user.pending_food_topic_json = JSON.stringify({ food_id: foodId, food_name: foodName, kind: "portion_given" });
-  await repo.saveUser(user);
-  return { reply, meal_logged: false };
-}
-
-/**
- * Cook From What I Have — "عندي بيض وبطاطا، شنو اگدر اطبخ؟" — يبحث بوصفات قسم وجبات الدايت
- * الحقيقية عن أعلى نسبة تطابق مكونات، صفر تسجيل وجبة أبدًا (نفس ضمان handleWhatIf). يعيد
- * استخدام extractFoodEntities الموجودة (نفس محرك استخراج الطعام المتعدد لتسجيل الوجبات، يشمل
- * نظام Aliases الحقيقي لـfoods.sqlite تلقائيًا).
- *
- * المطابقة تقارن food_id حقيقية أولاً (المستخدم عبر extractFoodEntities، الوصفة عبر food_id
- * المحلول مسبقًا وقت الاستيراد/الـBackfill — ingredientResolver.ts) — مقارنة أرقام سريعة،
- * صفر بطء مع نمو عدد الوصفات. لأي مكوّن وصفة لم يتحلّل بعد (food_id=null، متوقع لكثير من
- * المكونات — القاعدة صغيرة)، Fallback لنفس substring القديم (صفر تراجع بالتغطية). النسبة
- * تُحسب على المكونات required فقط (الافتراضي لكل مكوّن)؛ الناقص من optional يُذكَر بس ما يخفّض
- * النسبة أو يمنع تصنيف "جاهزة".
- */
-async function handleCookFromIngredients(repo: Repository, textNorm: string): Promise<DispatchResult> {
-  const entities = await extractFoodEntities(textNorm);
-  // نأخذ الهوية فقط (مو الكمية) — طعام واحد بدون رقم غالبًا يرجع "clarification: quantity/
-  // confirm_match" مو resolved مباشرة (نفس اللي صار مع "عندي دجاج"، دجاج مقلي طابق بثقة كافية
-  // للهوية بس احتاج سؤال كمية) — هذا لا يهمنا هنا أصلاً، نريد بس نعرف "شنو المكوّن المذكور؟".
-  const mentioned: { food_id: number | null; food_name: string }[] = [
-    ...entities.resolved.map((h) => ({ food_id: h.food_id, food_name: h.food_name })),
-    ...entities.clarifications.flatMap((c) => ("food_id" in c && c.food_id ? [{ food_id: c.food_id, food_name: c.food_name }] : [])),
-  ];
-
-  if (mentioned.length === 0) {
-    return { reply: "گلي شنو عندك من مكونات وأشوفلك وصفة حقيقية تناسبها (مثلاً: عندي بيض وبطاطا وطماطة).", meal_logged: false, suggested_recipe: null };
-  }
-
-  const recipes = await repo.findActiveRecipes(null);
-  const scored = recipeMatching.scoreRecipesByIngredients(recipes, mentioned);
-  const top = scored.slice(0, 3);
-
-  if (top.length === 0) {
-    return { reply: "ما لكيت وصفة حقيقية بقسم وجبات الدايت تستخدم هذي المكونات حاليًا.", meal_logged: false, suggested_recipe: null };
-  }
-
-  const lines = top.map((s) => {
-    const pct = Math.round(s.matchPercentage * 100);
-    let note: string;
-    if (s.missingRequired.length === 0) {
-      note = s.missingOptional.length > 0
-        ? ` — عندك كل المكونات الأساسية 👍 (اختياري: ${s.missingOptional.join("، ")})`
-        : " — عندك كل المكونات المطلوبة 👍";
-    } else {
-      note = ` — ناقصك: ${s.missingRequired.join("، ")}`;
-    }
-    return `🍽️ ${s.recipe.name} (${pct}% من المكونات متوفرة)${note}`;
-  });
-
-  // suggested_recipe من HIGH_MATCH فأعلى (≥80%) — كان 100% بس، الآن يعتمد على تصنيف حقيقي
-  const best = top[0];
-  const bestTier = recipeMatching.classifyMatchTier(best.matchPercentage);
-  const suggestedRecipe = (bestTier === "EXACT_MATCH" || bestTier === "HIGH_MATCH")
-    ? { id: best.recipe.id, slug: best.recipe.slug, name: best.recipe.name, calories: best.recipe.calories, protein: best.recipe.protein, carbs: best.recipe.carbs, fat: best.recipe.fat }
-    : null;
-
-  // صياغة صادقة: "تگدر تسويها" فقط لتطابق كامل، وإلا "تگدر تسويها إذا توفر X" (نفس مثال الطلب حرفيًا)
-  let intro: string;
-  if (bestTier === "EXACT_MATCH") {
-    intro = "من الي گلتلي عليه، تگدر تسوي هذي الوصفات الحقيقية من قسم وجبات الدايت:";
-  } else if (bestTier === "HIGH_MATCH") {
-    intro = `تگدر تسوي "${best.recipe.name}" إذا توفر: ${best.missingRequired.join("، ")}. وزائد خيارات ثانية قريبة:`;
-  } else {
-    intro = "من الي گلتلي عليه، أقرب وصفات حقيقية من قسم وجبات الدايت (مو جاهزة كاملة بعد):";
-  }
-
-  return {
-    reply: `${intro}\n${lines.join("\n")}`,
-    meal_logged: false,
-    suggested_recipe: suggestedRecipe,
-  };
-}
-
-/**
- * أسئلة معلوماتية صرفة عن طعام محدد (ASK_CALORIES/ASK_FOOD_SIZE/ASK_FOOD_FIT/ASK_SUBSTITUTION) —
- * صفر تسجيل وجبة أبدًا (meal_logged: false دايمًا)، بس معلومة حقيقية من قاعدة البيانات. يعتمد
- * نفس منطق استخراج الطعام المستخدم بـASK_PORTION_FOR_FOOD (رسالة حالية، أو موضوع طعام سابق).
- */
-async function handleFoodInfoQuestion(
-  repo: Repository, user: UserRecord, textNorm: string, now: Date,
-  mode: "calories" | "size" | "fit" | "substitution",
-): Promise<DispatchResult> {
-  let [foodId, foodName] = await extractFirstFood(textNorm);
-  if (foodId === null && user.pending_food_topic_json) {
-    const topic = JSON.parse(user.pending_food_topic_json) as { food_id: number; food_name: string };
-    foodId = topic.food_id;
-    foodName = topic.food_name;
-  }
-  if (foodId === null) {
-    return { reply: "شنو الأكلة اللي تسأل عنها بالضبط؟ گلي اسمها وأفيدك.", meal_logged: false };
-  }
-
-  if (mode === "fit") {
-    const profile = await repo.findNutritionProfile(user.id);
-    const ctx = await context.build(repo, user.id, profile, now);
-    return { reply: await recommendations.checkFoodFits(foodId, foodName!, ctx.remaining_calories), meal_logged: false };
-  }
-  if (mode === "substitution") {
-    return { reply: await recommendations.suggestLighterAlternative(foodId, foodName!), meal_logged: false };
-  }
-  // calories/size — نفس المصدر (كل الكميات الحقيقية المعروفة)، الفرق بس بصياغة نية السؤال
-  return { reply: await recommendations.describeFoodPortions(foodId, foodName!), meal_logged: false };
-}
-
-/**
- * What If Simulator — "إذا أكلت برگر هسه؟" — محاكاة حسابية بحتة، **صفر تسجيل وجبة أبدًا**
- * (meal_logged دايمًا false، صفر لمسة على pending/mealState/insertMealLog — نفس ضمان
- * handleFoodInfoQuestion أعلاه بالضبط). لو الفرق سلبي بوضوح (أكثر من 100 سعرة تجاوز)، يبحث
- * عن بدائل حقيقية من foods.sqlite (نفس تصنيف الطعام) ومن قسم وجبات الدايت (recipeSearch) —
- * صفر وصفة/بديل وهمي، صفر recipe_id غير موجود فعليًا بقاعدة البيانات.
- */
-async function handleWhatIf(repo: Repository, user: UserRecord, textNorm: string, now: Date): Promise<DispatchResult> {
-  const profile = await repo.findNutritionProfile(user.id);
-  const ctx = await context.build(repo, user.id, profile, now);
-
-  const entities = await extractFoodEntities(textNorm);
-  const resolved = entities.resolved;
-
-  let simulatedCalories: number;
-  let label: string;
-  let singleFoodId: number | null = null;
-
-  if (resolved.length > 0) {
-    let total = 0;
-    for (const hit of resolved) {
-      const n = await calculator.computeFood(hit.food_id, hit.grams ?? 0);
-      total += n.calories;
-    }
-    simulatedCalories = total;
-    label = responses.itemsInline(resolved.map((h) => ({ food_name: h.food_name, quantity: h.quantity ?? null })));
-    if (resolved.length === 1) singleFoodId = resolved[0].food_id;
-  } else {
-    // صفر طعام معروف اتطابق — نجرب رقم سعرات صريح بنفس الرسالة ("إذا أخذت وجبة 700 سعرة؟")
-    const calorieMatch = textNorm.match(/(\d+)\s*سعر/);
-    if (!calorieMatch) return { reply: responses.whatIfNoFood(), meal_logged: false, suggested_recipe: null };
-    simulatedCalories = parseInt(calorieMatch[1], 10);
-    label = "هذي الوجبة";
-  }
-
-  const after = ctx.remaining_calories - simulatedCalories;
-  let reply = responses.whatIfImpact(label, simulatedCalories, ctx.remaining_calories, after);
-
-  // طعام واحد محدَّد — نعرض دايمًا كمية حقيقية موصى بيها (بالخاشوقة/اللقمة/الحبة... حسب
-  // food_portions الفعلية) تناسب الباقي إلك، مو بس تأثير الكمية الكاملة الافتراضية (طلب
-  // مستخدم حقيقي: "بكم لكمة أو خاشوقة لازم آكل؟").
-  if (singleFoodId !== null) {
-    reply += `\n\n${await recommendations.suggestPortionForFood(singleFoodId, label, ctx.remaining_calories)}`;
-  }
-
-  // بديل حقيقي من قسم وجبات الدايت لو تجاوز واضح — recipeAlts[0] يصير suggested_recipe حقيقي
-  // (المرحلة 5/Prompt 2: كان يُذكَر بالرد كنص فقط، بدون بطاقة وصفة تفاعلية بالشات — نفس بيانات
-  // recipeSearch.suggestRecipesWithin الحقيقية الموجودة أصلاً، صفر مصدر بيانات جديد).
-  let suggestedRecipe: { id: string; slug: string; name: string; calories: number; protein: number; carbs: number; fat: number } | null = null;
-  if (after < -100) {
-    if (singleFoodId !== null) {
-      reply += `\n\n${await recommendations.suggestLighterAlternative(singleFoodId, label)}`;
-    }
-    const recipeAlts = await recipeSearch.suggestRecipesWithin(repo, Math.max(0, ctx.remaining_calories));
-    if (recipeAlts.length > 0) {
-      reply += `\n\n${responses.whatIfAlternativesIntro()}`;
-      for (const r of recipeAlts) reply += `\n🍽️ ${r.name} — ~${r.calories} kcal (موجودة بقسم وجبات الدايت)`;
-      const top = recipeAlts[0]!;
-      suggestedRecipe = { id: top.id, slug: top.slug, name: top.name, calories: top.calories, protein: top.protein, carbs: top.carbs, fat: top.fat };
-    }
-  }
-
-  return { reply, meal_logged: false, suggested_recipe: suggestedRecipe };
-}
-
-/** "شكد يعني صحن؟" بدون اسم طعام — سؤال عام عن وحدة قياس، صفر تسجيل. */
-async function handleUnitQuestion(textNorm: string): Promise<DispatchResult> {
-  const unit = intents.GENERIC_UNIT_WORDS.find((w) => textNorm.includes(w));
-  if (!unit) {
-    return { reply: "شنو الوحدة اللي تسأل عنها بالضبط؟ (مثلاً: صحن، حبة، خاشوقة، استكان)", meal_logged: false };
-  }
-  return { reply: await recommendations.describeGenericUnit(unit), meal_logged: false };
-}
-
-/**
- * حارس الأمان العام (ASK_GENERAL_FOOD_INFO) — أي سؤال عن أكل ما طابق نية محددة فوق. يحاول يفيد
- * لو عرف الطعام المذكور (نفس المصدر الحقيقي)، وإلا يوضح بصراحة إنه ما فهم — بس أبدًا ما يسجّل
- * وجبة. هذا بالضبط الحارس اللي يمنع تكرار Bug "شكد حجم البيتزا؟ ← تسجيل وهمي".
- */
-async function handleGeneralFoodInfo(textNorm: string): Promise<DispatchResult> {
-  const [foodId, foodName] = await extractFirstFood(textNorm);
-  if (foodId === null) {
-    // نفس تحسين "فطور !!" بـhandleMealMessage — بس هذا الفرع يُستدعى لرسائل فيها "؟" (مثلاً
-    // "عشا؟")، فما توصل الفحص هناك أصلاً. نفس المنطق هنا لتغطية الحالتين.
-    const bareMealType = explicitMealTypeKeyword(textNorm);
-    if (bareMealType) {
-      const label = responses.MEAL_TYPE_LABELS[bareMealType] ?? "الوجبة";
-      return { reply: `تمام كابتن، شنو أكلت بالضبط بـ${label}؟ گلي اسم الأكلة (مثلاً: بيضتين وخبز) وأحسبلك السعرات.`, meal_logged: false };
-    }
-    return {
-      reply: "ما فهمت سؤالك بوضوح 🙏 جرب تسأل بشكل أوضح (مثلاً: \"شكد سعرات الدولمة؟\" أو \"شكد آكل من التمن؟\")، أو گلي شنو أكلت فعليًا لو تريد تسجلها.",
-      meal_logged: false,
-    };
-  }
-  const info = await recommendations.describeFoodPortions(foodId, foodName!);
-  return {
-    reply: `${info}\n\n(إذا تريد تسجلها كوجبة أكلتها فعلاً، گلي بوضوح "اكلت ${foodName}" مع الكمية.)`,
-    meal_logged: false,
-  };
 }
 
 async function handleWaterLog(repo: Repository, user: UserRecord, textNorm: string, now: Date): Promise<DispatchResult> {
@@ -949,574 +263,11 @@ async function handleWaterLog(repo: Repository, user: UserRecord, textNorm: stri
   return { reply, meal_logged: false, new_milestones: streakSnapshot.new_milestones };
 }
 
-async function handleWeightUpdate(repo: Repository, user: UserRecord, textNorm: string): Promise<DispatchResult> {
-  const newWeight = findLeadingNumber(textNorm);
-  if (newWeight === null || !(newWeight >= 30 && newWeight <= 300)) {
-    return { reply: "شكد وزنك الجديد بالضبط؟ اكتبلي رقم بالكيلوغرام (مثلاً: وزني هسه 80).", meal_logged: false };
-  }
-
-  const result = await weightOps.applyWeightUpdate(repo, user.id, newWeight);
-  if (result === null) {
-    return { reply: "لازم تكمل بياناتك الأساسية أول مرة قبل ما أگدر أحدّث وزنك.", meal_logged: false };
-  }
-
-  let reply = responses.weightUpdated(newWeight, result.calorie_target);
-  if (result.safety_warning) reply += `\n\n⚠️ ${result.safety_warning}`;
-  return { reply, meal_logged: false, target_calories: result.calorie_target };
-}
-
-export interface IntentContextFlags {
-  has_pending: boolean;
-  has_recipe: boolean;
-  has_undoable_log: boolean;
-  has_pending_recipe: boolean;
-  has_pending_food_topic: boolean;
-}
-
-/** نقطة الدخول الرئيسية — يعادل nutrition_engine.handle_message عبر orchestrator.py. */
 /**
- * نقطة دخول مصدَّرة لمنطق تسجيل الوجبة الكامل — تُستخدم من أداة log_meal
- * (conversation/mutationTools.ts) بدل تكرار المنطق. تغطي 3 حالات بنفس أولوية dispatch() الحالية:
- * (1) pending منتهي (صفر clarifications متبقية) + النص نفسه عبارة تأكيد صريحة -> confirmPending
- *     (finalizeMeal source="confirmed") — هذي بالضبط الحالة اللي handleMealMessage وحدها لا
- *     تكفي لها (تعيد عرض الملخص فقط، لا تُنهي الوجبة أبدًا بدون هذا الفرع).
- * (2) أي حالة ثانية (رسالة جديدة كليًا، أو رد على clarification قائم) -> handleMealMessage، بنفس
- *     منطقها الداخلي (resolveClarificationItem يتعامل مع "اي"/"لا" لكل clarification بمفرده).
- * لا تستدعِها إلا بعد أن يتحقق الطالب من intents.isConsumptionAuthorized على النص الخام نفسه.
- */
-export async function runMealLoggingPipeline(
-  repo: Repository, user: UserRecord, rawText: string, now: Date = new Date(),
-): Promise<DispatchResult> {
-  const textNorm = rawText.trim();
-  const pending = mealState.loadPending(user);
-  if (pending && !hasAnswerableClarification(pending) && intents.matchesPhrase(textNorm, intents.CONFIRM_PHRASES)) {
-    const profile = await repo.findNutritionProfile(user.id);
-    const target = profile ? profile.calorie_target : 2000;
-    return confirmPending(repo, user, pending, target, now);
-  }
-  return handleMealMessage(repo, user, textNorm, pending, now);
-}
-
-/**
- * المسار المحلي الحتمي الكامل — نفس handleMessage() تمامًا قبل مرحلة "Gemini-First Conversational
- * AI" (صفر تغيير سلوكي). هذا هو مسار OFF الافتراضي بالكامل، وأيضًا الشبكة الآمنة اللي ACTIVE يسقط
- * لها عند أي فشل بطبقة المحادثة الجديدة (قبل أي أداة تحوّر تنجح — راجع conversation/brain.ts).
- */
-async function runLocalPipeline(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
-  const textNorm = text.trim();
-  const profile = await repo.findNutritionProfile(user.id);
-  const target = profile ? profile.calorie_target : 2000;
-
-  const pending = mealState.loadPending(user);
-  const undoSnapshot = await directLog.loadValid(repo, user, now);
-  const ctxFlags: IntentContextFlags = {
-    has_pending: pending !== null,
-    has_recipe: user.current_recipe_id !== null,
-    has_undoable_log: undoSnapshot !== null,
-    has_pending_recipe: user.pending_recipe_confirmation_id !== null,
-    has_pending_food_topic: user.pending_food_topic_json !== null,
-  };
-  const localIntent = intents.detectIntent(textNorm, ctxFlags);
-
-  const { intent, nluFoodQuery } = await resolveIntentViaNlu(repo, user, textNorm, localIntent, pending, profile, now);
-
-  return dispatch(repo, user, textNorm, intent, pending, target, now, nluFoodQuery);
-}
-
-/**
- * نقطة دخول مصدَّرة لتسجيل الماي — تُستخدم من أداة log_water (conversation/mutationTools.ts).
- * لا تستدعِها إلا بعد أن يتحقق الطالب من intents.isWaterLogAuthorized على النص الخام نفسه.
+ * نقطة دخول مصدَّرة لتسجيل الماي — تُستخدم من زر إشعار "✅ شربت كوب" (water-quick-log.mts).
  */
 export async function runWaterLoggingPipeline(
   repo: Repository, user: UserRecord, rawText: string, now: Date = new Date(),
 ): Promise<DispatchResult> {
   return handleWaterLog(repo, user, rawText.trim(), now);
-}
-
-const ALL_CONVERSATION_TOOLS: conversationTypes.CJTool<any, any>[] = [
-  ...conversationTools.READ_ONLY_TOOLS, mutationTools.logMeal, mutationTools.undoLastMeal, mutationTools.logWater,
-  mutationTools.logManualCalories, mutationTools.updateMeal,
-];
-
-/** يبني ChatReply من نتيجة أداة (لو موجودة) — الحقول العددية تجي حرفيًا من الأداة، Gemini يؤثر فقط على reply. */
-function assembleActiveResult(outcome: brain.ConversationalTurnOutcome): DispatchResult {
-  const reply = outcome.reply ?? null;
-  // علامة داخلية بحتة (تُحذَف قبل jsonOk بـchat.mts) — نص reply هنا صيغة Gemini الطبيعية
-  // أصلًا، فتمريره لـprovider.rephrase() ثانيةً (تنويع الجملة فقط) نداء Gemini إضافي زائد
-  // بلا فائدة حقيقية، وربما يغيّر معنى صاغه Gemini نفسه بقصد.
-  const _composed_by_gemini = true;
-  if (!outcome.toolResult || typeof outcome.toolResult !== "object") {
-    return { reply, meal_logged: false, _composed_by_gemini };
-  }
-  const tr = outcome.toolResult as Record<string, unknown>;
-  if ("meal_logged" in tr) {
-    // نتيجة أداة تحوّر (log_meal/undo) — كل الحقول العددية حرفيًا منها، reply فقط من Gemini
-    const { local_reply: _lr, ok: _ok, rejection_reason: _rr, ...rest } = tr as Record<string, unknown>;
-    return { ...rest, reply, meal_logged: Boolean(tr.meal_logged), _composed_by_gemini } as DispatchResult;
-  }
-  // نتيجة أداة قراءة — لو فيها وصفة حقيقية (recipe/recipes[0])، نعبّئ suggested_recipe للواجهة
-  const recipeCandidate = (tr.recipe as { id?: string } | undefined) ?? (Array.isArray(tr.recipes) ? tr.recipes[0] : undefined);
-  const suggested_recipe = recipeCandidate && typeof recipeCandidate === "object" && "id" in recipeCandidate ? recipeCandidate : null;
-  return { reply, meal_logged: false, suggested_recipe, _composed_by_gemini };
-}
-
-// نية حديث عام/بروتوكولي بحت — لا معنى لإلحاق تنبيه سعرات فوقها (رد "هلا"/"تسلم" بتنبيه صحي
-// غير مرتبط نهائيًا ليس "واضح وهادئ"، هذا بالضبط عكس المطلوب). كل نية ثانية غير مدرجة هنا
-// (ASK_REMAINING/END_DAY/ASK_RECOMMENDATION/LOG_MEAL/...) مرتبطة بأكل/سعرات بشكل معقول، فتُسمَح.
-const UNDER_EATING_NUDGE_EXCLUDED_INTENTS = new Set([
-  intents.GREETING, intents.FAREWELL, intents.THANKS, intents.ACKNOWLEDGEMENT,
-  intents.OFFTOPIC, intents.MEDICAL, intents.UNKNOWN, intents.CONFIRM, intents.CANCEL,
-  intents.NOT_YET, intents.CORRECTION,
-]);
-
-/**
- * نقطة تجميع مركزية واحدة لتنبيه "أكل قليل جدًا" — تُفحَص بعد أي رد نهائي بغض النظر عن المسار
- * (محلي/SHADOW/ACTIVE عبر Gemini)، صفر تكرار لهذا المنطق بأي مكان ثانٍ (بعكس compensationMessage
- * الحالية، مُكرَّرة عمدًا بـ3 مواضع لأسباب تاريخية غير مرتبطة بهذا التغيير). لا تُطبَّق فوق ردّ
- * فاضي/رفض عضوية مجانية، ولا فوق ردّ عنده nudge_actions أصلًا (مسار ACTIVE قد يمرّ هنا مرتين
- * بحالة !outcome.handled -> runLocalPipeline -> handleMessage، فهذا الحارس يمنع تكرار الإلحاق)،
- * ولا فوق رسالة حديث عام بحت (تصنيف محلي تقريبي بـdetectIntent — فحص لطيف لتجربة المستخدم فقط،
- * مو حارس أمان حرج، فما يحتاج دقة IntentContextFlags الكاملة).
- */
-async function attachUnderEatingNudge(
-  repo: Repository, user: UserRecord, text: string, result: DispatchResult, now: Date,
-): Promise<DispatchResult> {
-  if (!result.reply || result.premium_required || result.nudge_actions) return result;
-  const profile = await repo.findNutritionProfile(user.id);
-  if (!profile) return result;
-  const ctx = await context.build(repo, user.id, profile, now);
-  if (!ctx.under_target) return result;
-
-  if (!result.meal_logged) {
-    const pending = mealState.loadPending(user);
-    // بگ حقيقي مُكتشَف من شكوى مستخدم ("أكلت تمن وقيمة" -> رد سؤال كمية ملحوق بتنبيه أكل قليل
-    // غير مرتبط، مربك): وجود pending (سؤال توضيح كمية/هوية جاري، جديد هالدورة أو مستمر) يعني
-    // الرد أصلاً سؤال متابعة — إلحاق تنبيه ثاني فوقه يربك، مهما كانت النية. تخطَّ دائمًا هنا.
-    if (pending !== null) return result;
-    const localIntent = intents.detectIntent(text.trim(), {
-      has_pending: pending !== null,
-      has_recipe: user.current_recipe_id !== null,
-      has_undoable_log: false,
-      has_pending_recipe: user.pending_recipe_confirmation_id !== null,
-      has_pending_food_topic: user.pending_food_topic_json !== null,
-    });
-    if (UNDER_EATING_NUDGE_EXCLUDED_INTENTS.has(localIntent)) return result;
-  }
-
-  return {
-    ...result,
-    reply: `${result.reply}${responses.underEatingNudge()}`,
-    nudge_actions: [
-      { icon: "🍽️", label: "أضف وجبة", kind: "navigate", target: "/daily" },
-      { icon: "🥗", label: "اقترحلي وجبة مناسبة", kind: "chat", prompt: "اقترحلي وجبة مناسبة" },
-      { icon: "👨‍⚕️", label: "استشارة مختص", kind: "consult" },
-    ],
-  };
-}
-
-export async function handleMessage(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
-  const result = await handleMessageCore(repo, user, text, now);
-  return attachUnderEatingNudge(repo, user, text, result, now);
-}
-
-async function handleMessageCore(repo: Repository, user: UserRecord, text: string, now: Date = new Date()): Promise<DispatchResult> {
-  const mode = conversationConfig.getConversationalMode();
-  if (mode === "OFF") return runLocalPipeline(repo, user, text, now);
-
-  const localResult = mode === "SHADOW" ? await runLocalPipeline(repo, user, text, now) : null;
-
-  const textNorm = text.trim();
-  const pending = mealState.loadPending(user);
-  const undoSnapshot = await directLog.loadValid(repo, user, now);
-  const ctxFlags: IntentContextFlags = {
-    has_pending: pending !== null,
-    has_recipe: user.current_recipe_id !== null,
-    has_undoable_log: undoSnapshot !== null,
-    has_pending_recipe: user.pending_recipe_confirmation_id !== null,
-    has_pending_food_topic: user.pending_food_topic_json !== null,
-  };
-  const profile = await repo.findNutritionProfile(user.id);
-  const nutritionCtx = await context.build(repo, user.id, profile, now);
-
-  const conversationState = stateStore.loadConversationState(user);
-  const execCtx: conversationTypes.ToolExecContext = { repo, user, rawText: textNorm, ctxFlags, now, conversationState };
-  const turnCtx: conversationTypes.ConversationTurnContext = {
-    current_time_iraq: getCurrentPeriod(now),
-    remaining_calories: profile ? nutritionCtx.remaining_calories : null,
-    target_calories: profile ? nutritionCtx.target_calories : null,
-    goal: profile ? nutritionCtx.goal : null,
-    conversation_state: conversationState,
-    recent_turns: conversationState.recent_turns,
-    streak_days: user.streak_days,
-    is_premium: user.is_premium,
-  };
-
-  const provider = conversationConfig.getConversationProvider();
-  const outcome = await brain.runConversationalTurn(provider, execCtx, turnCtx, ALL_CONVERSATION_TOOLS, {
-    dryRunMutations: mode === "SHADOW",
-  });
-
-  // ذاكرة المحادثة تُحدَّث وتُحفَظ سواء SHADOW أو ACTIVE (بيانات وصفية بحتة، صفر تأثير على أي
-  // تحوّر) — حتى لو المستخدم بدّل لاحقًا لوضع ACTIVE، آخر أدوار SHADOW تبقى مفيدة كسياق.
-  if (outcome.handled) {
-    const nextState = stateStore.nextConversationState(
-      conversationState, textNorm, outcome.reply ?? null, outcome.toolUsed, undefined, outcome.toolResult,
-    );
-    await stateStore.saveConversationState(repo, user, nextState);
-  }
-
-  if (mode === "SHADOW") {
-    console.log("[conversation]", JSON.stringify({
-      local_reply_present: localResult!.reply !== null, gemini_handled: outcome.handled,
-      gemini_tool_used: outcome.toolUsed ?? null, shadow_mode: true,
-    }));
-    return localResult!; // الرد الفعلي دائمًا من المسار المحلي بوضع الظل
-  }
-
-  // ACTIVE
-  if (!outcome.handled) return runLocalPipeline(repo, user, text, now);
-  return assembleActiveResult(outcome);
-}
-
-/**
- * مرحلة 3 — Gemini كطبقة NLU Hybrid فوق النظام المحلي (راجع AI_ARCHITECTURE.md للتفصيل الكامل).
- * يُستدعى فقط لما النظام المحلي نفسه يعترف إنه ما فهم بوضوح (ASK_GENERAL_FOOD_INFO — نفس حارس
- * الأمان من المرحلة 1)، صفر استدعاء Gemini على أي رسالة أخرى (Local-First Routing، بند 5+23).
- * قاعدة أمان حرجة غير قابلة للتفاوض (بند 6): NLU_ALLOWED_INTENTS تستثني LOG_MEAL بالذات، فمهما
- * ادّعى Gemini (حتى should_log_meal=true)، أبدًا ما ينتج عنه تسجيل وجبة — الرسالة الأصلية تبقى
- * مصدر الحقيقة (بند 7)، والتحقق (validateNluResult) يرفض أي نية غير مدرجة أصلاً.
- */
-async function resolveIntentViaNlu(
-  repo: Repository, user: UserRecord, textNorm: string, localIntent: string,
-  pending: PendingMeal | null, profile: Awaited<ReturnType<Repository["findNutritionProfile"]>>, now: Date,
-): Promise<{ intent: string; nluFoodQuery: string | null }> {
-  if (localIntent !== intents.ASK_GENERAL_FOOD_INFO || !nluConfig.isNluEnabled()) {
-    return { intent: localIntent, nluFoodQuery: null };
-  }
-
-  const provider = nluConfig.getNluProvider();
-  const nluContext = await buildNluContext(repo, user, profile, pending, now);
-  const result = await provider.understand(textNorm, nluContext);
-
-  if (!result) {
-    console.log("[nlu]", JSON.stringify({ local_intent: localIntent, gemini_intent: null, fallback_reason: "unavailable_or_invalid" }));
-    return { intent: localIntent, nluFoodQuery: null };
-  }
-
-  const shadow = nluConfig.isShadowMode();
-  console.log("[nlu]", JSON.stringify({
-    local_intent: localIntent, gemini_intent: result.intent, gemini_confidence: result.confidence,
-    agreement: result.intent === localIntent, shadow_mode: shadow, food_query: result.entities.food_query,
-  }));
-
-  if (shadow) {
-    // وضع الظل: نراقب ونسجّل بس — القرار المحلي يبقى الفعلي دايمًا، صفر تأثير على الرد.
-    return { intent: localIntent, nluFoodQuery: null };
-  }
-
-  // دفاع بعمق (Defense in Depth) — تحقق مستقل هنا كمان، صفر ثقة عمياء بمصدر النتيجة (حتى لو
-  // GeminiNLUProvider نفسها تحقّقت داخليًا أصلاً عبر validateNluResult). أي NLUProvider مستقبلي
-  // قد لا يتحقق بنفس الصرامة — orchestrator.ts، مصدر القرار الفعلي، ما يثق بأي intent خارج
-  // اللائحة البيضاء تحت أي ظرف، بغض النظر شنو يدّعي should_log_meal. هذا بالضبط اللي يمنع سيناريو
-  // كارثي: رسالة سؤال بريئة ("ليش بيضة غالية هسه؟") تحتوي صدفة اسم طعام يتطابق بثقة كاملة —
-  // لو النية غير المفحوصة "LOG_MEAL" مرّت لـdispatch()، كانت راح تُسجَّل مباشرة (DIRECT_LOG).
-  if (!NLU_ALLOWED_INTENTS.has(result.intent)) {
-    console.warn("[nlu] rejected intent outside whitelist despite passing provider validation:", result.intent);
-    return { intent: localIntent, nluFoodQuery: null };
-  }
-
-  return { intent: result.intent, nluFoodQuery: result.entities.food_query };
-}
-
-async function buildNluContext(
-  repo: Repository, user: UserRecord, profile: Awaited<ReturnType<Repository["findNutritionProfile"]>>,
-  pending: PendingMeal | null, now: Date,
-): Promise<NLUContext> {
-  const ctx = await context.build(repo, user.id, profile, now);
-  let pendingFoodTopic: string | null = null;
-  if (user.pending_food_topic_json) {
-    try {
-      const topic = JSON.parse(user.pending_food_topic_json) as { food_name?: string };
-      pendingFoodTopic = topic.food_name ?? null;
-    } catch {
-      // JSON تالف — تجاهل بأمان، نفس تسامح بقية الكود مع pending_*_json
-    }
-  }
-  return {
-    current_time_iraq: getCurrentPeriod(now),
-    remaining_calories: profile ? ctx.remaining_calories : null,
-    target_calories: profile ? ctx.target_calories : null,
-    goal: profile ? ctx.goal : null,
-    pending_food_topic: pendingFoodTopic,
-    has_pending_meal: pending !== null,
-  };
-}
-
-async function dispatch(
-  repo: Repository, user: UserRecord, textNorm: string, intent: string,
-  pendingIn: PendingMeal | null, target: number, now: Date, nluFoodQuery: string | null = null,
-): Promise<DispatchResult> {
-  let pending = pendingIn;
-  // اسم طعام منظّف من Gemini NLU (لو انفعّل ووُثق بيه) — يُستخدم فقط لاستخراج الطعام بمعالجات
-  // الأسئلة المعلوماتية أدناه (بند 10 بالطلب: Gemini يعطي نص منظّف، الاستخراج/الحساب يبقى محليًا
-  // بالكامل عبر نفس extractFirstFood الحقيقي). لا تأثير على أي مسار تسجيل وجبة.
-  const foodLookupText = nluFoodQuery ?? textNorm;
-
-  if (REOPEN_INTENTS.has(intent) && pending === null) {
-    const reopened = await directLog.reopenMealForEdit(repo, user, now);
-    if (reopened !== null) {
-      pending = reopened as unknown as PendingMeal;
-    } else if (intent !== intents.ADD_FOOD) {
-      return { reply: "خلص وكت التعديل على آخر وجبة، خبرني شنو أكلت وأبدأ وجبة جديدة.", meal_logged: false };
-    }
-  }
-
-  if (intent === intents.OFFTOPIC) {
-    return { reply: "أنا مخصص لمساعدتك بالأكل واللياقة والتغذية داخل CJ FOOD 💪، ما أكدر أساعد بطلبات ثانية.", meal_logged: false };
-  }
-  if (intent === intents.MEDICAL) {
-    return { reply: "هذا سؤال يحتاج رأي مختص طبي، أنا ما أقدر أشخص أو أنصح بعلاج. تواصل مع دكتور أو مختص تغذية لهذا الموضوع 🙏", meal_logged: false };
-  }
-  if (intent === intents.NOT_YET) {
-    if (user.pending_recipe_confirmation_id) return { reply: responses.recipeNotYetAck(), meal_logged: false };
-    return { reply: "تمام، خبرني لما تاكل 🌱 أو گلي شنو تشتهي وأقترحلك شي مناسب لسعراتك المتبقية.", meal_logged: false };
-  }
-  if (intent === intents.EXPRESS_DESIRE) return handleExpressDesire(repo, user, textNorm, now);
-  if (intent === intents.EXPRESS_DISLIKE) return handleExpressDislike(textNorm);
-  if (intent === intents.EXPRESS_CRAVING) return handleFoodTopic(repo, user, foodLookupText, "craving", now);
-  if (intent === intents.PLAN_TO_EAT) return handleFoodTopic(repo, user, foodLookupText, "plan", now);
-  if (intent === intents.ASK_PORTION_FOR_FOOD) return handlePortionForFood(repo, user, textNorm, now, nluFoodQuery);
-  if (intent === intents.WHAT_IF) return handleWhatIf(repo, user, foodLookupText, now);
-  if (intent === intents.COOK_FROM_INGREDIENTS) return handleCookFromIngredients(repo, foodLookupText);
-  if (intent === intents.ASK_CALORIES) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "calories");
-  if (intent === intents.ASK_FOOD_SIZE) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "size");
-  if (intent === intents.ASK_FOOD_FIT) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "fit");
-  if (intent === intents.ASK_SUBSTITUTION) return handleFoodInfoQuestion(repo, user, foodLookupText, now, "substitution");
-  if (intent === intents.ASK_UNIT) return handleUnitQuestion(textNorm);
-  if (intent === intents.ASK_GENERAL_FOOD_INFO) return handleGeneralFoodInfo(foodLookupText);
-  if (intent === intents.GREETING) return handleGreeting(user, now);
-  if (intent === intents.FAREWELL) return { reply: responses.farewell(), meal_logged: false };
-  if (intent === intents.THANKS) return { reply: responses.thanksAck(), meal_logged: false };
-  if (intent === intents.ACKNOWLEDGEMENT) return { reply: responses.acknowledgement(), meal_logged: false };
-
-  if (intent === intents.CANCEL) {
-    if (hasAnswerableClarification(pending)) return handleMealMessage(repo, user, textNorm, pending, now);
-    if (pending) {
-      await mealState.savePending(repo, user, null);
-      return { reply: "تمام، ألغيتها. خبرني شنو أكلت فعليًا.", meal_logged: false };
-    }
-    if (user.pending_recipe_confirmation_id) {
-      user.pending_recipe_confirmation_id = null;
-      await repo.saveUser(user);
-      return { reply: responses.recipeDeclinedAck(), meal_logged: false };
-    }
-    if (user.pending_food_topic_json) {
-      user.pending_food_topic_json = null;
-      await repo.saveUser(user);
-      return { reply: responses.foodTopicCancelAck(), meal_logged: false };
-    }
-    return directLog.undo(repo, user, now);
-  }
-
-  if (intent === intents.CONFIRM) {
-    if (hasAnswerableClarification(pending)) return handleMealMessage(repo, user, textNorm, pending, now);
-    if (pending) return confirmPending(repo, user, pending, target, now);
-    if (user.pending_recipe_confirmation_id) return finalizeRecipeMeal(repo, user, target, now);
-    if (user.pending_food_topic_json) return handlePortionForFood(repo, user, textNorm, now);
-    return { reply: "ماكو شي بانتظار التأكيد هسه 🙂", meal_logged: false };
-  }
-
-  if (intent === intents.CORRECTION) {
-    if (findLeadingNumber(textNorm) !== null && pending) {
-      const [ok, msg] = await corrections.changeLastQuantity(pending, textNorm);
-      let reply = msg;
-      if (ok) {
-        await mealState.savePending(repo, user, pending);
-        reply += `\n\n${summarizePending(pending)}`;
-      }
-      return { reply, meal_logged: false };
-    }
-    return { reply: "وضحلي شنو تريد تصحح بالضبط.", meal_logged: false };
-  }
-
-  if (intent === intents.CHANGE_QUANTITY && pending) {
-    const [ok, msg] = await corrections.changeLastQuantity(pending, textNorm);
-    let reply = msg;
-    if (ok) {
-      await mealState.savePending(repo, user, pending);
-      reply += `\n\n${summarizePending(pending)}`;
-    }
-    return { reply, meal_logged: false };
-  }
-
-  if (intent === intents.REMOVE_FOOD && pending) {
-    const [ok, msg] = await corrections.removeFood(pending, textNorm);
-    let reply = msg;
-    if (ok) {
-      await mealState.savePending(repo, user, pending);
-      if (pending.items.length > 0) reply += `\n\n${summarizePending(pending)}`;
-    }
-    return { reply, meal_logged: false };
-  }
-
-  if (intent === intents.SWAP_FOOD && pending) {
-    const [ok, , msg] = await corrections.swapFood(pending, textNorm);
-    if (ok) await mealState.savePending(repo, user, pending);
-    return { reply: msg, meal_logged: false };
-  }
-
-  if (intent === intents.WATER_LOG) return handleWaterLog(repo, user, textNorm, now);
-  if (intent === intents.WEIGHT_UPDATE) return handleWeightUpdate(repo, user, textNorm);
-
-  if (intent === intents.ASK_TIP) {
-    const profile = await repo.findNutritionProfile(user.id);
-    const ctx = await context.build(repo, user.id, profile, now);
-    const category = tipsEngine.chooseCategoryForContext(ctx);
-    const tipText = await tipsEngine.pickTip(repo, user.id, category);
-    return { reply: tipText || "ما عندي نصيحة جديدة هسه، جرب لاحقًا 🌱", meal_logged: false };
-  }
-
-  if (intent === intents.END_DAY) {
-    const dayTotals = await calculator.todayTotals(repo, user.id, now);
-    const waterMl = await calculator.todayWaterMl(repo, user.id, now);
-    const remaining = target - dayTotals.calories;
-    let summary =
-      `ملخص يومك 📋\n🔥 السعرات: ${dayTotals.calories} / ${target} kcal\n` +
-      `🍗 بروتين: ${Math.round(dayTotals.protein)}غ | 🍞 كارب: ${Math.round(dayTotals.carbs)}غ | 🥑 دهون: ${Math.round(dayTotals.fat)}غ\n` +
-      `💧 الماي: ${waterMl} مل\n` +
-      `🍽️ عدد الوجبات المسجلة: ${dayTotals.logs.length}\n⭐ XP الحالي: ${user.xp}\n`;
-    summary += compensationMessage(remaining, target) || "\n\nبطل 🔥 اليوم كان مرتب جدًا. استمر، يوم وراء يوم راح تشوف الفرق.";
-    return { reply: summary, meal_logged: false };
-  }
-
-  if (intent === intents.ASK_REMAINING) {
-    const macro = askedMacro(textNorm);
-    if (macro) {
-      const profile = await repo.findNutritionProfile(user.id);
-      const ctx = await context.build(repo, user.id, profile, now);
-      const map = {
-        protein: [ctx.consumed_protein, ctx.macro_targets.protein_g ?? 0, "بروتين"] as const,
-        carb: [ctx.consumed_carbs, ctx.macro_targets.carbs_g ?? 0, "كارب"] as const,
-        fat: [ctx.consumed_fat, ctx.macro_targets.fat_g ?? 0, "دهون"] as const,
-      };
-      const [consumed, targetGrams, label] = map[macro];
-      const remainingGrams = targetGrams - consumed;
-      return { reply: responses.remainingMacro(label, remainingGrams, targetGrams), meal_logged: false };
-    }
-
-    const dayTotals = await calculator.todayTotals(repo, user.id, now);
-    const remaining = target - dayTotals.calories;
-    if (remaining >= 0) {
-      return { reply: `باقيلك تقريبًا ${remaining} سعرة من أصل ${target} kcal اليوم. تحب أقترحلك وجبة ضمنها؟`, meal_logged: false };
-    }
-    return { reply: `تجاوزت هدفك اليوم بـ ${Math.abs(remaining)} سعرة تقريبًا.${compensationMessage(remaining, target)}`, meal_logged: false };
-  }
-
-  if (intent === intents.GENERAL_NUTRITION) {
-    return { reply: responses.generalNutritionAnswer(generalNutritionTopic(textNorm)), meal_logged: false };
-  }
-
-  if (intent === intents.ASK_CALORIE_TARGET_MEAL) {
-    const m = textNorm.match(/(\d+)/);
-    if (m) return { reply: await recommendations.suggestMealNearTarget(parseInt(m[1], 10)), meal_logged: false };
-    return { reply: "شكد سعرة تريد تكون الوجبة تقريبًا؟ اكتبلي رقم.", meal_logged: false };
-  }
-
-  if (intent === intents.ASK_RECOMMENDATION) {
-    const profile = await repo.findNutritionProfile(user.id);
-    const ctx = await context.build(repo, user.id, profile, now);
-    const proteinNeeded = Math.max(0, (ctx.macro_targets.protein_g ?? 0) - ctx.consumed_protein);
-    let reply = await recommendations.suggestMealWithin(ctx.remaining_calories, proteinNeeded);
-
-    // وعي بالوقت (لا يُصفّي قائمة الاقتراحات، فقط يصوغ البادئة + يسمّي نوع الوجبة المتوقَّع) —
-    // findMealType يعطي الأولوية لذكر صريح بالرسالة نفسها، فطلب "أريد غداء" الساعة 10 مساءً ما
-    // ينحجب أبدًا حتى لو الوقت يقترح عشاء.
-    const timePrefix = responses.timeAwarePrefix(getConversationalPeriod(now));
-    if (timePrefix) {
-      const mealLabel = responses.MEAL_TYPE_LABELS[findMealType(textNorm, now)];
-      reply = `${timePrefix}${mealLabel ? ` وقت ${mealLabel} تقريبًا —` : ""} ${reply}`;
-    }
-
-    // ربط حقيقي بقسم وجبات الدايت — نفس recipeSearch.ts الموجود، صفر بحث موازٍ جديد. أول
-    // وصفة حقيقية تصير suggested_recipe مهيكلة (recipe_id حقيقي، لاستخدام الفرونت إند لاحقًا
-    // ببطاقة وصفة حقيقية بدل نص فقط) — صفر recipe_id لو ماكو تطابق فعلي (صفر Hallucination).
-    const matchingRecipes = await recipeSearch.suggestRecipesWithin(repo, ctx.remaining_calories);
-    let suggestedRecipe: { id: string; slug: string; name: string; calories: number; protein: number; carbs: number; fat: number } | null = null;
-    if (matchingRecipes.length > 0) {
-      const top = matchingRecipes[0]!;
-      suggestedRecipe = { id: top.id, slug: top.slug, name: top.name, calories: top.calories, protein: top.protein, carbs: top.carbs, fat: top.fat };
-      const lines = matchingRecipes.map((r) => `🍳 ${r.name} (~${r.calories} kcal) — موجودة بقسم وجبات الدايت`).join("\n");
-      reply += `\n\nأو جرب وصفة جاهزة من قسم وجبات الدايت:\n${lines}`;
-    }
-    return { reply, meal_logged: false, suggested_recipe: suggestedRecipe };
-  }
-
-  const hasRecipe = user.current_recipe_id !== null;
-  if (intent === intents.COOKING_STEP && hasRecipe) {
-    const recipe = await repo.findRecipeById(user.current_recipe_id!);
-    if (recipe) {
-      if (intents.MISSING_INGREDIENT_TRIGGERS.some((t) => textNorm.includes(t))) {
-        for (const sub of recipe.substitutions) {
-          if (textNorm.includes(sub.ingredient_name)) return { reply: sub.replacement, meal_logged: false };
-        }
-        return { reply: "ما عندي بديل مسجّل لهذا المكوّن بقاعدة بياناتي الحالية، جرب تحذفه إذا مو أساسي بالوصفة.", meal_logged: false };
-      }
-
-      const steps = [...recipe.steps].sort((a, b) => a.step_number - b.step_number);
-      const stepIdx = user.current_recipe_step;
-      if (stepIdx >= steps.length) {
-        const prompt = await markRecipeAwaitingConfirmation(repo, user, recipe.id);
-        return { reply: prompt, meal_logged: false };
-      }
-      const step = steps[stepIdx];
-      user.current_recipe_step = stepIdx + 1;
-      await repo.saveUser(user);
-      let stepText = `الخطوة ${stepIdx + 1}/${steps.length}: ${step.instruction}`;
-      const extras: string[] = [];
-      if (step.duration) extras.push(`⏱️ ${step.duration}`);
-      if (step.temperature) extras.push(`🌡️ ${step.temperature}`);
-      if (extras.length > 0) stepText += `\n${extras.join(" · ")}`;
-      if (step.tip) stepText += `\n💡 ${step.tip}`;
-      if (step.warning) stepText += `\n⚠️ ${step.warning}`;
-      return { reply: stepText, meal_logged: false };
-    }
-  }
-
-  if (intent === intents.ASK_RECIPE) {
-    const categoryId = await matchRecipeCategoryId(repo, textNorm);
-    const results = categoryId
-      ? await recipeSearch.searchRecipes(repo, "", categoryId)
-      : await recipeSearch.searchRecipes(repo, textNorm);
-    const recipe = results[0] ?? null;
-    if (recipe) {
-      // نفس تحقق /api/recipes-actions?action=start — نمنع بدء طبخة جديدة لو تجاوزت الهدف
-      // اليومي أصلاً (مو تسجيل وجبة أُكلت فعليًا، هذا يبقى صريح دايمًا بـ_finalizeMeal).
-      const profile = await repo.findNutritionProfile(user.id);
-      const ctx = await context.build(repo, user.id, profile, now);
-      if (ctx.over_target) {
-        return {
-          reply: `وصلت لهدف السعرات اليومي 🎯 "${recipe.name}" راح تزيد سعراتك أكثر من هدفك اليوم. تحب تشوف وصفة أخف بدالها؟`,
-          meal_logged: false,
-        };
-      }
-      user.current_recipe_id = recipe.id;
-      user.current_recipe_step = 0;
-      await repo.saveUser(user);
-      const ingredientsList = recipe.ingredients
-        .map((i) => `- ${i.name}` + (i.quantity && i.unit ? ` (${i.quantity} ${i.unit})` : i.unit ? ` (${i.unit})` : ""))
-        .join("\n");
-      const reply =
-        `🍳 ${recipe.name}\n\nالسعرات التقريبية: ${recipe.calories} kcal | بروتين ${pyFloatStr(recipe.protein)}غ | ` +
-        `كارب ${pyFloatStr(recipe.carbs)}غ | دهون ${pyFloatStr(recipe.fat)}غ\n\nالمكونات:\n${ingredientsList}\n\n` +
-        `اكتب "هسه شنو أسوي" لنبدأ خطوة بخطوة 👨‍🍳\nأو شوف الوصفة كاملة: /recipes/${recipe.slug}`;
-      return { reply, meal_logged: false };
-    }
-    return {
-      reply: "ما لقيت وصفة مناسبة بقاعدة بياناتي الحالية لهذا الطلب، جرب تذكر مكونات ثانية أو اسم أكلة معروفة، أو تصفح كل الوصفات بصفحة /recipes.",
-      meal_logged: false,
-    };
-  }
-
-  // LOG_MEAL / ADD_FOOD / أي نية ثانية غير معروفة -> نحاول نطابقها كأكل
-  return handleMealMessage(repo, user, textNorm, pending, now);
 }

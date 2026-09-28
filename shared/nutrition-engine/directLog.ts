@@ -8,7 +8,7 @@ import * as streaks from "./streaks.js";
 import * as xpEngine from "./xpEngine.js";
 import * as calculator from "./calculator.js";
 import { todayBaghdadIso } from "./iraqTime.js";
-import type { PendingItem } from "./corrections.js";
+import type { PendingItem } from "./mealTypes.js";
 
 export const UNDO_WINDOW_SECONDS = 300; // 5 دقايق — قابل للتعديل من هنا فقط
 
