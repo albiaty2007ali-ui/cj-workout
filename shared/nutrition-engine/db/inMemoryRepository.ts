@@ -46,6 +46,14 @@ export class InMemoryRepository implements Repository {
     return null;
   }
 
+  async countUsersReferredBy(userId: string): Promise<number> {
+    let count = 0;
+    for (const u of this.users.values()) {
+      if (u.referred_by === userId) count++;
+    }
+    return count;
+  }
+
   private xpTransactions: (XpTransactionInput & { id: string; created_at: Date })[] = [];
   private activeDays: ActiveDayRecord[] = [];
   streakMilestones: StreakMilestoneRecord[] = [];

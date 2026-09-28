@@ -117,6 +117,11 @@ export interface Repository {
   saveUser(user: UserRecord): Promise<void>;
   /** يبحث عن صاحب كود إحالة معيّن (حزمة تطوير الإحالة) — null لو الكود غير موجود. */
   findUserByReferralCode(code: string): Promise<UserRecord | null>;
+  /** عدد من أحالهم المستخدم فعليًا (حزمة لوحة "دعوة صديق") — فلتر تساوٍ وحيد على referred_by،
+   *  صفر فهرس مركّب مطلوب (نفس درس countXpTransactionsByReason). هذا "الأصدقاء المدعوون"
+   *  الحقيقي؛ قد يتجاوز عدد إحالات XP الفعلية (MAX_REFERRAL_XP_GRANTS=20) لأن التسجيل نفسه
+   *  بلا حد أقصى، الحد الأقصى فقط على منح XP. */
+  countUsersReferredBy(userId: string): Promise<number>;
 
   // ---- XP Ledger ----
   findXpTransactionBySource(userId: string, source: string): Promise<boolean>;

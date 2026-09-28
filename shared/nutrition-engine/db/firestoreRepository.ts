@@ -125,6 +125,11 @@ export class FirestoreRepository implements Repository {
     return this.findUser(snap.docs[0]!.id);
   }
 
+  async countUsersReferredBy(userId: string): Promise<number> {
+    const snap = await this.db.collection("users").where("referred_by", "==", userId).count().get();
+    return snap.data().count;
+  }
+
   // ---- XP Ledger ----
   private xpSourceDocId(userId: string, source: string): string {
     return `${userId}_src_${source}`;

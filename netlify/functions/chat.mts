@@ -85,6 +85,14 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       for (const m of newMilestones) {
         await sendNotification(db, claims.sub, "STREAK", `streak_${m.days}`, "/profile", "🔥 محطة جديدة!", `${m.label} — +${m.xp_reward} XP`);
       }
+      // ربط بسيط مع بطاقة الإنجاز القابلة للمشاركة (حزمة الإحالة/Premium) — زر إضافي فقط لو
+      // ماكو nudge_actions أصلًا من مسار ثانٍ (نفس أولوية attachUnderEatingNudge's الحارس،
+      // صفر استبدال لأي اقتراح موجود). صفر لمس لمنطق حساب المحطات نفسه.
+      if (!result.nudge_actions) {
+        result.nudge_actions = [
+          { icon: "📤", label: "شارك إنجازك", kind: "navigate", target: "/profile?share=streak" },
+        ];
+      }
     }
 
     return jsonOk(result);

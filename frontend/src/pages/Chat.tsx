@@ -51,6 +51,7 @@ export default function Chat() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [showConsult, setShowConsult] = useState(false);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [freeMealBanner, setFreeMealBanner] = useState<"warn1" | "limit" | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const nearBottomRef = useRef(true);
@@ -116,6 +117,29 @@ export default function Chat() {
     }
   }, [messages, sending]);
 
+  // بانر تنبيه نفاد الوجبات المجانية (حزمة الإحالة/Premium) — يعتمد على seen_features الحقيقية
+  // بحساب المستخدم (نفس نظام mark-feature-seen)، مو على قيمة remaining وحدها — فمرة يُغلَق
+  // (أو تُشاهَد نفس الحالة سابقًا)، ما يرجع يظهر أبدًا لنفس remaining=1/0، حتى بعد Refresh أو
+  // Logout/Login. هذا أضمن من تتبّع "القيمة السابقة" محليًا (يضيع بأي إعادة تحميل).
+  useEffect(() => {
+    if (!me || me.is_premium) { setFreeMealBanner(null); return; }
+    const seen = me.seen_features ?? {};
+    if (me.free_meals_remaining === 0 && (seen["free_meal_warning_0"] ?? 0) < 1) {
+      setFreeMealBanner("limit");
+    } else if (me.free_meals_remaining === 1 && (seen["free_meal_warning_1"] ?? 0) < 1) {
+      setFreeMealBanner("warn1");
+    } else {
+      setFreeMealBanner(null);
+    }
+  }, [me]);
+
+  function dismissFreeMealBanner() {
+    const key = freeMealBanner === "limit" ? "free_meal_warning_0" : "free_meal_warning_1";
+    setFreeMealBanner(null);
+    setMe((prev) => prev ? { ...prev, seen_features: { ...prev.seen_features, [key]: 1 } } : prev);
+    api.post("/settings?action=mark-feature-seen", { feature_key: key, version: 1 });
+  }
+
   /**
    * نقطة الإرسال الفعلية الوحيدة — تستدعيها كل من: نموذج الكتابة (sendMessage)، أزرار الشات
    * السريعة (STATIC_PROMPTS/greeting.prompts)، القائمة الجانبية، مساعد CJ (عبر ?send=)، وأزرار
@@ -163,6 +187,11 @@ export default function Chat() {
       api.get<DailyResponse>("/progress/daily").then((r) => {
         if (r.success && r.data && r.data.meals) setDaily(r.data);
       });
+      // free_meals_used بالرد يعني وجبة مجانية استُهلكت هسه — نجيب /me من جديد حتى
+      // free_meals_remaining (وseen_features لبانر التنبيه) يبقى حقيقي، مو قيمة أول تحميل باهتة.
+      if (typeof res.data?.free_meals_used === "number") {
+        api.get<MeResponse>("/me").then((r) => { if (r.success && r.data) setMe(r.data); });
+      }
     } finally {
       setSending(false);
     }
@@ -234,6 +263,23 @@ export default function Chat() {
             <div className="calorie-card">
               <p className="cc-label">{me.is_premium ? t("chat.premiumActive") : t("chat.freeTrialLabel")}</p>
               <p className="cc-value">{me.is_premium ? t("chat.activeStatus") : `${me.free_meals_remaining} / 6`}</p>
+            </div>
+          </div>
+        )}
+
+        {freeMealBanner && (
+          <div className="notice-box" style={{ borderColor: "var(--gold)" }}>
+            <p style={{ margin: 0, fontWeight: 700 }}>
+              {freeMealBanner === "limit" ? t("freeMealWarning.limitReachedTitle") : t("freeMealWarning.oneLeftTitle")}
+            </p>
+            <p style={{ margin: "6px 0", fontSize: "0.88rem", color: "var(--text-muted)" }}>
+              {freeMealBanner === "limit" ? t("freeMealWarning.limitReachedBody") : t("freeMealWarning.oneLeftBody")}
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="btn btn-moss" onClick={() => { dismissFreeMealBanner(); navigate("/subscribe"); }}>
+                {t("freeMealWarning.seePremium")}
+              </button>
+              <button type="button" className="btn btn-outline-dark" onClick={dismissFreeMealBanner}>{t("freeMealWarning.later")}</button>
             </div>
           </div>
         )}

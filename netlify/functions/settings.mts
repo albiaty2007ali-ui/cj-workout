@@ -29,6 +29,9 @@ const FEATURE_INTRO_KEYS = new Set([
   "feature_intro_daily_food", "feature_intro_diet_meals", "feature_intro_weight",
   "feature_intro_challenges", "feature_intro_cj_assistant", "feature_intro_tournament",
   "feature_intro_specialist", "feature_intro_subscription", "feature_intro_profile",
+  // تنبيه نفاد الوجبات المجانية (حزمة الإحالة/Premium) — نفس آلية seen_features/
+  // mark-feature-seen أعلاه بالضبط، مفتاحان إضافيان فقط بدل بنية تخزين رابعة جديدة.
+  "free_meal_warning_1", "free_meal_warning_0",
 ]);
 
 export default async (req: Request, _context: Context): Promise<Response> => {

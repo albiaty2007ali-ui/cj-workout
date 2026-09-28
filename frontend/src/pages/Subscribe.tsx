@@ -5,6 +5,8 @@ import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
 import AdSlot from "../components/AdSlot";
 import { AD_SLOTS } from "../lib/adsConfig";
+import PremiumComparisonTable from "../components/PremiumComparisonTable";
+import { useI18n } from "../i18n/I18nContext";
 
 interface SubscribeInfo {
   card_number: string;
@@ -15,6 +17,7 @@ interface SubscribeInfo {
 
 export default function Subscribe() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [info, setInfo] = useState<SubscribeInfo | null>(null);
   const [reference, setReference] = useState("");
@@ -81,8 +84,15 @@ export default function Subscribe() {
           </div>
         ) : (
           <>
-            <h1 className="font-display">إتمام الاشتراك</h1>
-            <p className="subtitle">CJ FOOD Monthly — {info ? info.price.toLocaleString("en-US") : "..."} د.ع / شهر</p>
+            <PremiumComparisonTable />
+            <p className="subtitle" style={{ textAlign: "center", marginTop: 4 }}>
+              CJ FOOD Monthly — {info ? info.price.toLocaleString("en-US") : "..."} {t("premiumCompare.priceSuffix")}
+            </p>
+            <button type="button" className="btn btn-gold btn-block" style={{ marginTop: 10 }} onClick={() => document.getElementById("reference")?.focus()}>
+              {t("premiumCompare.ctaSubscribe")}
+            </button>
+
+            <h1 className="font-display" style={{ marginTop: 32 }}>إتمام الاشتراك</h1>
 
             <AdSlot html={AD_SLOTS.subscribeInterstitial} className="ad-slot ad-slot-large" />
 

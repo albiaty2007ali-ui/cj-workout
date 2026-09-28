@@ -76,3 +76,44 @@ describe("grantReferralXp", () => {
     expect(txs[0]!.amount).toBe(REFERRAL_XP);
   });
 });
+
+describe("countUsersReferredBy (حزمة لوحة دعوة صديق)", () => {
+  it("يحسب فقط المستخدمين اللي referred_by يطابق المستخدم المطلوب", async () => {
+    const repo = new InMemoryRepository();
+    const referrer = makeUser({ id: "ref6", xp: 0 });
+    const other = makeUser({ id: "other1", xp: 0 });
+    await repo.saveUser(referrer);
+    await repo.saveUser(other);
+    await repo.saveUser(makeUser({ id: "friend1", referred_by: "ref6" }));
+    await repo.saveUser(makeUser({ id: "friend2", referred_by: "ref6" }));
+    await repo.saveUser(makeUser({ id: "friend3", referred_by: "other1" }));
+
+    expect(await repo.countUsersReferredBy("ref6")).toBe(2);
+    expect(await repo.countUsersReferredBy("other1")).toBe(1);
+  });
+
+  it("يرجّع صفر لمستخدم بدون أي إحالات، بدون خطأ", async () => {
+    const repo = new InMemoryRepository();
+    await repo.saveUser(makeUser({ id: "lonely1" }));
+    expect(await repo.countUsersReferredBy("lonely1")).toBe(0);
+  });
+
+  it("قد يتجاوز عدد المُحالين الفعلي سقف منح XP (referred_count مستقل عن xp_grants_cap)", async () => {
+    const repo = new InMemoryRepository();
+    let referrer = makeUser({ id: "ref7", xp: 0 });
+    await repo.saveUser(referrer);
+    for (let i = 0; i < MAX_REFERRAL_XP_GRANTS; i++) {
+      await grantReferralXp(repo, referrer, `bulk7-${i}`);
+      referrer = (await repo.findUser("ref7"))!;
+      await repo.saveUser(makeUser({ id: `bulk7-${i}`, referred_by: "ref7" }));
+    }
+    // إحالة إضافية بعد السقف: تسجّل referred_by (نفس ما يصير حقيقةً عند auth-register.mts)
+    // لكن صفر XP إضافي — referred_count الحقيقي (21) يختلف عمدًا عن xp_grants_used (20).
+    await repo.saveUser(makeUser({ id: "over-cap-friend", referred_by: "ref7" }));
+    const overCapGranted = await grantReferralXp(repo, referrer, "over-cap-friend");
+
+    expect(overCapGranted).toBe(false);
+    expect(await repo.countUsersReferredBy("ref7")).toBe(MAX_REFERRAL_XP_GRANTS + 1);
+    expect(await repo.countXpTransactionsByReason("ref7", REFERRAL_XP_REASON)).toBe(MAX_REFERRAL_XP_GRANTS);
+  });
+});

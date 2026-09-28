@@ -93,3 +93,13 @@ export interface ChatReply {
   meal_fat?: number;
   nudge_actions?: NudgeAction[];
 }
+
+export interface ReferralStats {
+  referral_code: string;
+  referred_count: number;
+  referral_xp_total: number;
+  xp_per_referral: number;
+  xp_grants_used: number;
+  xp_grants_cap: number;
+  history: { date: string; xp: number }[];
+}

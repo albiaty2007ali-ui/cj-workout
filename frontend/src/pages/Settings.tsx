@@ -5,6 +5,7 @@ import AppShell from "../components/AppShell";
 import ThemeSelector from "../components/ThemeSelector";
 import AboutAppModal from "../components/AboutAppModal";
 import FeatureIntroReplayModal from "../components/FeatureIntroReplayModal";
+import ReferralPanel from "../components/ReferralPanel";
 import PremiumFeatureModal from "../components/PremiumFeatureModal";
 import { pushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from "../lib/push";
 import { useIntroSlides } from "./IntroTour";
@@ -276,6 +277,11 @@ export default function Settings() {
             <button type="button" className="btn btn-moss" onClick={shareApp}>📤 شارك التطبيق مع أصدقائك</button>
             <a href="https://instagram.com/tfxo1" target="_blank" rel="noopener noreferrer" className="btn btn-outline-dark">📷 تابعنا على إنستغرام</a>
           </div>
+        </div>
+
+        <div className="notice-box">
+          <h3 style={{ marginTop: 0 }}>{t("referral.title")}</h3>
+          <ReferralPanel />
         </div>
 
         <div className="notice-box">

@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, type MeResponse } from "../lib/api";
 import type { ProfileResponse, CalendarDay } from "../lib/profileApi";
 import AppShell from "../components/AppShell";
+import AchievementShareModal from "../components/AchievementShareModal";
+import type { AchievementKind } from "../lib/achievementCard";
 import { useI18n, backArrow, forwardArrow } from "../i18n/I18nContext";
 import { WEEKDAY_LABELS, MONTH_LABELS } from "../i18n/translations";
 import { resizeImageToSquareJpeg } from "../lib/imageResize";
+
+const SHARE_KIND_PARAM: Record<string, AchievementKind> = {
+  streak: "streak", level: "level", longeststreak: "longestStreak", meals: "meals", challenges: "challenges",
+};
 
 function monthKey(iso: string): string {
   return iso.slice(0, 7);
@@ -38,6 +44,19 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [params, setParams] = useSearchParams();
+  const [shareKind, setShareKind] = useState<AchievementKind | null>(null);
+
+  // ?share=streak (إلخ) يسمح لأي صفحة (رسالة محطة Streak بالشات مثلًا) بفتح مودال المشاركة
+  // مباشرة على إنجاز محدَّد — مرة وحدة، الباراميتر يُحذَف بعدها حتى Refresh/رجوع ما يعيد فتحه.
+  useEffect(() => {
+    const raw = params.get("share");
+    if (!raw) return;
+    const kind = SHARE_KIND_PARAM[raw.toLowerCase()];
+    setParams((prev) => { const next = new URLSearchParams(prev); next.delete("share"); return next; }, { replace: true });
+    if (kind) setShareKind(kind);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   const STATUS_LABEL: Record<CalendarDay["status"], string> = {
     green: t("profile.statusGreen"), yellow: t("profile.statusYellow"),
@@ -237,29 +256,51 @@ export default function Profile() {
               <span className="ab-icon">⭐</span>
               <span className="ab-value">{profile.achievements.level}</span>
               <span className="ab-label">{t("profile.achLevelLabel")}</span>
+              <button type="button" className="ab-share-btn" aria-label={t("achievementShare.title")} onClick={() => setShareKind("level")}>📤</button>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🔥</span>
               <span className="ab-value">{profile.achievements.streak_days}</span>
               <span className="ab-label">{t("profile.achStreakLabel")}</span>
+              <button type="button" className="ab-share-btn" aria-label={t("achievementShare.title")} onClick={() => setShareKind("streak")}>📤</button>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🏔️</span>
               <span className="ab-value">{profile.achievements.longest_streak}</span>
               <span className="ab-label">{t("profile.achLongestStreakLabel")}</span>
+              <button type="button" className="ab-share-btn" aria-label={t("achievementShare.title")} onClick={() => setShareKind("longestStreak")}>📤</button>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🍽️</span>
               <span className="ab-value">{profile.achievements.meals_logged}</span>
               <span className="ab-label">{t("profile.achMealsLabel")}</span>
+              <button type="button" className="ab-share-btn" aria-label={t("achievementShare.title")} onClick={() => setShareKind("meals")}>📤</button>
             </div>
             <div className="achievement-badge">
               <span className="ab-icon">🏆</span>
               <span className="ab-value">{profile.achievements.challenges_completed}</span>
               <span className="ab-label">{t("profile.achChallengesLabel")}</span>
+              <button type="button" className="ab-share-btn" aria-label={t("achievementShare.title")} onClick={() => setShareKind("challenges")}>📤</button>
             </div>
           </div>
         </div>
+
+        {shareKind && me && profile && (
+          <AchievementShareModal
+            initialKind={shareKind}
+            data={{
+              value: shareKind === "level" ? profile.achievements.level
+                : shareKind === "streak" ? profile.achievements.streak_days
+                : shareKind === "longestStreak" ? profile.achievements.longest_streak
+                : shareKind === "meals" ? profile.achievements.meals_logged
+                : profile.achievements.challenges_completed,
+              displayName: me.name || "مستخدم CJ",
+              level: profile.achievements.level,
+              xp: me.xp,
+            }}
+            onClose={() => setShareKind(null)}
+          />
+        )}
 
         <div className="notice-box" style={{ marginTop: 16 }}>
           <h3 style={{ marginTop: 0 }}>{t("profile.calendarTitle")}</h3>

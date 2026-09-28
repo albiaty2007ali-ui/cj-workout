@@ -199,6 +199,11 @@
   to = "/.netlify/functions/water-quick-log"
   status = 200
 
+[[redirects]]
+  from = "/api/referral-stats"
+  to = "/.netlify/functions/referral-stats"
+  status = 200
+
 # SPA Fallback — لازم آخر قاعدة (الأعم)، حتى refresh مباشر على /chat أو /login يشتغل بدون 404
 [[redirects]]
   from = "/*"
