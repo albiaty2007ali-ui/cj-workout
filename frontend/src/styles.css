@@ -310,6 +310,7 @@ body {
 }
 
 .sidebar-item {
+  position: relative;
   display: block;
   padding: 11px 20px;
   color: #eee;
@@ -928,6 +929,23 @@ body {
 .modal-close-btn {
   position: absolute; inset-inline-end: 14px; top: 14px; background: none; border: none;
   color: var(--text-muted); font-size: 1.1rem; cursor: pointer; line-height: 1;
+}
+
+/* ---- Feature Discovery: مودال تعريف ميزة (بطاقة عائمة صغيرة، مو ملء الشاشة) ---- */
+.feature-intro-card { max-width: 360px; text-align: center; }
+.feature-intro-icon { font-size: 2.4rem; margin: 0 0 4px; line-height: 1; }
+
+/* نقطة تنبيه ذكية (🔴) — مؤشر بصري بحت (aria-hidden)، لا تُغيّر حجم/مكان الزر ولا تُعيق الضغط
+   عليه (pointer-events:none)، موضع منطقي (inset-inline) يتكيّف تلقائيًا مع RTL، ولون --danger
+   نفسه المُعرَّف بكل الثيمات (صفر لون جديد ثابت يكسر أي ثيم). */
+.feature-dot {
+  position: absolute; inset-inline-end: 8px; top: 50%; transform: translateY(-50%) scale(1);
+  width: 8px; height: 8px; border-radius: 50%; background: var(--danger);
+  pointer-events: none; animation: feature-dot-in var(--motion-base) ease;
+}
+@keyframes feature-dot-in {
+  from { opacity: 0; transform: translateY(-50%) scale(0.4); }
+  to { opacity: 1; transform: translateY(-50%) scale(1); }
 }
 
 /* ---- قائمة مساعد CJ — بطاقات Icon+عنوان+وصف بدل نصوص بسيطة ---- */

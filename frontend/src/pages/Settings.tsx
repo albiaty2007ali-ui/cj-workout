@@ -4,6 +4,7 @@ import { api, type MeResponse } from "../lib/api";
 import AppShell from "../components/AppShell";
 import ThemeSelector from "../components/ThemeSelector";
 import AboutAppModal from "../components/AboutAppModal";
+import FeatureIntroReplayModal from "../components/FeatureIntroReplayModal";
 import PremiumFeatureModal from "../components/PremiumFeatureModal";
 import { pushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from "../lib/push";
 import { useIntroSlides } from "./IntroTour";
@@ -35,6 +36,7 @@ export default function Settings() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [savedMsg, setSavedMsg] = useState("");
   const [showAboutApp, setShowAboutApp] = useState(false);
+  const [showFeatureIntroReplay, setShowFeatureIntroReplay] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -300,6 +302,9 @@ export default function Settings() {
           <button type="button" className="btn btn-outline-dark" style={{ marginTop: 14, marginInlineStart: 10 }} onClick={() => setShowAboutApp(true)}>
             ℹ️ حول التطبيق والشروط
           </button>
+          <button type="button" className="btn btn-outline-dark" style={{ marginTop: 14, marginInlineStart: 10 }} onClick={() => setShowFeatureIntroReplay(true)}>
+            {t("featureIntro.replaySectionTitle")}
+          </button>
         </div>
 
         {notif && (
@@ -538,6 +543,7 @@ export default function Settings() {
         </div>
       </main>
       {showAboutApp && <AboutAppModal onClose={() => setShowAboutApp(false)} />}
+      {showFeatureIntroReplay && <FeatureIntroReplayModal onClose={() => setShowFeatureIntroReplay(false)} />}
     </AppShell>
   );
 }

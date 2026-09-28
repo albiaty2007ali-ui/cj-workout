@@ -47,6 +47,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       email: claims.email,
       notification_prompt_shown: display?.notification_prompt_shown ?? false,
       theme: display?.theme ?? "dark",
+      seen_features: display?.seen_features ?? {},
       referral_code: user.referral_code,
       // إشارة حقيقية (مو شارة ثابتة دائمًا خضراء) — يعكس هل GEMINI_API_KEY مضبوط فعليًا وGEMINI_
       // CONVERSATIONAL_MODE ليس OFF. لا يستدعي Gemini حقيقيًا (صفر تكلفة/تأخير)، بس لا يخترع حالة.

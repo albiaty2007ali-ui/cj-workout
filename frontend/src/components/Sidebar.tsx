@@ -2,11 +2,15 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useI18n, type TranslationKey } from "../i18n/I18nContext";
+import { FEATURE_INTROS, isFeatureSeen, type FeatureIntroDef } from "../lib/featureIntros";
 
 interface SidebarProps {
   userName: string;
   isAdmin: boolean;
   photoUrl?: string | null;
+  /** حالة Feature Discovery (راجع AppShell.tsx) — تحدّد أي زر يحمل نقطة 🔴. اختيارية حتى Sidebar
+   * يبقى قابل للاستخدام بدونها (تختفي كل النقاط، صفر كسر). */
+  seenFeatures?: Record<string, number>;
   onOpenAssistant?: () => void;
   onOpenConsult?: () => void;
   onOpenTournament?: () => void;
@@ -29,7 +33,7 @@ const NAV_GROUPS: NavGroup[] = [
   ] },
 ];
 
-export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, onOpenConsult, onOpenTournament }: SidebarProps) {
+export default function Sidebar({ userName, isAdmin, photoUrl, seenFeatures, onOpenAssistant, onOpenConsult, onOpenTournament }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const activeGroupKey = NAV_GROUPS.find((g) => g.items.some((i) => i.to === location.pathname))?.key ?? null;
@@ -37,6 +41,17 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
   const navigate = useNavigate();
   const { t } = useI18n();
   const isActive = (to: string) => location.pathname === to;
+
+  /** نقطة تنبيه ذكية (Feature Discovery) — true فقط لو أكو تعريف ميزة مطابق (route أو trigger)
+   * وغير مُشاهَد بعد بالإصدار الحالي. seenFeatures غير محمّلة بعد (undefined) = صفر نقاط مؤقتًا
+   * بدل ومضة خاطئة، تظهر فور وصول /api/me الحقيقي. */
+  function needsDot(match: Pick<FeatureIntroDef, "route" | "trigger">): boolean {
+    if (!seenFeatures) return false;
+    const def = FEATURE_INTROS.find((d) => (match.route ? d.route === match.route : d.trigger === match.trigger));
+    return def ? !isFeatureSeen(seenFeatures, def) : false;
+  }
+
+  const Dot = () => <span className="feature-dot" aria-hidden="true" />;
 
   async function logout() {
     await api.post("/auth/logout");
@@ -69,7 +84,10 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
               {openGroup === group.key && (
                 <div className="sidebar-group-body">
                   {group.items.map((item) => (
-                    <Link key={item.to} className={`sidebar-item ${isActive(item.to) ? "active" : ""}`} to={item.to} onClick={() => setOpen(false)}>{t(item.labelKey)}</Link>
+                    <Link key={item.to} className={`sidebar-item ${isActive(item.to) ? "active" : ""}`} to={item.to} onClick={() => setOpen(false)}>
+                      {t(item.labelKey)}
+                      {needsDot({ route: item.to }) && <Dot />}
+                    </Link>
                   ))}
                 </div>
               )}
@@ -79,9 +97,15 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
           {onOpenAssistant && (
             <>
               <p className="sidebar-group-title">{t("sidebar.groupAssistant")}</p>
-              <button className="sidebar-item" onClick={() => { onOpenAssistant(); setOpen(false); }}>{t("sidebar.assistantMenuItem")}</button>
+              <button className="sidebar-item" onClick={() => { onOpenAssistant(); setOpen(false); }}>
+                {t("sidebar.assistantMenuItem")}
+                {needsDot({ trigger: "assistant" }) && <Dot />}
+              </button>
               {onOpenTournament && (
-                <button className="sidebar-item" onClick={() => { onOpenTournament(); setOpen(false); }}>🏆 عندي بطولة</button>
+                <button className="sidebar-item" onClick={() => { onOpenTournament(); setOpen(false); }}>
+                  🏆 عندي بطولة
+                  {needsDot({ trigger: "tournament" }) && <Dot />}
+                </button>
               )}
             </>
           )}
@@ -89,11 +113,17 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
           {onOpenConsult && (
             <>
               <p className="sidebar-group-title">{t("sidebar.groupHelp")}</p>
-              <button className="sidebar-item" onClick={() => { onOpenConsult(); setOpen(false); }}>{t("sidebar.consultItem")}</button>
+              <button className="sidebar-item" onClick={() => { onOpenConsult(); setOpen(false); }}>
+                {t("sidebar.consultItem")}
+                {needsDot({ trigger: "consult" }) && <Dot />}
+              </button>
             </>
           )}
 
-          <Link className={`sidebar-item sidebar-item-highlight ${isActive("/subscribe") ? "active" : ""}`} to="/subscribe" onClick={() => setOpen(false)}>{t("sidebar.subscribe")}</Link>
+          <Link className={`sidebar-item sidebar-item-highlight ${isActive("/subscribe") ? "active" : ""}`} to="/subscribe" onClick={() => setOpen(false)}>
+            {t("sidebar.subscribe")}
+            {needsDot({ route: "/subscribe" }) && <Dot />}
+          </Link>
 
           <p className="sidebar-group-title">{t("sidebar.groupSettings")}</p>
           <Link className={`sidebar-item ${isActive("/settings") ? "active" : ""}`} to="/settings" onClick={() => setOpen(false)}>{t("sidebar.settings")}</Link>
@@ -102,6 +132,7 @@ export default function Sidebar({ userName, isAdmin, photoUrl, onOpenAssistant, 
         <div className="sidebar-bottom">
           <Link className={`sidebar-item sidebar-item-profile ${isActive("/profile") ? "active" : ""}`} to="/profile" onClick={() => setOpen(false)}>
             {photoUrl ? <img src={photoUrl} alt="" className="sidebar-avatar" /> : <span>👤</span>} {userName}
+            {needsDot({ route: "/profile" }) && <Dot />}
           </Link>
           <button className="sidebar-item" onClick={logout}>{t("sidebar.logout")}</button>
         </div>

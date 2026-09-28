@@ -22,6 +22,14 @@ const VISIBILITY_OPTIONS = new Set(["public", "private"]);
 const FREE_THEMES = new Set(["light", "dark"]);
 const PREMIUM_THEMES = new Set(["midnight", "ocean", "emerald", "sunset", "aurora", "carbon"]);
 const THEMES = new Set([...FREE_THEMES, ...PREMIUM_THEMES]);
+// مفاتيح ثابتة (Feature Discovery) — مصدر الحقيقة الوحيد لأسماء المفاتيح الصالحة بالـbackend؛
+// frontend/src/lib/featureIntros.ts يطابقها حرفيًا. فحص تنظيفي بحت (تعليم مفتاح غير معروف
+// كـ"مشاهَد" صفر تأثير أمني — لا يفتح صلاحية ولا يتجاوز أي قفل، الطلب صراحة يوضّح هذا).
+const FEATURE_INTRO_KEYS = new Set([
+  "feature_intro_daily_food", "feature_intro_diet_meals", "feature_intro_weight",
+  "feature_intro_challenges", "feature_intro_cj_assistant", "feature_intro_tournament",
+  "feature_intro_specialist", "feature_intro_subscription", "feature_intro_profile",
+]);
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   const claims = authenticateRequest(req);
@@ -130,6 +138,26 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       // جولة "هلا بيك" التعريفية — تُعلَّم مكتملة لما المستخدم يخلّصها أو يضغط "تخطي"، وكلاهما
       // "شافها" بمعنى ما تظهر تلقائيًا مرة ثانية (يبقى فيه "إعادة مشاهدة المقدمة" من الإعدادات).
       await userRef.set({ intro_completed: true }, { merge: true });
+      return jsonOk({ ok: true });
+    }
+
+    if (action === "mark-feature-seen") {
+      // Feature Discovery — مودال تعريف ميزة + نقطة التنبيه المقابلة لها بالقائمة الجانبية
+      // يشتركان بنفس الحقل هذا. version رقم صحيح (يسمح لاحقًا بإعادة إظهار ميزة فرعية جديدة
+      // داخل قسم موجود عبر رفع version بتعريف الميزة بـfeatureIntros.ts، بدون التأثير على بقية
+      // المفاتيح المحفوظة). claims.sub فقط دائمًا — صفر ثقة بأي user_id من الجسم.
+      const featureKey = body.feature_key;
+      const version = body.version;
+      if (typeof featureKey !== "string" || !FEATURE_INTRO_KEYS.has(featureKey)) {
+        return jsonError(400, "VALIDATION_ERROR", "مفتاح ميزة غير معروف");
+      }
+      if (typeof version !== "number" || !Number.isInteger(version) || version < 1) {
+        return jsonError(400, "VALIDATION_ERROR", "رقم إصدار غير صحيح");
+      }
+      // .update() (لا .set(..., {merge:true})) عمدًا — الأخير يعامل مفتاح بنقطة كنص حرفي لاسم
+      // حقل ("seen_features.x" كحقل جذر مستقل)، مو كمسار متداخل. .update() هو الصحيح لتحديث
+      // مفتاح وحد داخل Map موجودة بدون استبدال بقيتها (اكتُشف حيًا: راجع تقرير التحقق).
+      await userRef.update({ [`seen_features.${featureKey}`]: version });
       return jsonOk({ ok: true });
     }
 

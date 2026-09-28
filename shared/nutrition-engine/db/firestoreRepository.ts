@@ -539,6 +539,11 @@ export interface UserDisplayFields {
   /** اسم الثيم المختار — "light"/"dark" مجانيين، البقية Premium (يُتحقَّق بالـbackend عبر
    * settings.mts's action=theme، صفر ثقة بالواجهة فقط). */
   theme: string;
+  /** نظام Feature Discovery (مودالات تعريف الميزات + نقاط التنبيه) — key هو أحد المفاتيح الثابتة
+   * بـfrontend/src/lib/featureIntros.ts (مثلاً "feature_intro_daily_food")، القيمة رقم الإصدار
+   * الذي شاهده المستخدم. "غير مُشاهَد" = القيمة المخزَّنة أقل من `version` الحالي بالتعريف —
+   * هذا ما يسمح لاحقًا بإعادة إظهار ميزة فرعية جديدة داخل قسم موجود بدون إزعاج كل شي قديم. */
+  seen_features: Record<string, number>;
 }
 
 export async function getUserDisplayFields(db: Firestore, userId: string): Promise<UserDisplayFields | null> {
@@ -553,6 +558,7 @@ export async function getUserDisplayFields(db: Firestore, userId: string): Promi
     language: d.language === "en" ? "en" : "ar",
     notification_prompt_shown: d.notification_prompt_shown === true,
     theme: typeof d.theme === "string" ? d.theme : "dark",
+    seen_features: (d.seen_features && typeof d.seen_features === "object") ? d.seen_features : {},
   };
 }
 
