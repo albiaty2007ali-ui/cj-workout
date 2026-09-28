@@ -104,6 +104,9 @@ export default async (_req: Request, _context: Context): Promise<Response> => {
           await sendNotification(
             db, userId, "WATER", `${today}_${hour}`, "/chat",
             "💧 خذ رشفة ماي", "ما وصلت نص هدفك اليومي من الماي بعد — كوب وحد هسه يفيدك.",
+            // زر إجراء مباشر على الإشعار — يسجّل كوب ماي (240 مل) فورًا بدون فتح الموقع، عبر
+            // notificationclick بـsw.js يستدعي /api/water/quick-log. الويب فقط (راجع push.ts).
+            [{ action: "log_water", title: "✅ شربت كوب" }],
           );
           waterSent++;
         }

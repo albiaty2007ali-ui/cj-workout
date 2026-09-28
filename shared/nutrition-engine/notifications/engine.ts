@@ -77,6 +77,7 @@ export function canSendNow(settings: NotificationSettings, category: string, now
  */
 export async function sendNotification(
   db: Firestore, userId: string, category: string, dedupKey: string, url: string, title: string, body: string,
+  actions?: { action: string; title: string }[],
 ): Promise<void> {
   try {
     const settings = await getSettings(db, userId);
@@ -99,7 +100,7 @@ export async function sendNotification(
         continue;
       }
       const subscription: PushSubscriptionJson = { endpoint: data.endpoint, keys: data.keys };
-      const ok = await sendPush(subscription, { title, body, url });
+      const ok = await sendPush(subscription, { title, body, url, actions });
       if (!ok) {
         // ما نقدر نميّز سبب الفشل هنا (sendPush يبتلع التفاصيل) — حذف الاشتراكات المنتهية فعليًا
         // يصير بمسار push-subscribe.mts نفسه عند إعادة الاشتراك، تبسيط مقصود لتفادي تعقيد إضافي.

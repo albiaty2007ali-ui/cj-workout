@@ -14,6 +14,7 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       data: { url: payload.url || "/chat" },
+      actions: payload.actions || [],
     })
   );
 });
@@ -21,6 +22,15 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || "/chat";
+
+  // زر "✅ شربت كوب" على إشعار الماي — يسجّل مباشرة عبر fetch بالخلفية، بدون فتح نافذة
+  // (نفس جلسة تسجيل الدخول تُرفَق تلقائيًا لأن الطلب من نفس origin، كوكي الجلسة يوصل عادي).
+  if (event.action === "log_water") {
+    event.waitUntil(
+      fetch("/api/water/quick-log", { method: "POST", credentials: "include" }).catch(() => {})
+    );
+    return;
+  }
 
   event.waitUntil(
     (async () => {

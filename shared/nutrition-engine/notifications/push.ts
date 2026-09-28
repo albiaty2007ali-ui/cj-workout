@@ -20,6 +20,10 @@ export interface PushPayload {
   title: string;
   body: string;
   url: string;
+  /** أزرار إجراء على الإشعار نفسه (Notification Actions) — اختياري، ويب فقط (لا تنطبق على
+   *  مسار sendFcmPush/أندرويد، يحتاج آلية مختلفة). frontend/public/sw.js يقرأها ويفحص
+   *  event.action بـnotificationclick. */
+  actions?: { action: string; title: string }[];
 }
 
 let configured = false;
