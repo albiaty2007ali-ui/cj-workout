@@ -121,10 +121,12 @@ export interface Repository {
   // ---- XP Ledger ----
   findXpTransactionBySource(userId: string, source: string): Promise<boolean>;
   insertXpTransaction(tx: XpTransactionInput): Promise<void>;
-  // مرتبة تصاعديًا بالتاريخ — لأغراض عرض فقط (مثلاً Progress Replay)، صفر استخدام بمنطق منح XP.
+  // مرتبة تصاعديًا بالتاريخ — لأغراض عرض فقط (مثلاً Progress Replay، حذف وجبة)، صفر استخدام
+  // بمنطق منح XP. Firestore's تنفيذ يرتّب بالكود لا بالاستعلام (راجع firestoreRepository.ts).
   listXpTransactionsByReason(userId: string, reason: string): Promise<{ amount: number; source: string | null; created_at: Date }[]>;
   /** عدّاد بسيط بلا ترتيب (حزمة تطوير الإحالة) — يتفادى عمدًا orderBy فوگ فلترين تساوٍ لأن ذاك
-   *  يحتاج فهرس مركّب بـFirestore (اكتُشف حيًا: listXpTransactionsByReason فشلت فعليًا بدونه). */
+   *  يحتاج فهرس مركّب بـFirestore (اكتُشف حيًا: listXpTransactionsByReason فشلت فعليًا بدونه
+   *  قبل ما نحوّلها هي نفسها لترتيب بالكود). */
   countXpTransactionsByReason(userId: string, reason: string): Promise<number>;
 
   // ---- Active Days / Streaks ----

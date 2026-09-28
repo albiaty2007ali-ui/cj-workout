@@ -151,18 +151,24 @@ export class FirestoreRepository implements Repository {
   }
 
   async listXpTransactionsByReason(userId: string, reason: string): Promise<{ amount: number; source: string | null; created_at: Date }[]> {
+    // بلا orderBy بالاستعلام عمدًا (نفس درس countXpTransactionsByReason تحت) — فهرس مركّب
+    // ناقص فعليًا بهذا المشروع كان يخلي هذا الاستدعاء يفشل بصمت لحالة الإحالة (مصلَّح سابقًا
+    // بالتحويل لـcountXpTransactionsByReason هناك)، لكن استدعاءات ثانية حقيقية (حذف وجبة
+    // بـorchestrator.ts، Progress Replay) لسا تستخدم هذي الدالة نفسها وتحتاج الترتيب فعلًا —
+    // الحل هنا: نجيب بلا orderBy (فلترتا تساوٍ فقط، صفر فهرس مطلوب) ونرتّب بالكود بدل Firestore.
     const snap = await this.db.collection("xp_transactions")
-      .where("user_id", "==", userId).where("reason", "==", reason)
-      .orderBy("created_at", "asc").get();
-    return snap.docs.map((d) => {
-      const data = d.data();
-      return { amount: data.amount, source: data.source ?? null, created_at: toDate(data.created_at) };
-    });
+      .where("user_id", "==", userId).where("reason", "==", reason).get();
+    return snap.docs
+      .map((d) => {
+        const data = d.data();
+        return { amount: data.amount, source: data.source ?? null, created_at: toDate(data.created_at) };
+      })
+      .sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
   }
 
   async countXpTransactionsByReason(userId: string, reason: string): Promise<number> {
-    // بلا orderBy عمدًا — فلترتا تساوٍ فقط، Firestore يخدمها بدون فهرس مركّب (بعكس
-    // listXpTransactionsByReason أعلاه اللي تحتاج فهرسًا لوجود orderBy فوگ فلترين).
+    // بلا orderBy — فلترتا تساوٍ فقط، Firestore يخدمها بدون فهرس مركّب (listXpTransactionsByReason
+    // أعلاه صار يرتّب بالكود لنفس السبب، بدل orderBy بالاستعلام).
     const snap = await this.db.collection("xp_transactions")
       .where("user_id", "==", userId).where("reason", "==", reason).count().get();
     return snap.data().count;
